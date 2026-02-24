@@ -3,6 +3,7 @@ import { IPC_CHANNELS, MasteryState } from '@shared/types'
 import type { WordBankEntry, WordBankFilters, FsrsState } from '@shared/types'
 import type { Prisma } from '@prisma/client'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
 import { createLogger } from '../logger'
 
@@ -14,8 +15,9 @@ export function registerWordbankHandlers(): void {
     async (_event, filters?: WordBankFilters): Promise<WordBankEntry[]> => {
       log.info('wordbank:list started', { filters: filters ?? {} })
       const db = getDb()
+      const userId = getCurrentUserId()
 
-      const where: Record<string, unknown> = {}
+      const where: Record<string, unknown> = { userId }
       if (filters?.masteryState) {
         where.masteryState = filters.masteryState
       }
@@ -53,10 +55,12 @@ export function registerWordbankHandlers(): void {
     ): Promise<WordBankEntry> => {
       log.info('wordbank:add started', { surfaceForm: data.surfaceForm })
       const db = getDb()
+      const userId = getCurrentUserId()
       const initialFsrs = createInitialFsrsState()
 
       const item = await db.lexicalItem.create({
         data: {
+          userId,
           surfaceForm: data.surfaceForm,
           reading: data.reading,
           meaning: data.meaning,
@@ -99,8 +103,10 @@ export function registerWordbankHandlers(): void {
     async (_event, query: string): Promise<WordBankEntry[]> => {
       log.info('wordbank:search started', { query })
       const db = getDb()
+      const userId = getCurrentUserId()
       const items = await db.lexicalItem.findMany({
         where: {
+          userId,
           OR: [
             { surfaceForm: { contains: query, mode: 'insensitive' } },
             { reading: { contains: query, mode: 'insensitive' } },

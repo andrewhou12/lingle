@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { ContextLogEntry, ContextType, LearningModality } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:context-log')
@@ -20,10 +21,11 @@ export function registerContextLogHandlers(): void {
     ): Promise<{ entries: ContextLogEntry[]; total: number }> => {
       log.info('contextLog:list started', { itemId: params.itemId, itemType: params.itemType })
       const db = getDb()
+      const userId = getCurrentUserId()
       const where =
         params.itemType === 'lexical'
-          ? { lexicalItemId: params.itemId }
-          : { grammarItemId: params.itemId }
+          ? { userId, lexicalItemId: params.itemId }
+          : { userId, grammarItemId: params.itemId }
 
       const [entries, total] = await Promise.all([
         db.itemContextLog.findMany({
@@ -76,9 +78,11 @@ export function registerContextLogHandlers(): void {
         modality: params.modality,
       })
       const db = getDb()
+      const userId = getCurrentUserId()
 
       const entry = await db.itemContextLog.create({
         data: {
+          userId,
           contextType: params.contextType,
           modality: params.modality,
           wasProduction: params.wasProduction,
@@ -92,7 +96,6 @@ export function registerContextLogHandlers(): void {
 
       log.info('contextLog:add completed', { entryId: entry.id })
 
-      // Update item's contextTypes and contextCount
       if (params.itemType === 'lexical') {
         const item = await db.lexicalItem.findUniqueOrThrow({
           where: { id: params.itemId },
@@ -111,7 +114,7 @@ export function registerContextLogHandlers(): void {
           where: { id: params.itemId },
         })
         if (!item.contextTypes.includes(params.contextType)) {
-          const isNovel = item.contextTypes.length > 0 // first context is not novel, subsequent ones are
+          const isNovel = item.contextTypes.length > 0
           await db.grammarItem.update({
             where: { id: params.itemId },
             data: {

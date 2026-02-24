@@ -15,6 +15,7 @@ import { registerDashboardHandlers } from './ipc/dashboard'
 import { registerNarrativeHandlers } from './ipc/narrative'
 import { registerChatHandlers } from './ipc/chat'
 import { registerAuthHandlers } from './ipc/auth'
+import { registerOnboardingHandlers } from './ipc/onboarding'
 import { createLogger } from './logger'
 
 const log = createLogger('app')
@@ -73,6 +74,7 @@ app.whenReady().then(() => {
   registerNarrativeHandlers()
   registerChatHandlers()
   registerAuthHandlers()
+  registerOnboardingHandlers()
 
   log.info('All IPC handlers registered')
 

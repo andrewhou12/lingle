@@ -1,12 +1,14 @@
 import type { ItemType, ExpandedLearnerProfile } from '@shared/types'
 import type { BubbleItemInput } from '@core/curriculum/bubble'
 import { getDb } from '../../db'
+import { getCurrentUserId } from '../../auth-state'
 
 export async function gatherBubbleItems(): Promise<BubbleItemInput[]> {
   const db = getDb()
+  const userId = getCurrentUserId()
 
-  const lexicalItems = await db.lexicalItem.findMany()
-  const grammarItems = await db.grammarItem.findMany()
+  const lexicalItems = await db.lexicalItem.findMany({ where: { userId } })
+  const grammarItems = await db.grammarItem.findMany({ where: { userId } })
 
   return [
     ...lexicalItems.map((item) => ({

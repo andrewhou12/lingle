@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { PragmaticState } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:pragmatics')
@@ -12,11 +13,11 @@ export function registerPragmaticHandlers(): void {
     async (): Promise<PragmaticState> => {
       log.info('pragmatics:getState started')
       const db = getDb()
+      const userId = getCurrentUserId()
 
-      // Upsert: create default if not exists
       const profile = await db.pragmaticProfile.upsert({
-        where: { id: 1 },
-        create: { id: 1 },
+        where: { userId },
+        create: { userId },
         update: {},
       })
 
@@ -49,11 +50,12 @@ export function registerPragmaticHandlers(): void {
         politeAccuracy: state.politeAccuracy,
       })
       const db = getDb()
+      const userId = getCurrentUserId()
 
       const updated = await db.pragmaticProfile.upsert({
-        where: { id: 1 },
+        where: { userId },
         create: {
-          id: 1,
+          userId,
           casualAccuracy: state.casualAccuracy,
           politeAccuracy: state.politeAccuracy,
           registerSlipCount: state.registerSlipCount,

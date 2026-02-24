@@ -4,6 +4,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { randomBytes, createHash } from 'crypto'
 import { IPC_CHANNELS } from '@shared/types'
 import type { AuthUser } from '@shared/types'
+import { getDb } from '../db'
+import { setCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('auth')
@@ -50,13 +52,41 @@ function clearSession(): void {
   }
 }
 
-function extractUser(raw: Record<string, unknown>): AuthUser {
+function extractUser(raw: Record<string, unknown>): Omit<AuthUser, 'onboardingCompleted'> {
   const meta = (raw.user_metadata ?? {}) as Record<string, unknown>
   return {
     id: raw.id as string,
     email: (raw.email as string) ?? null,
     name: (meta.full_name as string) ?? (meta.name as string) ?? null,
     avatarUrl: (meta.avatar_url as string) ?? null,
+  }
+}
+
+async function ensureDbUser(authUser: Omit<AuthUser, 'onboardingCompleted'>): Promise<AuthUser> {
+  const db = getDb()
+  const dbUser = await db.user.upsert({
+    where: { id: authUser.id },
+    create: {
+      id: authUser.id,
+      email: authUser.email,
+      name: authUser.name,
+      avatarUrl: authUser.avatarUrl,
+    },
+    update: {
+      email: authUser.email,
+      name: authUser.name,
+      avatarUrl: authUser.avatarUrl,
+    },
+  })
+
+  setCurrentUserId(dbUser.id)
+
+  return {
+    id: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.name,
+    avatarUrl: dbUser.avatarUrl,
+    onboardingCompleted: dbUser.onboardingCompleted,
   }
 }
 
@@ -91,11 +121,12 @@ async function exchangeCode(
   }
 
   const data = (await res.json()) as Record<string, unknown>
+  const rawUser = extractUser(data.user as Record<string, unknown>)
   return {
     access_token: data.access_token as string,
     refresh_token: data.refresh_token as string,
     expires_at: data.expires_at as number,
-    user: extractUser(data.user as Record<string, unknown>),
+    user: { ...rawUser, onboardingCompleted: false },
   }
 }
 
@@ -115,11 +146,12 @@ async function refreshTokens(refreshToken: string): Promise<StoredSession | null
     if (!res.ok) return null
 
     const data = (await res.json()) as Record<string, unknown>
+    const rawUser = extractUser(data.user as Record<string, unknown>)
     return {
       access_token: data.access_token as string,
       refresh_token: data.refresh_token as string,
       expires_at: data.expires_at as number,
-      user: extractUser(data.user as Record<string, unknown>),
+      user: { ...rawUser, onboardingCompleted: false },
     }
   } catch {
     return null
@@ -192,14 +224,20 @@ export function registerAuthHandlers(): void {
       log.info('Session expired, attempting refresh')
       const refreshed = await refreshTokens(session.refresh_token)
       if (refreshed) {
+        const user = await ensureDbUser(refreshed.user)
+        refreshed.user = user
         saveSession(refreshed)
-        return { user: refreshed.user }
+        return { user }
       }
       clearSession()
+      setCurrentUserId(null)
       return null
     }
 
-    return { user: session.user }
+    const user = await ensureDbUser(session.user)
+    session.user = user
+    saveSession(session)
+    return { user }
   })
 
   ipcMain.handle(IPC_CHANNELS.AUTH_SIGN_IN_GOOGLE, async () => {
@@ -219,10 +257,12 @@ export function registerAuthHandlers(): void {
 
     const code = await openOAuthPopup(oauthUrl)
     const session = await exchangeCode(code, codeVerifier)
+    const user = await ensureDbUser(session.user)
+    session.user = user
     saveSession(session)
 
-    log.info('Google sign-in successful', { userId: session.user.id })
-    return { user: session.user }
+    log.info('Google sign-in successful', { userId: user.id })
+    return { user }
   })
 
   ipcMain.handle(IPC_CHANNELS.AUTH_SIGN_OUT, async () => {
@@ -241,6 +281,7 @@ export function registerAuthHandlers(): void {
       }
     }
     clearSession()
+    setCurrentUserId(null)
     log.info('Signed out')
   })
 }

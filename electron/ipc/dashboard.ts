@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { FrontierData, FrontierItem, WeeklyStats } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { computeKnowledgeBubble } from '@core/curriculum/bubble'
 import { gatherBubbleItems, toExpandedProfile } from './_helpers/gather-items'
 import { createLogger } from '../logger'
@@ -14,8 +15,9 @@ export function registerDashboardHandlers(): void {
     async (): Promise<FrontierData | null> => {
       log.info('dashboard:getFrontier started')
       const db = getDb()
+      const userId = getCurrentUserId()
 
-      const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+      const profile = await db.learnerProfile.findUnique({ where: { userId } })
       if (!profile) {
         log.warn('dashboard:getFrontier - no profile found')
         return null
@@ -59,14 +61,14 @@ export function registerDashboardHandlers(): void {
     async (): Promise<WeeklyStats> => {
       log.info('dashboard:getWeeklyStats started')
       const db = getDb()
+      const userId = getCurrentUserId()
 
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
       weekAgo.setHours(0, 0, 0, 0)
 
-      // Reviews this week
       const weeklyReviews = await db.reviewEvent.findMany({
-        where: { timestamp: { gte: weekAgo } },
+        where: { userId, timestamp: { gte: weekAgo } },
       })
 
       const correctCount = weeklyReviews.filter(
@@ -75,21 +77,19 @@ export function registerDashboardHandlers(): void {
       const accuracyThisWeek =
         weeklyReviews.length > 0 ? correctCount / weeklyReviews.length : 0
 
-      // Conversation sessions this week
       const weeklySessions = await db.conversationSession.count({
-        where: { timestamp: { gte: weekAgo } },
+        where: { userId, timestamp: { gte: weekAgo } },
       })
 
-      // Items that advanced past "introduced" this week (proxy: lastReviewed in the week + not unseen/introduced)
       const itemsLearned = await db.lexicalItem.count({
         where: {
+          userId,
           lastReviewed: { gte: weekAgo },
           masteryState: { notIn: ['unseen', 'introduced'] },
         },
       })
 
-      // Streak from profile
-      const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+      const profile = await db.learnerProfile.findUnique({ where: { userId } })
 
       const stats: WeeklyStats = {
         reviewsThisWeek: weeklyReviews.length,

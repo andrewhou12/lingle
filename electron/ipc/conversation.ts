@@ -12,6 +12,7 @@ import type {
 import type { Prisma } from '@prisma/client'
 import { MasteryState } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:conversation')
@@ -35,7 +36,6 @@ import { recalculateProfile, type ProfileItemInput } from '@core/profile/calcula
 
 const anthropic = new Anthropic()
 
-// Track active conversation sessions
 const activeSessions = new Map<
   string,
   {
@@ -48,10 +48,12 @@ const activeSessions = new Map<
 async function buildLearnerSummary(): Promise<LearnerSummary> {
   log.debug('Building learner summary')
   const db = getDb()
-  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { id: 1 } })
+  const userId = getCurrentUserId()
+  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { userId } })
 
   const activeItems = await db.lexicalItem.findMany({
     where: {
+      userId,
       masteryState: {
         in: [
           MasteryState.Apprentice1,
@@ -65,15 +67,14 @@ async function buildLearnerSummary(): Promise<LearnerSummary> {
   })
 
   const stableCount = await db.lexicalItem.count({
-    where: { masteryState: { in: [MasteryState.Expert, MasteryState.Master] } },
+    where: { userId, masteryState: { in: [MasteryState.Expert, MasteryState.Master] } },
   })
   const burnedCount = await db.lexicalItem.count({
-    where: { masteryState: MasteryState.Burned },
+    where: { userId, masteryState: MasteryState.Burned },
   })
 
-  // Get pragmatic state
   let pragmaticState: PragmaticState | null = null
-  const pragProfile = await db.pragmaticProfile.findUnique({ where: { id: 1 } })
+  const pragProfile = await db.pragmaticProfile.findUnique({ where: { userId } })
   if (pragProfile) {
     pragmaticState = {
       casualAccuracy: pragProfile.casualAccuracy,
@@ -90,9 +91,8 @@ async function buildLearnerSummary(): Promise<LearnerSummary> {
     }
   }
 
-  // Get curriculum recommendations
-  const allLexical = await db.lexicalItem.findMany()
-  const allGrammar = await db.grammarItem.findMany()
+  const allLexical = await db.lexicalItem.findMany({ where: { userId } })
+  const allGrammar = await db.grammarItem.findMany({ where: { userId } })
   const bubbleItems: BubbleItemInput[] = [
     ...allLexical.map((i) => ({
       id: i.id,
@@ -124,7 +124,6 @@ async function buildLearnerSummary(): Promise<LearnerSummary> {
     tomBriefInput: null,
   })
 
-  // Modality gap detection
   const modalityGapDescription =
     bubble.levelBreakdowns.length > 0
       ? `Production ceiling: ${profile.productionCeiling}, Comprehension ceiling: ${profile.comprehensionCeiling}`
@@ -172,30 +171,32 @@ async function buildLearnerSummary(): Promise<LearnerSummary> {
 
 async function buildExpandedTomBrief(): Promise<ReturnType<typeof generateExpandedDailyBrief>> {
   const db = getDb()
+  const userId = getCurrentUserId()
 
   const lexicalItems = await db.lexicalItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
     include: { reviewEvents: { orderBy: { timestamp: 'desc' }, take: 10 } },
   })
   const grammarItems = await db.grammarItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
     include: { reviewEvents: { orderBy: { timestamp: 'desc' }, take: 10 } },
   })
 
   const conversationSessions = await db.conversationSession.findMany({
+    where: { userId },
     orderBy: { timestamp: 'desc' },
     take: 50,
   })
   const totalSessionCount = conversationSessions.length
 
   const recentErrors = await db.reviewEvent.findMany({
-    where: { grade: { in: ['again', 'hard'] } },
+    where: { userId, grade: { in: ['again', 'hard'] } },
     orderBy: { timestamp: 'desc' },
     take: 100,
   })
 
   let pragmaticState: PragmaticState | null = null
-  const pragProfile = await db.pragmaticProfile.findUnique({ where: { id: 1 } })
+  const pragProfile = await db.pragmaticProfile.findUnique({ where: { userId } })
   if (pragProfile) {
     pragmaticState = {
       casualAccuracy: pragProfile.casualAccuracy,
@@ -281,6 +282,7 @@ export function registerConversationHandlers(): void {
     async (): Promise<ExpandedSessionPlan> => {
       log.info('conversation:plan started')
       const elapsed = log.timer()
+      const userId = getCurrentUserId()
 
       try {
         const learner = await buildLearnerSummary()
@@ -304,9 +306,9 @@ export function registerConversationHandlers(): void {
         const plan = parseSessionPlan(textContent.text)
         const db = getDb()
 
-        // Create conversation session
         const session = await db.conversationSession.create({
           data: {
+            userId,
             transcript: [],
             targetsPlanned: {
               vocabulary: plan.targetVocabulary,
@@ -327,9 +329,8 @@ export function registerConversationHandlers(): void {
           messages: [],
         })
 
-        // Increment total sessions
         await db.learnerProfile.update({
-          where: { id: 1 },
+          where: { userId },
           data: { totalSessions: { increment: 1 } },
         })
 
@@ -364,7 +365,6 @@ export function registerConversationHandlers(): void {
           throw new Error(`No active session: ${sessionId}`)
         }
 
-        // Add user message
         const userMsg: ConversationMessage = {
           role: 'user',
           content: message,
@@ -372,7 +372,6 @@ export function registerConversationHandlers(): void {
         }
         session.messages.push(userMsg)
 
-        // Build API messages (keep last 30 turns)
         const recentMessages = session.messages.slice(-30)
         const apiMessages = recentMessages.map((m) => ({
           role: m.role as 'user' | 'assistant',
@@ -398,7 +397,6 @@ export function registerConversationHandlers(): void {
         }
         session.messages.push(assistantMsg)
 
-        // Update transcript in DB
         const db = getDb()
         await db.conversationSession.update({
           where: { id: sessionId },
@@ -422,9 +420,9 @@ export function registerConversationHandlers(): void {
 
       try {
         const db = getDb()
+        const userId = getCurrentUserId()
         const session = activeSessions.get(sessionId)
 
-        // Update session duration
         const dbSession = await db.conversationSession.findUnique({
           where: { id: sessionId },
         })
@@ -448,7 +446,6 @@ export function registerConversationHandlers(): void {
 
         let result: PostSessionAnalysis | null = null
 
-        // Run post-session analysis
         const analysisPrompt = buildAnalysisPrompt(session.messages, session.plan)
         const analysisTimer = log.timer()
         const analysisResponse = await anthropic.messages.create({
@@ -477,7 +474,6 @@ export function registerConversationHandlers(): void {
           overallAssessment: analysis.overallAssessment,
         }
 
-        // Update conversation session with analysis results
         await db.conversationSession.update({
           where: { id: sessionId },
           data: {
@@ -487,41 +483,40 @@ export function registerConversationHandlers(): void {
           },
         })
 
-        // Create ItemContextLog entries for each context log
-        for (const log of analysis.contextLogs) {
+        for (const ctxLog of analysis.contextLogs) {
           await db.itemContextLog.create({
             data: {
+              userId,
               contextType: 'conversation',
-              modality: log.modality,
-              wasProduction: log.wasProduction,
-              wasSuccessful: log.wasSuccessful,
+              modality: ctxLog.modality,
+              wasProduction: ctxLog.wasProduction,
+              wasSuccessful: ctxLog.wasSuccessful,
               sessionId,
-              lexicalItemId: log.itemType === 'lexical' ? log.itemId : null,
-              grammarItemId: log.itemType === 'grammar' ? log.itemId : null,
+              lexicalItemId: ctxLog.itemType === 'lexical' ? ctxLog.itemId : null,
+              grammarItemId: ctxLog.itemType === 'grammar' ? ctxLog.itemId : null,
             },
           })
 
-          // Update item modality counters and context types
-          if (log.itemType === 'lexical') {
-            const item = await db.lexicalItem.findUnique({ where: { id: log.itemId } })
+          if (ctxLog.itemType === 'lexical') {
+            const item = await db.lexicalItem.findUnique({ where: { id: ctxLog.itemId } })
             if (item) {
               const updatedContextTypes = item.contextTypes.includes('conversation')
                 ? item.contextTypes
                 : [...item.contextTypes, 'conversation']
 
               const modalityUpdates: Record<string, { increment: number }> = {}
-              if (log.modality === 'reading') modalityUpdates.readingExposures = { increment: 1 }
-              if (log.modality === 'writing') modalityUpdates.writingProductions = { increment: 1 }
-              if (log.modality === 'speaking') modalityUpdates.speakingProductions = { increment: 1 }
-              if (log.modality === 'listening') modalityUpdates.listeningExposures = { increment: 1 }
+              if (ctxLog.modality === 'reading') modalityUpdates.readingExposures = { increment: 1 }
+              if (ctxLog.modality === 'writing') modalityUpdates.writingProductions = { increment: 1 }
+              if (ctxLog.modality === 'speaking') modalityUpdates.speakingProductions = { increment: 1 }
+              if (ctxLog.modality === 'listening') modalityUpdates.listeningExposures = { increment: 1 }
 
               await db.lexicalItem.update({
-                where: { id: log.itemId },
+                where: { id: ctxLog.itemId },
                 data: {
                   contextTypes: updatedContextTypes,
                   contextCount: updatedContextTypes.length,
                   ...modalityUpdates,
-                  ...(log.wasProduction
+                  ...(ctxLog.wasProduction
                     ? {
                         productionCount: { increment: 1 },
                         productionWeight: { increment: 1.0 },
@@ -531,7 +526,7 @@ export function registerConversationHandlers(): void {
               })
             }
           } else {
-            const item = await db.grammarItem.findUnique({ where: { id: log.itemId } })
+            const item = await db.grammarItem.findUnique({ where: { id: ctxLog.itemId } })
             if (item) {
               const updatedContextTypes = item.contextTypes.includes('conversation')
                 ? item.contextTypes
@@ -539,19 +534,19 @@ export function registerConversationHandlers(): void {
               const isNovel = !item.contextTypes.includes('conversation') && item.contextTypes.length > 0
 
               const modalityUpdates: Record<string, { increment: number }> = {}
-              if (log.modality === 'reading') modalityUpdates.readingExposures = { increment: 1 }
-              if (log.modality === 'writing') modalityUpdates.writingProductions = { increment: 1 }
-              if (log.modality === 'speaking') modalityUpdates.speakingProductions = { increment: 1 }
-              if (log.modality === 'listening') modalityUpdates.listeningExposures = { increment: 1 }
+              if (ctxLog.modality === 'reading') modalityUpdates.readingExposures = { increment: 1 }
+              if (ctxLog.modality === 'writing') modalityUpdates.writingProductions = { increment: 1 }
+              if (ctxLog.modality === 'speaking') modalityUpdates.speakingProductions = { increment: 1 }
+              if (ctxLog.modality === 'listening') modalityUpdates.listeningExposures = { increment: 1 }
 
               await db.grammarItem.update({
-                where: { id: log.itemId },
+                where: { id: ctxLog.itemId },
                 data: {
                   contextTypes: updatedContextTypes,
                   contextCount: updatedContextTypes.length,
                   ...modalityUpdates,
                   ...(isNovel ? { novelContextCount: { increment: 1 } } : {}),
-                  ...(log.wasProduction
+                  ...(ctxLog.wasProduction
                     ? { productionWeight: { increment: 1.0 } }
                     : {}),
                 },
@@ -560,15 +555,15 @@ export function registerConversationHandlers(): void {
           }
         }
 
-        // Add newly encountered items to lexical_items as "introduced"
         for (const newItem of analysis.newItemsEncountered) {
           const existing = await db.lexicalItem.findFirst({
-            where: { surfaceForm: newItem.surfaceForm },
+            where: { userId, surfaceForm: newItem.surfaceForm },
           })
           if (!existing) {
             const initialFsrs = createInitialFsrsState()
             await db.lexicalItem.create({
               data: {
+                userId,
                 surfaceForm: newItem.surfaceForm,
                 meaning: '',
                 masteryState: 'introduced',
@@ -583,8 +578,7 @@ export function registerConversationHandlers(): void {
           }
         }
 
-        // Run pragmatic analysis
-        const profile = await db.learnerProfile.findUniqueOrThrow({ where: { id: 1 } })
+        const profile = await db.learnerProfile.findUniqueOrThrow({ where: { userId } })
         const pragmaticPrompt = buildPragmaticAnalysisPrompt({
           transcript: session.messages,
           targetRegister: session.plan.pragmaticTargets.targetRegister,
@@ -604,8 +598,7 @@ export function registerConversationHandlers(): void {
         if (pragmaticText?.type === 'text') {
           const pragResult = parsePragmaticAnalysis(pragmaticText.text)
 
-          // Update pragmatic profile
-          const currentPrag = await db.pragmaticProfile.findUnique({ where: { id: 1 } })
+          const currentPrag = await db.pragmaticProfile.findUnique({ where: { userId } })
           const currentState: PragmaticState = currentPrag
             ? {
                 casualAccuracy: currentPrag.casualAccuracy,
@@ -637,16 +630,15 @@ export function registerConversationHandlers(): void {
           const updatedState = updatePragmaticState(currentState, pragResult)
 
           await db.pragmaticProfile.upsert({
-            where: { id: 1 },
+            where: { userId },
             create: {
-              id: 1,
+              userId,
               ...updatedState,
             },
             update: updatedState,
           })
         }
 
-        // Trigger profile recalculation
         log.info('Triggering profile recalculation after conversation end')
         await triggerProfileRecalculation()
       }
@@ -668,7 +660,9 @@ export function registerConversationHandlers(): void {
     > => {
       log.info('conversation:list started')
       const db = getDb()
+      const userId = getCurrentUserId()
       const sessions = await db.conversationSession.findMany({
+        where: { userId },
         orderBy: { timestamp: 'desc' },
         take: 20,
       })
@@ -687,12 +681,13 @@ export function registerConversationHandlers(): void {
 async function triggerProfileRecalculation(): Promise<void> {
   log.debug('Profile recalculation triggered')
   const db = getDb()
+  const userId = getCurrentUserId()
 
   const lexicalItems = await db.lexicalItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
   })
   const grammarItems = await db.grammarItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
   })
 
   const items: ProfileItemInput[] = [
@@ -722,8 +717,8 @@ async function triggerProfileRecalculation(): Promise<void> {
     })),
   ]
 
-  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { id: 1 } })
-  const totalReviewEvents = await db.reviewEvent.count()
+  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { userId } })
+  const totalReviewEvents = await db.reviewEvent.count({ where: { userId } })
 
   const update = recalculateProfile({
     items,
@@ -735,7 +730,7 @@ async function triggerProfileRecalculation(): Promise<void> {
   })
 
   await db.learnerProfile.update({
-    where: { id: 1 },
+    where: { userId },
     data: {
       ...update,
       totalReviewEvents,
