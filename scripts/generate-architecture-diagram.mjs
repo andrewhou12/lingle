@@ -267,27 +267,30 @@ elements.push(sectionLabel({ x: Z1_X, y: Z1_Y, content: "Zone 1: Process Boundar
 const rendererY = Z1_Y + 50;
 {
   const { elements: els } = titledBox({
-    x: Z1_X, y: rendererY, w: Z1_W, h: 200,
+    x: Z1_X, y: rendererY, w: Z1_W, h: 260,
     title: "RENDERER PROCESS  (src/)",
     titleBg: COLORS.blue, titleBorder: COLORS.blueBorder,
     bodyBg: "#f8f9fa", bodyBorder: COLORS.blueBorder,
     bodyLines: [
       "React 19  +  Radix UI  +  Tailwind CSS  +  Vite",
       "",
-      "Pages:   Dashboard │ Review │ Learn │ Knowledge │ Chat │ Settings │ SignIn",
+      "Pages:   Dashboard │ Review │ Learn │ Knowledge │ Chat │ Settings │ SignIn │ Onboarding",
       "",
       "Hooks:   useReview │ useConversation │ useFrontier │ useWordbank",
       "",
       "State:   AuthProvider (Context) — only global state",
+      "         Provides: user, needsOnboarding, completeOnboarding()",
       "         Everything else is local useState + useCallback per page",
-      "         NO Redux / Zustand / Recoil",
+      "",
+      "Routing: Auth gate → Onboarding gate → App Shell",
+      "         !user → SignInPage │ !onboarded → OnboardingPage │ else → main app",
     ],
   });
   elements.push(...els);
 }
 
 // --- IPC Bridge Arrow ---
-const bridgeY = rendererY + 200 + 15;
+const bridgeY = rendererY + 260 + 15;
 elements.push(...arrow({ startX: Z1_X + Z1_W / 2, startY: bridgeY, endX: Z1_X + Z1_W / 2, endY: bridgeY + 50, color: COLORS.redBorder, strokeW: 3, label: "window.linguist.xxx()  →  ipcRenderer.invoke()" }));
 elements.push(...arrow({ startX: Z1_X + Z1_W / 2 + 30, startY: bridgeY + 50, endX: Z1_X + Z1_W / 2 + 30, endY: bridgeY, color: "#868e96", strokeW: 2, dashed: true, label: "Promise<T> response" }));
 
@@ -322,13 +325,15 @@ const mainY = mainArrowY + 60;
     titleBg: COLORS.gray, titleBorder: COLORS.grayBorder,
     bodyBg: "#f8f9fa", bodyBorder: COLORS.grayBorder,
     bodyLines: [
-      "electron/main.ts         App entry, window management, registers all 13 handler groups",
+      "electron/main.ts         App entry, window management, registers all 14 handler groups",
       "electron/db.ts           PrismaClient singleton (getDb() / disconnectDb())",
+      "electron/auth-state.ts   In-memory userId singleton (set on login, cleared on logout)",
       "electron/logger.ts       Logging utility",
-      "electron/ipc/            13 domain handler files (see Zone 2)",
+      "electron/ipc/            14 domain handler files (see Zone 2)",
       "",
       "In-memory:  activeSessions Map  (holds live conversation state per session)",
-      "Pattern:    Handler calls core/ functions → writes results to DB via Prisma",
+      "            currentUserId (auth-state) — every IPC handler scopes DB queries by userId",
+      "Pattern:    Handler calls getCurrentUserId() → core/ functions → writes to DB via Prisma",
     ],
   });
   elements.push(...els);
@@ -343,7 +348,7 @@ const Z2_X = 420;  // offset right to clear Zone 6 left sidebar
 const Z2_Y = mainY + 160 + ZONE_GAP;
 const Z2_W = 720;
 
-elements.push(sectionLabel({ x: Z2_X, y: Z2_Y, content: "Zone 2: IPC Handlers  (electron/ipc/)" }));
+elements.push(sectionLabel({ x: Z2_X, y: Z2_Y, content: "Zone 2: IPC Handlers  (electron/ipc/)  — 14 handlers" }));
 
 const handlers = [
   { name: "reviews.ts", color: COLORS.blue, border: COLORS.blueBorder, methods: "getQueue  submit  getSummary", category: "Learning Core" },
@@ -357,7 +362,8 @@ const handlers = [
   { name: "dashboard.ts", color: COLORS.green, border: COLORS.greenBorder, methods: "getFrontier  getWeeklyStats", category: "Profile/Analytics" },
   { name: "narrative.ts", color: COLORS.orange, border: COLORS.orangeBorder, methods: "buildDraft  polish", category: "AI-Powered" },
   { name: "chat.ts", color: COLORS.orange, border: COLORS.orangeBorder, methods: "send (stream)  stop  onChunk  onDone", category: "AI-Powered (Streaming)" },
-  { name: "auth.ts", color: COLORS.gray, border: COLORS.grayBorder, methods: "getSession  signInGoogle  signOut", category: "Infrastructure" },
+  { name: "auth.ts", color: COLORS.gray, border: COLORS.grayBorder, methods: "getSession  signInGoogle  signOut  ensureDbUser", category: "Infrastructure (Google PKCE)" },
+  { name: "onboarding.ts", color: COLORS.blue, border: COLORS.blueBorder, methods: "getStatus  getAssessment  complete", category: "Learning Core (New User)" },
 ];
 
 const HANDLER_COL_W = 340;
@@ -502,6 +508,23 @@ const coreModules = [
       "  circumlocution, silence events, L1 fallback",
     ],
   },
+  {
+    name: "core/onboarding/  (assessment-data.ts)",
+    bg: COLORS.blue, border: COLORS.blueBorder,
+    lines: [
+      "ASSESSMENT_ITEMS: 55 static items across N5→N1",
+      "  N5: 10 vocab + 5 grammar = 15",
+      "  N4: 8 vocab + 4 grammar = 12",
+      "  N3: 8 vocab + 4 grammar = 12",
+      "  N2: 6 vocab + 3 grammar = 9",
+      "  N1: 4 vocab + 2 grammar = 6",
+      "",
+      "getAssessmentItemsForLevel(level) → items[]",
+      "  Beginner → N5 only (15 items)",
+      "  N3 → N4+N3+N2 (~33 items)",
+      "getLevelCefrMapping() → JLPT↔CEFR map",
+    ],
+  },
 ];
 
 let coreY = Z3_Y + 60;
@@ -529,14 +552,31 @@ const Z4_X = 60;
 const Z4_Y = Math.max(legendY + 60, Z3_BOTTOM) + ZONE_GAP;
 const Z4_W = 1740;
 
-elements.push(sectionLabel({ x: Z4_X, y: Z4_Y, content: "Zone 4: Database Schema  (Prisma + Local Supabase Postgres)" }));
+elements.push(sectionLabel({ x: Z4_X, y: Z4_Y, content: "Zone 4: Database Schema  (Prisma + Hosted Supabase Postgres)" }));
+elements.push(text({ x: Z4_X, y: Z4_Y + 35, content: "Multi-tenant: every model has userId field + @@index([userId]) — all queries scoped by getCurrentUserId()", size: 12, family: 3, color: COLORS.redBorder }));
 
 const models = [
   {
-    name: "LearnerProfile",
-    note: "singleton (id=1)",
+    name: "User",
+    note: "from Supabase Auth",
     fields: [
+      "id (String, Supabase auth ID)",
+      "email, name, avatarUrl",
+      "onboardingCompleted (bool)",
+      "createdAt, updatedAt",
+      "",
+      "Upserted by ensureDbUser() on",
+      "every sign-in / session restore",
+      "→ owns ALL other models via userId",
+    ],
+  },
+  {
+    name: "LearnerProfile",
+    note: "one per user",
+    fields: [
+      "userId (unique FK → User)",
       "targetLanguage, nativeLanguage",
+      "selfReportedLevel (JLPT)",
       "dailyNewItemLimit, targetRetention",
       "computedLevel (CEFR)",
       "comprehensionCeiling, productionCeiling",
@@ -544,14 +584,13 @@ const models = [
       "listeningLevel, speakingLevel (0-1)",
       "totalSessions, totalReviewEvents",
       "currentStreak, longestStreak",
-      "errorPatternSummary (JSON)",
-      "avoidancePatternSummary (JSON)",
     ],
   },
   {
     name: "LexicalItem",
     note: "vocabulary entries",
     fields: [
+      "userId (FK → User)",
       "surfaceForm, reading, meaning",
       "partOfSpeech, tags[]",
       "masteryState (unseen→burned)",
@@ -560,32 +599,31 @@ const models = [
       "productionWeight (float)",
       "exposureCount, productionCount",
       "contextTypes[], contextCount",
-      "readingExposures, writingProductions",
       "cefrLevel, frequencyRank",
-      "→ reviewEvents[]",
-      "→ contextLogs[]",
+      "→ reviewEvents[], contextLogs[]",
     ],
   },
   {
     name: "GrammarItem",
     note: "grammar patterns",
     fields: [
-      "patternId (unique), name, description",
+      "userId (FK → User)",
+      "patternId @@unique([userId, patternId])",
+      "name, description",
       "masteryState (unseen→burned)",
       "recognitionFsrs (JSON)",
       "productionFsrs (JSON)",
       "productionWeight, novelContextCount",
       "contextTypes[], contextCount",
       "prerequisiteIds[] (pattern refs)",
-      "cefrLevel, frequencyRank",
-      "→ reviewEvents[]",
-      "→ contextLogs[]",
+      "→ reviewEvents[], contextLogs[]",
     ],
   },
   {
     name: "ReviewEvent",
     note: "every review logged",
     fields: [
+      "userId (FK → User)",
       "itemType (lexical|grammar)",
       "grade (again|hard|good|easy)",
       "modality (recognition|production|cloze)",
@@ -599,6 +637,7 @@ const models = [
     name: "ConversationSession",
     note: "full session record",
     fields: [
+      "userId (FK → User)",
       "id (UUID), timestamp",
       "durationSeconds",
       "transcript (JSON array)",
@@ -613,6 +652,7 @@ const models = [
     name: "TomInference",
     note: "ToM engine output",
     fields: [
+      "userId (FK → User)",
       "type: avoidance | confusion_pair",
       "      | regression | modality_gap",
       "itemIds[] (int array)",
@@ -625,6 +665,7 @@ const models = [
     name: "ItemContextLog",
     note: "per-item exposure log",
     fields: [
+      "userId (FK → User)",
       "contextType, modality",
       "wasProduction (bool)",
       "wasSuccessful (bool|null)",
@@ -635,8 +676,9 @@ const models = [
   },
   {
     name: "PragmaticProfile",
-    note: "singleton (id=1)",
+    note: "one per user",
     fields: [
+      "userId (unique FK → User)",
       "casualAccuracy, politeAccuracy (0-1)",
       "registerSlipCount",
       "preferredRegister",
@@ -650,6 +692,7 @@ const models = [
     name: "CurriculumItem",
     note: "recommendation queue",
     fields: [
+      "userId (FK → User)",
       "itemType, referenceItemId",
       "surfaceForm, reading, meaning",
       "cefrLevel, frequencyRank",
@@ -663,7 +706,7 @@ const MODEL_W = 280;
 const MODEL_GAP = 20;
 const MODEL_COLS = 5;
 
-const modelStartY = Z4_Y + 48;
+const modelStartY = Z4_Y + 65;  // extra space for multi-tenancy subtitle
 
 models.forEach((m, i) => {
   const col = i % MODEL_COLS;
@@ -693,17 +736,26 @@ const maxRow1Height = models.length > MODEL_COLS
 const Z4_BOTTOM = modelStartY + 310 + maxRow1Height;
 
 // DB Relationships (arrows between models)
-// LexicalItem(col=1) → ReviewEvent(col=3)
-const lexItemCenterX = Z4_X + 1 * (MODEL_W + MODEL_GAP) + MODEL_W;
-const reviewEventX = Z4_X + 3 * (MODEL_W + MODEL_GAP);
+// User(col=0) owns all — arrow to right edge
+const userRightX = Z4_X + 0 * (MODEL_W + MODEL_GAP) + MODEL_W;
+const learnerProfileX = Z4_X + 1 * (MODEL_W + MODEL_GAP);
+elements.push(...arrow({
+  startX: userRightX, startY: modelStartY + 80,
+  endX: learnerProfileX, endY: modelStartY + 80,
+  color: COLORS.purpleBorder, strokeW: 1, label: "1:1",
+}));
+
+// LexicalItem(col=2) → ReviewEvent(col=4)
+const lexItemCenterX = Z4_X + 2 * (MODEL_W + MODEL_GAP) + MODEL_W;
+const reviewEventX = Z4_X + 4 * (MODEL_W + MODEL_GAP);
 elements.push(...arrow({
   startX: lexItemCenterX, startY: modelStartY + 100,
   endX: reviewEventX, endY: modelStartY + 100,
   color: COLORS.purpleBorder, strokeW: 1, label: "1:N",
 }));
 
-// GrammarItem(col=2) → ReviewEvent(col=3)
-const grammarCenterX = Z4_X + 2 * (MODEL_W + MODEL_GAP) + MODEL_W;
+// GrammarItem(col=3) → ReviewEvent(col=4)
+const grammarCenterX = Z4_X + 3 * (MODEL_W + MODEL_GAP) + MODEL_W;
 elements.push(...arrow({
   startX: grammarCenterX, startY: modelStartY + 130,
   endX: reviewEventX, endY: modelStartY + 130,
@@ -824,6 +876,39 @@ const flowCY = flowAY + 330;
   elements.push(...els);
 }
 
+// --- Flow D: Onboarding ---
+const flowDX = flowAX;
+const flowDY = flowCY + 280;
+{
+  const { elements: els } = titledBox({
+    x: flowDX, y: flowDY, w: 700, h: 340,
+    title: "Flow D: New User Onboarding (6-step wizard)",
+    titleBg: COLORS.blue, titleBorder: COLORS.blueBorder,
+    bodyBg: "#f8f9fa", bodyBorder: COLORS.blueBorder,
+    bodyLines: [
+      "Steps: welcome → language → level → assessment → preferences → complete",
+      "",
+      " 1. User signs in (Google PKCE) → ensureDbUser() upserts User row",
+      " 2. AuthProvider checks user.onboardingCompleted — gates app if false",
+      " 3. WelcomeStep: greet by name (from auth)",
+      " 4. LanguageStep: select native language (target = Japanese fixed)",
+      " 5. LevelStep: self-report JLPT (Beginner/N5/N4/N3/N2/N1)",
+      " 6. AssessmentStep:",
+      "    → onboardingGetAssessment(level) IPC → core/onboarding",
+      "    → getAssessmentItemsForLevel(): 15-33 items (tap to mark known)",
+      " 7. PreferencesStep: daily new item limit slider (3-30, default 10)",
+      " 8. CompleteStep → onboardingComplete(result) IPC:",
+      "    → CREATE LearnerProfile + PragmaticProfile",
+      "    → Known items seeded as apprentice_2 (FSRS pre-initialized)",
+      "    → Unknown items seeded as unseen",
+      "    → Lower-level items (not in test) seeded as introduced",
+      "    → User.onboardingCompleted = true",
+      "    → AuthProvider.needsOnboarding = false → main app loads",
+    ],
+  });
+  elements.push(...els);
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ZONE 6 — External Dependencies & Shared Types (top-left area)
@@ -857,21 +942,24 @@ elements.push(sectionLabel({ x: Z6_X, y: Z6_Y, content: "Zone 6: External System
   elements.push(...els);
 }
 
-// Local Supabase
+// Supabase (Hosted)
 {
   const { elements: els } = titledBox({
-    x: Z6_X, y: Z6_Y + 260, w: Z6_W, h: 160,
-    title: "Local Supabase  (Postgres)",
+    x: Z6_X, y: Z6_Y + 260, w: Z6_W, h: 200,
+    title: "Supabase  (Hosted Postgres + Auth)",
     titleBg: COLORS.purple, titleBorder: COLORS.purpleBorder,
     bodyBg: "#f8f0ff", bodyBorder: COLORS.purpleBorder,
     bodyLines: [
-      "localhost:54322 (Postgres)",
-      "localhost:54323 (Studio UI)",
-      "",
+      "Hosted Supabase instance",
       "Prisma ORM for all DB access",
-      "No Supabase client in V1",
-      "No auth / realtime features yet",
-      "Data persists in .supabase/",
+      "",
+      "Auth Service (Google OAuth PKCE):",
+      "  /auth/v1/token (code exchange)",
+      "  /auth/v1/token (refresh)",
+      "  /auth/v1/logout",
+      "",
+      "Session persisted to disk as JSON",
+      "  {userData}/auth/session.json",
     ],
   });
   elements.push(...els);
@@ -880,7 +968,7 @@ elements.push(sectionLabel({ x: Z6_X, y: Z6_Y, content: "Zone 6: External System
 // ts-fsrs
 {
   const { elements: els } = titledBox({
-    x: Z6_X, y: Z6_Y + 432, w: Z6_W, h: 110,
+    x: Z6_X, y: Z6_Y + 472, w: Z6_W, h: 110,
     title: "ts-fsrs  (Local Scheduling)",
     titleBg: COLORS.green, titleBorder: COLORS.greenBorder,
     bodyBg: "#f0faf0", bodyBorder: COLORS.greenBorder,
@@ -897,7 +985,7 @@ elements.push(sectionLabel({ x: Z6_X, y: Z6_Y, content: "Zone 6: External System
 // Electron + Vite
 {
   const { elements: els } = titledBox({
-    x: Z6_X, y: Z6_Y + 554, w: Z6_W, h: 110,
+    x: Z6_X, y: Z6_Y + 594, w: Z6_W, h: 110,
     title: "Electron 34 + Vite",
     titleBg: COLORS.gray, titleBorder: COLORS.grayBorder,
     bodyBg: "#f8f9fa", bodyBorder: COLORS.grayBorder,
@@ -920,8 +1008,8 @@ const STX = Z1_X + Z1_W + 50;
 const STY = Z1_Y + 40;
 {
   const { elements: els } = titledBox({
-    x: STX, y: STY, w: 400, h: 350,
-    title: "shared/types.ts  (436 lines)",
+    x: STX, y: STY, w: 400, h: 400,
+    title: "shared/types.ts",
     titleBg: COLORS.yellow, titleBorder: COLORS.yellowBorder,
     bodyBg: "#fffbeb", bodyBorder: COLORS.yellowBorder,
     bodyLines: [
@@ -939,12 +1027,17 @@ const STY = Z1_Y + 40;
       "  IPC_CHANNELS (50+ method constants)",
       "  IpcChannel (union type)",
       "",
+      "Auth & Onboarding:",
+      "  AuthUser { id, email, name, avatarUrl,",
+      "             onboardingCompleted }",
+      "  SelfReportedLevel, OnboardingResult",
+      "  AssessmentItem",
+      "",
       "Payloads:",
       "  ReviewSubmission, ReviewQueueItem",
       "  ConversationMessage, SessionPlan",
       "  PostSessionAnalysis, ExpandedTomBrief",
       "  KnowledgeBubble, CurriculumRecommendation",
-      "  FrontierData, WeeklyStats, AuthUser",
     ],
   });
   elements.push(...els);
@@ -1022,7 +1115,7 @@ elements.push(text({ x: SMX + 450, y: stateY + stateH + 28, content: "→ grade=
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ARX = Z6_X;
-const ARY = Z6_Y + 680;
+const ARY = Z6_Y + 720;
 
 {
   const { elements: els } = titledBox({
@@ -1054,7 +1147,7 @@ const ARY = Z6_Y + 680;
 // ═══════════════════════════════════════════════════════════════════════════
 
 const V2X = ARX;
-const V2Y = ARY + 250;
+const V2Y = ARY + 250;  // below Structural Rules
 
 {
   const { elements: els } = titledBox({
