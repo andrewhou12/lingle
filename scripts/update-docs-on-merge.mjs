@@ -2,7 +2,7 @@
 /**
  * Linguist — Auto-update architecture diagram and progress notes on merge.
  *
- * Triggered by GitHub Actions on push to main. Reads the merged PR diff,
+ * Triggered by GitHub Actions when a PR is merged to main. Reads the merged PR diff,
  * current architecture diagram, and recent progress notes, then asks Claude
  * to update the Excalidraw diagram (if architecturally relevant) and generate
  * a new progress entry.
@@ -44,6 +44,50 @@ function todayString() {
 }
 
 // ─── 1. Gather context ─────────────────────────────────────────────────────
+
+// Full diff (all files) for relevance filtering
+const fullDiffStat = git("diff HEAD~1..HEAD --stat");
+const fullDiffFiles = git("diff HEAD~1..HEAD --name-only");
+
+// ─── 1a. Relevance filter — skip trivial or non-code changes ────────────────
+
+const changedFiles = fullDiffFiles.split("\n").filter(Boolean);
+
+// Check if all changed files are non-code (docs, config, env, non-src yml)
+const NON_CODE_PATTERNS = [
+  /\.md$/,
+  /^\.env/,
+  /package-lock\.json$/,
+  /pnpm-lock\.yaml$/,
+  // Config JSON files (package.json, tsconfig, turbo, etc.)
+  /(?:^|\/)(?:package|tsconfig|turbo|\.prettierrc|\.eslintrc).*\.json$/,
+  // YML files outside of src/ directories
+  /^(?!.*(?:src|apps|packages)\/).*\.ya?ml$/,
+];
+
+function isNonCodeFile(filePath) {
+  return NON_CODE_PATTERNS.some((pattern) => pattern.test(filePath));
+}
+
+const allNonCode = changedFiles.length > 0 && changedFiles.every(isNonCodeFile);
+if (allNonCode) {
+  console.log("Change too small to document, skipping. (only non-code files changed)");
+  process.exit(0);
+}
+
+// Check line count — skip if fewer than 15 lines changed
+const diffStatSummary = git("diff HEAD~1..HEAD --shortstat");
+// e.g. " 3 files changed, 10 insertions(+), 2 deletions(-)"
+const insertions = parseInt((diffStatSummary.match(/(\d+) insertion/) || [, "0"])[1], 10);
+const deletions = parseInt((diffStatSummary.match(/(\d+) deletion/) || [, "0"])[1], 10);
+const totalLinesChanged = insertions + deletions;
+
+if (totalLinesChanged < 15) {
+  console.log(`Change too small to document, skipping. (${totalLinesChanged} lines changed, threshold is 15)`);
+  process.exit(0);
+}
+
+console.log(`${changedFiles.length} files changed, ${totalLinesChanged} lines — proceeding with docs update.`);
 
 // Git diff from the merged PR, filtered to code files, capped at 8000 chars
 const rawDiff = git(

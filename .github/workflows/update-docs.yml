@@ -1,21 +1,21 @@
-# Auto-update architecture diagram and progress notes on merge to main.
+# Auto-update architecture diagram and progress notes when a PR is merged to main.
 #
 # REMINDER: Add ANTHROPIC_API_KEY to GitHub repo secrets:
 #   Settings → Secrets and variables → Actions → New repository secret
 #
-# This workflow runs on every push to main (i.e. merged PRs).
-# It skips commits made by the bot itself via [skip ci] in the commit message.
+# This workflow runs only on merged PRs to main (not direct pushes).
+# The update script exits early (successfully) for trivial or non-code changes.
 
 name: Update Docs on Merge
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
 
 jobs:
   update-docs:
-    # Skip if the commit message contains [skip ci]
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
