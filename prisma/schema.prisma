@@ -7,10 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                   String               @id // Supabase auth user ID
+  email                String?
+  name                 String?
+  avatarUrl            String?
+  onboardingCompleted  Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  learnerProfile       LearnerProfile?
+  pragmaticProfile     PragmaticProfile?
+  lexicalItems         LexicalItem[]
+  grammarItems         GrammarItem[]
+  reviewEvents         ReviewEvent[]
+  conversationSessions ConversationSession[]
+  tomInferences        TomInference[]
+  itemContextLogs      ItemContextLog[]
+  curriculumItems      CurriculumItem[]
+}
+
 model LearnerProfile {
-  id                      Int      @id @default(1)
+  id                      Int      @id @default(autoincrement())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id])
   targetLanguage          String
   nativeLanguage          String
+  selfReportedLevel       String   @default("beginner")
   dailyNewItemLimit       Int      @default(10)
   targetRetention         Float    @default(0.90)
   computedLevel           String   @default("A1")
@@ -33,6 +56,8 @@ model LearnerProfile {
 
 model LexicalItem {
   id                  Int              @id @default(autoincrement())
+  userId              String
+  user                User             @relation(fields: [userId], references: [id])
   surfaceForm         String
   reading             String?
   meaning             String
@@ -57,11 +82,15 @@ model LexicalItem {
   productionWeight    Float            @default(0)
   reviewEvents        ReviewEvent[]
   contextLogs         ItemContextLog[]
+
+  @@index([userId])
 }
 
 model GrammarItem {
   id                  Int              @id @default(autoincrement())
-  patternId           String           @unique
+  userId              String
+  user                User             @relation(fields: [userId], references: [id])
+  patternId           String
   name                String
   description         String?
   cefrLevel           String?
@@ -82,10 +111,15 @@ model GrammarItem {
   prerequisiteIds     String[]         @default([])
   reviewEvents        ReviewEvent[]
   contextLogs         ItemContextLog[]
+
+  @@unique([userId, patternId])
+  @@index([userId])
 }
 
 model ReviewEvent {
   id               Int          @id @default(autoincrement())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id])
   itemType         String
   grade            String
   modality         String
@@ -97,10 +131,14 @@ model ReviewEvent {
   lexicalItemId    Int?
   grammarItem      GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId    Int?
+
+  @@index([userId])
 }
 
 model ConversationSession {
   id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
   timestamp       DateTime @default(now())
   durationSeconds Int?
   transcript      Json
@@ -109,10 +147,14 @@ model ConversationSession {
   errorsLogged    Json
   avoidanceEvents Json
   sessionPlan     Json
+
+  @@index([userId])
 }
 
 model TomInference {
   id            Int      @id @default(autoincrement())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
   type          String
   itemIds       Int[]
   confidence    Float
@@ -120,12 +162,16 @@ model TomInference {
   firstDetected DateTime @default(now())
   lastUpdated   DateTime @updatedAt
   resolved      Boolean  @default(false)
+
+  @@index([userId])
 }
 
 model ItemContextLog {
   id            Int          @id @default(autoincrement())
-  contextType   String       // "srs_review" | "conversation" | "reading" | "textbook" | "drill"
-  modality      String       // "reading" | "listening" | "speaking" | "writing"
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  contextType   String
+  modality      String
   wasProduction Boolean      @default(false)
   wasSuccessful Boolean?
   contextQuote  String?
@@ -136,12 +182,15 @@ model ItemContextLog {
   grammarItem   GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId Int?
 
+  @@index([userId])
   @@index([lexicalItemId, timestamp])
   @@index([grammarItemId, timestamp])
 }
 
 model PragmaticProfile {
-  id                    Int      @id @default(1)
+  id                    Int      @id @default(autoincrement())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id])
   casualAccuracy        Float    @default(0)
   politeAccuracy        Float    @default(0)
   registerSlipCount     Int      @default(0)
@@ -158,7 +207,9 @@ model PragmaticProfile {
 
 model CurriculumItem {
   id              Int       @id @default(autoincrement())
-  itemType        String    // "lexical" | "grammar"
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  itemType        String
   referenceItemId Int?
   surfaceForm     String?
   reading         String?
@@ -168,9 +219,9 @@ model CurriculumItem {
   frequencyRank   Int?
   priority        Float     @default(0)
   reason          String
-  status          String    @default("queued") // "queued" | "introduced" | "skipped"
+  status          String    @default("queued")
   queuedAt        DateTime  @default(now())
   introducedAt    DateTime?
 
-  @@index([status, priority])
+  @@index([userId, status, priority])
 }

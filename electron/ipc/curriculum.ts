@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import type { Prisma } from '@prisma/client'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { computeKnowledgeBubble } from '@core/curriculum/bubble'
 import { generateRecommendations } from '@core/curriculum/recommender'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
@@ -33,16 +34,17 @@ export function registerCurriculumHandlers(): void {
     async (): Promise<CurriculumRecommendation[]> => {
       log.info('curriculum:getRecommendations started')
       const db = getDb()
+      const userId = getCurrentUserId()
       const items = await gatherBubbleItems()
       const bubble = computeKnowledgeBubble(items)
 
-      const lexicalItems = await db.lexicalItem.findMany()
-      const grammarItems = await db.grammarItem.findMany()
+      const lexicalItems = await db.lexicalItem.findMany({ where: { userId } })
+      const grammarItems = await db.grammarItem.findMany({ where: { userId } })
 
       const knownSurfaceForms = new Set(lexicalItems.map((i) => i.surfaceForm))
       const knownPatternIds = new Set(grammarItems.map((i) => i.patternId))
 
-      const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+      const profile = await db.learnerProfile.findUnique({ where: { userId } })
       const dailyLimit = profile?.dailyNewItemLimit ?? 10
 
       const recommendations = generateRecommendations({
@@ -50,13 +52,13 @@ export function registerCurriculumHandlers(): void {
         knownSurfaceForms,
         knownPatternIds,
         dailyNewItemLimit: dailyLimit,
-        tomBriefInput: null, // ToM brief computed separately when needed
+        tomBriefInput: null,
       })
 
-      // Store recommendations as CurriculumItems and attach DB ids
       for (const rec of recommendations) {
         const created = await db.curriculumItem.create({
           data: {
+            userId,
             itemType: rec.itemType,
             surfaceForm: rec.surfaceForm,
             reading: rec.reading,
@@ -85,6 +87,7 @@ export function registerCurriculumHandlers(): void {
     ): Promise<{ itemId: number; itemType: ItemType }> => {
       log.info('curriculum:introduceItem started', { curriculumItemId })
       const db = getDb()
+      const userId = getCurrentUserId()
 
       const currItem = await db.curriculumItem.findUniqueOrThrow({
         where: { id: curriculumItemId },
@@ -95,6 +98,7 @@ export function registerCurriculumHandlers(): void {
       if (currItem.itemType === 'lexical') {
         const created = await db.lexicalItem.create({
           data: {
+            userId,
             surfaceForm: currItem.surfaceForm ?? '',
             reading: currItem.reading,
             meaning: currItem.meaning ?? '',
@@ -118,11 +122,12 @@ export function registerCurriculumHandlers(): void {
       } else {
         const patternId = currItem.patternId ?? `grammar_${Date.now()}`
         const created = await db.grammarItem.upsert({
-          where: { patternId },
+          where: { userId_patternId: { userId, patternId } },
           update: {
             masteryState: 'introduced',
           },
           create: {
+            userId,
             patternId,
             name: currItem.surfaceForm ?? currItem.patternId ?? '',
             description: currItem.meaning,
@@ -162,23 +167,22 @@ export function registerCurriculumHandlers(): void {
     async (): Promise<CurriculumRecommendation[]> => {
       log.info('curriculum:regenerate started')
       const db = getDb()
+      const userId = getCurrentUserId()
 
-      // Clear old queued items
       await db.curriculumItem.deleteMany({
-        where: { status: 'queued' },
+        where: { userId, status: 'queued' },
       })
 
-      // Re-run the recommendation engine
       const items = await gatherBubbleItems()
       const bubble = computeKnowledgeBubble(items)
 
-      const lexicalItems = await db.lexicalItem.findMany()
-      const grammarItems = await db.grammarItem.findMany()
+      const lexicalItems = await db.lexicalItem.findMany({ where: { userId } })
+      const grammarItems = await db.grammarItem.findMany({ where: { userId } })
 
       const knownSurfaceForms = new Set(lexicalItems.map((i) => i.surfaceForm))
       const knownPatternIds = new Set(grammarItems.map((i) => i.patternId))
 
-      const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+      const profile = await db.learnerProfile.findUnique({ where: { userId } })
       const dailyLimit = profile?.dailyNewItemLimit ?? 10
 
       const recommendations = generateRecommendations({
@@ -192,6 +196,7 @@ export function registerCurriculumHandlers(): void {
       for (const rec of recommendations) {
         const created = await db.curriculumItem.create({
           data: {
+            userId,
             itemType: rec.itemType,
             surfaceForm: rec.surfaceForm,
             reading: rec.reading,

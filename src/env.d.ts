@@ -19,6 +19,9 @@ import type {
   PostSessionAnalysis,
   ItemType,
   AuthUser,
+  AssessmentItem,
+  OnboardingResult,
+  SelfReportedLevel,
 } from '@shared/types'
 
 interface LinguistApi {
@@ -120,6 +123,11 @@ interface LinguistApi {
   authGetSession: () => Promise<{ user: AuthUser } | null>
   authSignInGoogle: () => Promise<{ user: AuthUser }>
   authSignOut: () => Promise<void>
+
+  // Onboarding
+  onboardingGetStatus: () => Promise<{ completed: boolean }>
+  onboardingGetAssessment: (selfReportedLevel: SelfReportedLevel) => Promise<AssessmentItem[]>
+  onboardingComplete: (result: OnboardingResult) => Promise<void>
 }
 
 declare global {

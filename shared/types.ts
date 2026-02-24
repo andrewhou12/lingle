@@ -95,6 +95,11 @@ export const IPC_CHANNELS = {
   AUTH_GET_SESSION: 'auth:get-session',
   AUTH_SIGN_IN_GOOGLE: 'auth:sign-in-google',
   AUTH_SIGN_OUT: 'auth:sign-out',
+
+  // Onboarding
+  ONBOARDING_GET_STATUS: 'onboarding:get-status',
+  ONBOARDING_GET_ASSESSMENT: 'onboarding:get-assessment',
+  ONBOARDING_COMPLETE: 'onboarding:complete',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -411,6 +416,30 @@ export interface AuthUser {
   email: string | null
   name: string | null
   avatarUrl: string | null
+  onboardingCompleted: boolean
+}
+
+// ── Onboarding Types ──
+
+export type SelfReportedLevel = 'beginner' | 'N5' | 'N4' | 'N3' | 'N2' | 'N1'
+
+export interface AssessmentItem {
+  index: number
+  surfaceForm: string
+  reading: string
+  meaning: string
+  partOfSpeech: string
+  level: string
+  type: 'vocabulary' | 'grammar'
+  patternId?: string
+}
+
+export interface OnboardingResult {
+  targetLanguage: string
+  nativeLanguage: string
+  selfReportedLevel: SelfReportedLevel
+  dailyNewItemLimit: number
+  knownItemIndices: number[]
 }
 
 export interface ExpandedPostSessionAnalysis extends PostSessionAnalysis {

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { ExpandedTomBrief, FsrsState, PragmaticState } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:tom')
@@ -16,20 +17,20 @@ import {
 async function gatherAnalysisData() {
   log.debug('Gathering ToM analysis data')
   const db = getDb()
+  const userId = getCurrentUserId()
 
-  // Gather item review histories
   const lexicalItems = await db.lexicalItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
     include: { reviewEvents: { orderBy: { timestamp: 'desc' }, take: 10 } },
   })
 
   const grammarItems = await db.grammarItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
     include: { reviewEvents: { orderBy: { timestamp: 'desc' }, take: 10 } },
   })
 
-  // Count conversation sessions per item for sessionsInCurrentState approximation
   const conversationSessions = await db.conversationSession.findMany({
+    where: { userId },
     orderBy: { timestamp: 'desc' },
     take: 50,
   })
@@ -41,7 +42,7 @@ async function gatherAnalysisData() {
       masteryState: item.masteryState as ItemReviewHistory['masteryState'],
       productionCount: item.productionCount,
       conversationProductionCount: item.speakingProductions + item.writingProductions,
-      sessionsInCurrentState: Math.min(totalSessionCount, 10), // approximate
+      sessionsInCurrentState: Math.min(totalSessionCount, 10),
       recentGrades: item.reviewEvents.map(
         (e) => e.grade as ItemReviewHistory['recentGrades'][number]
       ),
@@ -58,9 +59,8 @@ async function gatherAnalysisData() {
     })),
   ]
 
-  // Gather error records
   const recentErrors = await db.reviewEvent.findMany({
-    where: { grade: { in: ['again', 'hard'] } },
+    where: { userId, grade: { in: ['again', 'hard'] } },
     orderBy: { timestamp: 'desc' },
     take: 100,
   })
@@ -73,7 +73,6 @@ async function gatherAnalysisData() {
       errorType: e.grade,
     }))
 
-  // Modality data for gap detection
   const modalityData: ModalityItemData[] = [
     ...lexicalItems.map((item) => ({
       itemId: item.id,
@@ -95,7 +94,6 @@ async function gatherAnalysisData() {
     })),
   ]
 
-  // Grammar transfer data
   const grammarTransferData: GrammarTransferData[] = grammarItems.map((item) => ({
     itemId: item.id,
     patternId: item.patternId,
@@ -103,9 +101,8 @@ async function gatherAnalysisData() {
     contextCount: item.contextCount,
   }))
 
-  // Pragmatic profile
   let pragmaticState: PragmaticState | null = null
-  const pragProfile = await db.pragmaticProfile.findUnique({ where: { id: 1 } })
+  const pragProfile = await db.pragmaticProfile.findUnique({ where: { userId } })
   if (pragProfile) {
     pragmaticState = {
       casualAccuracy: pragProfile.casualAccuracy,
@@ -133,6 +130,7 @@ export function registerTomHandlers(): void {
 
     try {
     const db = getDb()
+    const userId = getCurrentUserId()
     const { items, errors, modalityData, grammarTransferData, pragmaticState } =
       await gatherAnalysisData()
 
@@ -153,15 +151,15 @@ export function registerTomHandlers(): void {
       transferGaps: brief.transferGaps.length,
     })
 
-    // Store inferences in DB — clear old unresolved ones first, then create fresh
     await db.tomInference.updateMany({
-      where: { resolved: false },
+      where: { userId, resolved: false },
       data: { resolved: true },
     })
 
     for (const avoidance of brief.avoidancePatterns) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'avoidance',
           itemIds: [avoidance.itemId],
           confidence: 0.7,
@@ -173,6 +171,7 @@ export function registerTomHandlers(): void {
     for (const pair of brief.confusionPairs) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'confusion_pair',
           itemIds: pair.itemIds,
           confidence: 0.6,
@@ -184,6 +183,7 @@ export function registerTomHandlers(): void {
     for (const regression of brief.regressions) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'regression',
           itemIds: [regression.itemId],
           confidence: 0.8,
@@ -195,6 +195,7 @@ export function registerTomHandlers(): void {
     for (const gap of brief.modalityGaps) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'modality_gap',
           itemIds: [],
           confidence: 0.75,
@@ -206,6 +207,7 @@ export function registerTomHandlers(): void {
     for (const transfer of brief.transferGaps) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'transfer_gap',
           itemIds: [transfer.itemId],
           confidence: 0.65,
@@ -214,11 +216,10 @@ export function registerTomHandlers(): void {
       })
     }
 
-    // Update learner profile pattern summaries
-    const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+    const profile = await db.learnerProfile.findUnique({ where: { userId } })
     if (profile) {
       await db.learnerProfile.update({
-        where: { id: 1 },
+        where: { userId },
         data: {
           errorPatternSummary: {
             confusionPairs: brief.confusionPairs.length,
@@ -272,8 +273,9 @@ export function registerTomHandlers(): void {
     > => {
       log.info('tom:getInferences started')
       const db = getDb()
+      const userId = getCurrentUserId()
       const inferences = await db.tomInference.findMany({
-        where: { resolved: false },
+        where: { userId, resolved: false },
         orderBy: { lastUpdated: 'desc' },
       })
 

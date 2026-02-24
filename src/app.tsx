@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/auth-context'
 import { AppShell } from './components/app-shell'
 import { Spinner } from './components/spinner'
 import { SignInPage } from './pages/sign-in'
+import { OnboardingPage } from './pages/onboarding'
 import { DashboardPage } from './pages/dashboard'
 import { ReviewPage } from './pages/review'
 import { LearnPage } from './pages/learn'
@@ -12,7 +13,7 @@ import { ChatPage } from './pages/chat'
 import { SettingsPage } from './pages/settings'
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, loading, needsOnboarding } = useAuth()
 
   if (loading) {
     return (
@@ -31,6 +32,10 @@ function AppContent() {
 
   if (!user) {
     return <SignInPage />
+  }
+
+  if (needsOnboarding) {
+    return <OnboardingPage />
   }
 
   return (

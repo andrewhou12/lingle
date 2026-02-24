@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { ExpandedLearnerProfile, FsrsState } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { recalculateProfile, type ProfileItemInput } from '@core/profile/calculator'
 import { createLogger } from '../logger'
 
@@ -13,7 +14,8 @@ export function registerProfileHandlers(): void {
     async (): Promise<ExpandedLearnerProfile | null> => {
       log.info('profile:get started')
       const db = getDb()
-      const profile = await db.learnerProfile.findUnique({ where: { id: 1 } })
+      const userId = getCurrentUserId()
+      const profile = await db.learnerProfile.findUnique({ where: { userId } })
       if (!profile) {
         log.warn('profile:get - no profile found')
         return null
@@ -57,8 +59,9 @@ export function registerProfileHandlers(): void {
     ): Promise<ExpandedLearnerProfile> => {
       log.info('profile:update', { fields: Object.keys(updates) })
       const db = getDb()
+      const userId = getCurrentUserId()
       const profile = await db.learnerProfile.update({
-        where: { id: 1 },
+        where: { userId },
         data: updates,
       })
 
@@ -90,12 +93,13 @@ export function registerProfileHandlers(): void {
     log.info('profile:recalculate started')
     const elapsed = log.timer()
     const db = getDb()
+    const userId = getCurrentUserId()
 
     const lexicalItems = await db.lexicalItem.findMany({
-      where: { masteryState: { not: 'unseen' } },
+      where: { userId, masteryState: { not: 'unseen' } },
     })
     const grammarItems = await db.grammarItem.findMany({
-      where: { masteryState: { not: 'unseen' } },
+      where: { userId, masteryState: { not: 'unseen' } },
     })
 
     const items: ProfileItemInput[] = [
@@ -125,8 +129,8 @@ export function registerProfileHandlers(): void {
       })),
     ]
 
-    const profile = await db.learnerProfile.findUniqueOrThrow({ where: { id: 1 } })
-    const totalReviewEvents = await db.reviewEvent.count()
+    const profile = await db.learnerProfile.findUniqueOrThrow({ where: { userId } })
+    const totalReviewEvents = await db.reviewEvent.count({ where: { userId } })
 
     const update = recalculateProfile({
       items,
@@ -138,7 +142,7 @@ export function registerProfileHandlers(): void {
     })
 
     const updated = await db.learnerProfile.update({
-      where: { id: 1 },
+      where: { userId },
       data: {
         ...update,
         totalReviewEvents,

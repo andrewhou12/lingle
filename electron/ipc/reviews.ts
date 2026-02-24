@@ -9,6 +9,7 @@ import type {
 } from '@shared/types'
 import type { Prisma } from '@prisma/client'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { computeReviewQueue, scheduleReview } from '@core/fsrs/scheduler'
 import { computeNextMasteryState } from '@core/mastery/state-machine'
 import { recalculateProfile } from '@core/profile/calculator'
@@ -24,13 +25,14 @@ export function registerReviewHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.REVIEW_GET_QUEUE, async (): Promise<ReviewQueueItem[]> => {
     log.info('review:getQueue started')
     const db = getDb()
+    const userId = getCurrentUserId()
 
     const lexicalItems = await db.lexicalItem.findMany({
-      where: { masteryState: { not: MasteryState.Unseen } },
+      where: { userId, masteryState: { not: MasteryState.Unseen } },
     })
 
     const grammarItems = await db.grammarItem.findMany({
-      where: { masteryState: { not: MasteryState.Unseen } },
+      where: { userId, masteryState: { not: MasteryState.Unseen } },
     })
 
     const allItems = [
@@ -74,12 +76,13 @@ export function registerReviewHandlers(): void {
 
       try {
       const db = getDb()
+      const userId = getCurrentUserId()
       const prodWeight = submission.productionWeight ?? (submission.modality === 'production' ? 0.5 : 1.0)
       const contextType = submission.contextType ?? 'srs_review'
 
-      // Log the review event
       await db.reviewEvent.create({
         data: {
+          userId,
           itemType: submission.itemType,
           grade: submission.grade,
           modality: submission.modality,
@@ -91,13 +94,12 @@ export function registerReviewHandlers(): void {
         },
       })
 
-      // Determine modality for context log
       const modality: LearningModality =
         submission.modality === 'production' ? 'writing' : 'reading'
 
-      // Create ItemContextLog entry
       await db.itemContextLog.create({
         data: {
+          userId,
           contextType,
           modality,
           wasProduction: submission.modality === 'production',
@@ -107,7 +109,6 @@ export function registerReviewHandlers(): void {
         },
       })
 
-      // Update FSRS state
       const fsrsField =
         submission.modality === 'production' ? 'productionFsrs' : 'recognitionFsrs'
 
@@ -118,14 +119,12 @@ export function registerReviewHandlers(): void {
         const currentFsrs = item[fsrsField] as unknown as FsrsState
         const { nextState } = scheduleReview(currentFsrs, submission.grade)
 
-        // Accumulate production weight
         const newProductionWeight =
           item.productionWeight +
           (submission.modality === 'production' ? prodWeight : 0)
 
         const hasProduction = newProductionWeight >= 1.0 || item.productionCount > 0
 
-        // Update contextTypes if srs_review not already present
         const updatedContextTypes = item.contextTypes.includes(contextType)
           ? item.contextTypes
           : [...item.contextTypes, contextType]
@@ -138,7 +137,7 @@ export function registerReviewHandlers(): void {
           productionCount: item.productionCount,
           productionWeight: newProductionWeight,
           contextCount: updatedContextTypes.length,
-          novelContextCount: 0, // lexical items don't track novel contexts
+          novelContextCount: 0,
         })
 
         if (newMastery !== item.masteryState) {
@@ -151,7 +150,6 @@ export function registerReviewHandlers(): void {
           })
         }
 
-        // Build modality counter updates
         const modalityUpdates: Record<string, { increment: number }> = {}
         if (modality === 'reading') {
           modalityUpdates.readingExposures = { increment: 1 }
@@ -176,7 +174,6 @@ export function registerReviewHandlers(): void {
           },
         })
 
-        // Trigger async profile recalculation every 10 reviews
         reviewCount++
         if (reviewCount % 10 === 0) {
           log.info('Triggering profile recalculation', { reviewCount })
@@ -264,11 +261,12 @@ export function registerReviewHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.REVIEW_GET_SUMMARY, async (): Promise<ReviewSummary> => {
     log.info('review:getSummary started')
     const db = getDb()
+    const userId = getCurrentUserId()
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
     const todayReviews = await db.reviewEvent.findMany({
-      where: { timestamp: { gte: today } },
+      where: { userId, timestamp: { gte: today } },
     })
 
     const correctCount = todayReviews.filter(
@@ -290,12 +288,13 @@ export function registerReviewHandlers(): void {
 async function triggerProfileRecalculation(): Promise<void> {
   log.debug('Profile recalculation triggered')
   const db = getDb()
+  const userId = getCurrentUserId()
 
   const lexicalItems = await db.lexicalItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
   })
   const grammarItems = await db.grammarItem.findMany({
-    where: { masteryState: { not: 'unseen' } },
+    where: { userId, masteryState: { not: 'unseen' } },
   })
 
   const items = [
@@ -325,8 +324,8 @@ async function triggerProfileRecalculation(): Promise<void> {
     })),
   ]
 
-  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { id: 1 } })
-  const totalReviewEvents = await db.reviewEvent.count()
+  const profile = await db.learnerProfile.findUniqueOrThrow({ where: { userId } })
+  const totalReviewEvents = await db.reviewEvent.count({ where: { userId } })
 
   const update = recalculateProfile({
     items,
@@ -338,7 +337,7 @@ async function triggerProfileRecalculation(): Promise<void> {
   })
 
   await db.learnerProfile.update({
-    where: { id: 1 },
+    where: { userId },
     data: {
       ...update,
       totalReviewEvents,
