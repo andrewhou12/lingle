@@ -51,7 +51,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <nav
         style={{
           width: 240,
-          borderRight: '1px solid var(--gray-6)',
+          borderRight: '1px solid var(--gray-4)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
