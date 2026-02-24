@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { ExpandedTomBrief, FsrsState, PragmaticState } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:tom')
@@ -154,6 +155,7 @@ export function registerTomHandlers(): void {
     })
 
     // Store inferences in DB — clear old unresolved ones first, then create fresh
+    const userId = getCurrentUserId()
     await db.tomInference.updateMany({
       where: { resolved: false },
       data: { resolved: true },
@@ -162,6 +164,7 @@ export function registerTomHandlers(): void {
     for (const avoidance of brief.avoidancePatterns) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'avoidance',
           itemIds: [avoidance.itemId],
           confidence: 0.7,
@@ -173,6 +176,7 @@ export function registerTomHandlers(): void {
     for (const pair of brief.confusionPairs) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'confusion_pair',
           itemIds: pair.itemIds,
           confidence: 0.6,
@@ -184,6 +188,7 @@ export function registerTomHandlers(): void {
     for (const regression of brief.regressions) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'regression',
           itemIds: [regression.itemId],
           confidence: 0.8,
@@ -195,6 +200,7 @@ export function registerTomHandlers(): void {
     for (const gap of brief.modalityGaps) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'modality_gap',
           itemIds: [],
           confidence: 0.75,
@@ -206,6 +212,7 @@ export function registerTomHandlers(): void {
     for (const transfer of brief.transferGaps) {
       await db.tomInference.create({
         data: {
+          userId,
           type: 'transfer_gap',
           itemIds: [transfer.itemId],
           confidence: 0.65,

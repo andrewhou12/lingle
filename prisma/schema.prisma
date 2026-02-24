@@ -8,31 +8,35 @@ datasource db {
 }
 
 model LearnerProfile {
-  id                      Int      @id @default(1)
+  id                      Int       @id @default(autoincrement())
+  userId                  String    @unique
   targetLanguage          String
   nativeLanguage          String
-  dailyNewItemLimit       Int      @default(10)
-  targetRetention         Float    @default(0.90)
-  computedLevel           String   @default("A1")
-  comprehensionCeiling    String   @default("A1")
-  productionCeiling       String   @default("A1")
-  readingLevel            Float    @default(0)
-  listeningLevel          Float    @default(0)
-  speakingLevel           Float    @default(0)
-  writingLevel            Float    @default(0)
-  totalSessions           Int      @default(0)
-  totalReviewEvents       Int      @default(0)
-  currentStreak           Int      @default(0)
-  longestStreak           Int      @default(0)
+  selfReportedLevel       String    @default("beginner")
+  dailyNewItemLimit       Int       @default(10)
+  targetRetention         Float     @default(0.90)
+  computedLevel           String    @default("A1")
+  comprehensionCeiling    String    @default("A1")
+  productionCeiling       String    @default("A1")
+  readingLevel            Float     @default(0)
+  listeningLevel          Float     @default(0)
+  speakingLevel           Float     @default(0)
+  writingLevel            Float     @default(0)
+  totalSessions           Int       @default(0)
+  totalReviewEvents       Int       @default(0)
+  currentStreak           Int       @default(0)
+  longestStreak           Int       @default(0)
   lastActiveDate          DateTime?
-  errorPatternSummary     Json     @default("{}")
-  avoidancePatternSummary Json     @default("{}")
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  errorPatternSummary     Json      @default("{}")
+  avoidancePatternSummary Json      @default("{}")
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  User                    User      @relation(fields: [userId], references: [id])
 }
 
 model LexicalItem {
   id                  Int              @id @default(autoincrement())
+  userId              String
   surfaceForm         String
   reading             String?
   meaning             String
@@ -55,13 +59,17 @@ model LexicalItem {
   frequencyRank       Int?
   cefrLevel           String?
   productionWeight    Float            @default(0)
-  reviewEvents        ReviewEvent[]
   contextLogs         ItemContextLog[]
+  User                User             @relation(fields: [userId], references: [id])
+  reviewEvents        ReviewEvent[]
+
+  @@index([userId])
 }
 
 model GrammarItem {
   id                  Int              @id @default(autoincrement())
-  patternId           String           @unique
+  userId              String
+  patternId           String
   name                String
   description         String?
   cefrLevel           String?
@@ -80,12 +88,17 @@ model GrammarItem {
   productionWeight    Float            @default(0)
   novelContextCount   Int              @default(0)
   prerequisiteIds     String[]         @default([])
-  reviewEvents        ReviewEvent[]
+  User                User             @relation(fields: [userId], references: [id])
   contextLogs         ItemContextLog[]
+  reviewEvents        ReviewEvent[]
+
+  @@unique([userId, patternId])
+  @@index([userId])
 }
 
 model ReviewEvent {
   id               Int          @id @default(autoincrement())
+  userId           String
   itemType         String
   grade            String
   modality         String
@@ -93,14 +106,18 @@ model ReviewEvent {
   sessionId        String?
   productionWeight Float        @default(1.0)
   contextType      String?
-  lexicalItem      LexicalItem? @relation(fields: [lexicalItemId], references: [id])
   lexicalItemId    Int?
-  grammarItem      GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId    Int?
+  grammarItem      GrammarItem? @relation(fields: [grammarItemId], references: [id])
+  lexicalItem      LexicalItem? @relation(fields: [lexicalItemId], references: [id])
+  User             User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model ConversationSession {
   id              String   @id @default(uuid())
+  userId          String
   timestamp       DateTime @default(now())
   durationSeconds Int?
   transcript      Json
@@ -109,10 +126,14 @@ model ConversationSession {
   errorsLogged    Json
   avoidanceEvents Json
   sessionPlan     Json
+  User            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model TomInference {
   id            Int      @id @default(autoincrement())
+  userId        String
   type          String
   itemIds       Int[]
   confidence    Float
@@ -120,45 +141,54 @@ model TomInference {
   firstDetected DateTime @default(now())
   lastUpdated   DateTime @updatedAt
   resolved      Boolean  @default(false)
+  User          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model ItemContextLog {
   id            Int          @id @default(autoincrement())
-  contextType   String       // "srs_review" | "conversation" | "reading" | "textbook" | "drill"
-  modality      String       // "reading" | "listening" | "speaking" | "writing"
+  userId        String
+  contextType   String
+  modality      String
   wasProduction Boolean      @default(false)
   wasSuccessful Boolean?
   contextQuote  String?
   sessionId     String?
   timestamp     DateTime     @default(now())
-  lexicalItem   LexicalItem? @relation(fields: [lexicalItemId], references: [id])
   lexicalItemId Int?
-  grammarItem   GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId Int?
+  grammarItem   GrammarItem? @relation(fields: [grammarItemId], references: [id])
+  lexicalItem   LexicalItem? @relation(fields: [lexicalItemId], references: [id])
+  User          User         @relation(fields: [userId], references: [id])
 
   @@index([lexicalItemId, timestamp])
   @@index([grammarItemId, timestamp])
+  @@index([userId])
 }
 
 model PragmaticProfile {
-  id                    Int      @id @default(1)
-  casualAccuracy        Float    @default(0)
-  politeAccuracy        Float    @default(0)
-  registerSlipCount     Int      @default(0)
-  preferredRegister     String   @default("polite")
-  circumlocutionCount   Int      @default(0)
-  silenceEvents         Int      @default(0)
-  l1FallbackCount       Int      @default(0)
-  averageSpeakingPace   Float?
-  hesitationRate        Float?
+  id                     Int      @id @default(autoincrement())
+  userId                 String   @unique
+  casualAccuracy         Float    @default(0)
+  politeAccuracy         Float    @default(0)
+  registerSlipCount      Int      @default(0)
+  preferredRegister      String   @default("polite")
+  circumlocutionCount    Int      @default(0)
+  silenceEvents          Int      @default(0)
+  l1FallbackCount        Int      @default(0)
+  averageSpeakingPace    Float?
+  hesitationRate         Float?
   avoidedGrammarPatterns String[] @default([])
-  avoidedVocabIds       Int[]    @default([])
-  updatedAt             DateTime @updatedAt
+  avoidedVocabIds        Int[]    @default([])
+  updatedAt              DateTime @updatedAt
+  User                   User     @relation(fields: [userId], references: [id])
 }
 
 model CurriculumItem {
   id              Int       @id @default(autoincrement())
-  itemType        String    // "lexical" | "grammar"
+  userId          String
+  itemType        String
   referenceItemId Int?
   surfaceForm     String?
   reading         String?
@@ -168,9 +198,29 @@ model CurriculumItem {
   frequencyRank   Int?
   priority        Float     @default(0)
   reason          String
-  status          String    @default("queued") // "queued" | "introduced" | "skipped"
+  status          String    @default("queued")
   queuedAt        DateTime  @default(now())
   introducedAt    DateTime?
+  User            User      @relation(fields: [userId], references: [id])
 
-  @@index([status, priority])
+  @@index([userId, status, priority])
+}
+
+model User {
+  id                  String                @id
+  email               String?
+  name                String?
+  avatarUrl           String?
+  onboardingCompleted Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  ConversationSession ConversationSession[]
+  CurriculumItem      CurriculumItem[]
+  GrammarItem         GrammarItem[]
+  ItemContextLog      ItemContextLog[]
+  LearnerProfile      LearnerProfile?
+  LexicalItem         LexicalItem[]
+  PragmaticProfile    PragmaticProfile?
+  ReviewEvent         ReviewEvent[]
+  TomInference        TomInference[]
 }

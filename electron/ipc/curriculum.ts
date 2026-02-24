@@ -12,6 +12,7 @@ import { computeKnowledgeBubble } from '@core/curriculum/bubble'
 import { generateRecommendations } from '@core/curriculum/recommender'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
 import { gatherBubbleItems } from './_helpers/gather-items'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:curriculum')
@@ -54,9 +55,11 @@ export function registerCurriculumHandlers(): void {
       })
 
       // Store recommendations as CurriculumItems and attach DB ids
+      const userId = getCurrentUserId()
       for (const rec of recommendations) {
         const created = await db.curriculumItem.create({
           data: {
+            userId,
             itemType: rec.itemType,
             surfaceForm: rec.surfaceForm,
             reading: rec.reading,
@@ -92,9 +95,12 @@ export function registerCurriculumHandlers(): void {
 
       const initialFsrs = createInitialFsrsState()
 
+      const userId = getCurrentUserId()
+
       if (currItem.itemType === 'lexical') {
         const created = await db.lexicalItem.create({
           data: {
+            userId,
             surfaceForm: currItem.surfaceForm ?? '',
             reading: currItem.reading,
             meaning: currItem.meaning ?? '',
@@ -118,11 +124,12 @@ export function registerCurriculumHandlers(): void {
       } else {
         const patternId = currItem.patternId ?? `grammar_${Date.now()}`
         const created = await db.grammarItem.upsert({
-          where: { patternId },
+          where: { userId_patternId: { userId, patternId } },
           update: {
             masteryState: 'introduced',
           },
           create: {
+            userId,
             patternId,
             name: currItem.surfaceForm ?? currItem.patternId ?? '',
             description: currItem.meaning,
@@ -189,9 +196,11 @@ export function registerCurriculumHandlers(): void {
         tomBriefInput: null,
       })
 
+      const userId = getCurrentUserId()
       for (const rec of recommendations) {
         const created = await db.curriculumItem.create({
           data: {
+            userId,
             itemType: rec.itemType,
             surfaceForm: rec.surfaceForm,
             reading: rec.reading,

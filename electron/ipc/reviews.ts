@@ -13,6 +13,7 @@ import { computeReviewQueue, scheduleReview } from '@core/fsrs/scheduler'
 import { computeNextMasteryState } from '@core/mastery/state-machine'
 import { recalculateProfile } from '@core/profile/calculator'
 import { MasteryState } from '@shared/types'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:reviews')
@@ -74,12 +75,14 @@ export function registerReviewHandlers(): void {
 
       try {
       const db = getDb()
+      const userId = getCurrentUserId()
       const prodWeight = submission.productionWeight ?? (submission.modality === 'production' ? 0.5 : 1.0)
       const contextType = submission.contextType ?? 'srs_review'
 
       // Log the review event
       await db.reviewEvent.create({
         data: {
+          userId,
           itemType: submission.itemType,
           grade: submission.grade,
           modality: submission.modality,
@@ -98,6 +101,7 @@ export function registerReviewHandlers(): void {
       // Create ItemContextLog entry
       await db.itemContextLog.create({
         data: {
+          userId,
           contextType,
           modality,
           wasProduction: submission.modality === 'production',

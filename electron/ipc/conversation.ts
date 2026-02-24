@@ -32,6 +32,7 @@ import { generateRecommendations } from '@core/curriculum/recommender'
 import { computeKnowledgeBubble, type BubbleItemInput } from '@core/curriculum/bubble'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
 import { recalculateProfile, type ProfileItemInput } from '@core/profile/calculator'
+import { getCurrentUserId } from '../auth-state'
 
 const anthropic = new Anthropic()
 
@@ -305,8 +306,10 @@ export function registerConversationHandlers(): void {
         const db = getDb()
 
         // Create conversation session
+        const userId = getCurrentUserId()
         const session = await db.conversationSession.create({
           data: {
+            userId,
             transcript: [],
             targetsPlanned: {
               vocabulary: plan.targetVocabulary,
@@ -488,9 +491,11 @@ export function registerConversationHandlers(): void {
         })
 
         // Create ItemContextLog entries for each context log
+        const ctxUserId = getCurrentUserId()
         for (const log of analysis.contextLogs) {
           await db.itemContextLog.create({
             data: {
+              userId: ctxUserId,
               contextType: 'conversation',
               modality: log.modality,
               wasProduction: log.wasProduction,
@@ -569,6 +574,7 @@ export function registerConversationHandlers(): void {
             const initialFsrs = createInitialFsrsState()
             await db.lexicalItem.create({
               data: {
+                userId: ctxUserId,
                 surfaceForm: newItem.surfaceForm,
                 meaning: '',
                 masteryState: 'introduced',
@@ -637,9 +643,9 @@ export function registerConversationHandlers(): void {
           const updatedState = updatePragmaticState(currentState, pragResult)
 
           await db.pragmaticProfile.upsert({
-            where: { id: 1 },
+            where: { userId: ctxUserId },
             create: {
-              id: 1,
+              userId: ctxUserId,
               ...updatedState,
             },
             update: updatedState,

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/types'
 import type { ContextLogEntry, ContextType, LearningModality } from '@shared/types'
 import { getDb } from '../db'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:context-log')
@@ -79,6 +80,7 @@ export function registerContextLogHandlers(): void {
 
       const entry = await db.itemContextLog.create({
         data: {
+          userId: getCurrentUserId(),
           contextType: params.contextType,
           modality: params.modality,
           wasProduction: params.wasProduction,

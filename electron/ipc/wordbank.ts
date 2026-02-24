@@ -4,6 +4,7 @@ import type { WordBankEntry, WordBankFilters, FsrsState } from '@shared/types'
 import type { Prisma } from '@prisma/client'
 import { getDb } from '../db'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
+import { getCurrentUserId } from '../auth-state'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:wordbank')
@@ -57,6 +58,7 @@ export function registerWordbankHandlers(): void {
 
       const item = await db.lexicalItem.create({
         data: {
+          userId: getCurrentUserId(),
           surfaceForm: data.surfaceForm,
           reading: data.reading,
           meaning: data.meaning,
