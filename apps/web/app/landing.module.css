@@ -1,0 +1,294 @@
+/* ══════════════════════════════════════════
+   Linguist Landing Page
+   ══════════════════════════════════════════ */
+
+.page {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+/* ── Header ── */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 0 2.5rem;
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(250, 250, 250, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0a0a0a;
+  text-decoration: none;
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--accent-9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-shippori), 'Shippori Mincho', serif;
+  font-size: 0.85rem;
+  color: #fafafa;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.navLink {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 450;
+  color: rgba(10, 10, 10, 0.5);
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.navLink:hover {
+  color: #0a0a0a;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.navCta {
+  margin-left: 0.5rem;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: white;
+  background: var(--accent-9);
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-decoration: none;
+}
+
+.navCta:hover {
+  background: var(--accent-10);
+}
+
+/* ── Main ── */
+.main {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 5rem 2rem 3rem;
+  pointer-events: none;
+}
+
+.main > * {
+  pointer-events: all;
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(10, 10, 10, 0.55);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0.3rem 0.75rem 0.3rem 0.4rem;
+  border-radius: 100px;
+  margin-bottom: 2.2rem;
+}
+
+.badgeDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-shippori), 'Shippori Mincho', serif;
+  font-size: 0.65rem;
+  color: #fafafa;
+}
+
+/* ── Heading ── */
+.heading {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: clamp(3.2rem, 9vw, 7.5rem);
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  color: #0a0a0a;
+  max-width: 16ch;
+  margin: 0 0 1.5rem;
+}
+
+.heading em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--accent-9) 0%, var(--accent-11) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Tagline ── */
+.tagline {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+  color: rgba(10, 10, 10, 0.5);
+  max-width: 36ch;
+  line-height: 1.6;
+  margin: 0 0 2.5rem;
+}
+
+/* ── CTAs ── */
+.ctaRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ctaPrimary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background: var(--accent-9);
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.ctaPrimary:hover {
+  background: var(--accent-10);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 100, 255, 0.18);
+}
+
+.ctaSecondary {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(10, 10, 10, 0.6);
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-decoration: none;
+}
+
+.ctaSecondary:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+  color: #0a0a0a;
+}
+
+/* ── Social proof ── */
+.socialProof {
+  margin-top: 3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.78rem;
+  color: rgba(10, 10, 10, 0.35);
+}
+
+.avatars {
+  display: flex;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fafafa;
+  margin-left: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-shippori), 'Shippori Mincho', serif;
+  font-size: 0.65rem;
+  background: #e8e4dc;
+  color: #666;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+/* ── Footer ── */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 0 2.5rem;
+  height: 52px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(250, 250, 250, 0.8);
+  backdrop-filter: blur(12px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footerLeft {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.72rem;
+  color: rgba(10, 10, 10, 0.3);
+}
+
+.footerRight {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.footerLink {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  font-size: 0.72rem;
+  color: rgba(10, 10, 10, 0.35);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footerLink:hover {
+  color: #0a0a0a;
+}
