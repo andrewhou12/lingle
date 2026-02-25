@@ -1587,7 +1587,7 @@ function validateNoOverlaps(elements) {
   }
 }
 
-const outPath = new URL("../architecture.excalidraw", import.meta.url).pathname;
+const outPath = new URL("../docs/architecture.excalidraw", import.meta.url).pathname;
 writeFileSync(outPath, JSON.stringify(excalidrawFile, null, 2));
 console.log(`Wrote ${elements.length} elements to ${outPath}`);
 console.log("  Open in https://excalidraw.com or the VS Code Excalidraw extension.");
