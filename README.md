@@ -286,7 +286,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ## Progress
 
-See [markdown/progress/](markdown/progress/) for detailed session-by-session development logs.
+See [docs/progress/](docs/progress/) for detailed session-by-session development logs.
 
 ## Known Issues
 

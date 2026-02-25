@@ -21,8 +21,8 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
-const EXCALIDRAW_PATH = join(ROOT, "architecture.excalidraw");
-const PROGRESS_DIR = join(ROOT, "markdown", "progress");
+const EXCALIDRAW_PATH = join(ROOT, "docs", "architecture.excalidraw");
+const PROGRESS_DIR = join(ROOT, "docs", "progress");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
