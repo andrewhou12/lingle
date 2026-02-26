@@ -1,0 +1,2129 @@
+[
+  {
+    "patternId": "n3_ageru_finish",
+    "name": "上げる",
+    "description": "Auxiliary verb meaning to finish doing something completely or thoroughly",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_iru"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 1
+  },
+  {
+    "patternId": "n3_amari_so_much",
+    "name": "あまり",
+    "description": "Expresses 'so much that' or excessive degree leading to a result",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_amari_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 2
+  },
+  {
+    "patternId": "n3_amari_ni_mo",
+    "name": "あまりにも",
+    "description": "Expresses 'too much' or 'excessively' with stronger emphasis than あまり",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_amari_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 3
+  },
+  {
+    "patternId": "n3_au_together",
+    "name": "合う",
+    "description": "Auxiliary verb meaning to do something together or mutually",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_iru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 4
+  },
+  {
+    "patternId": "n3_ba_ii",
+    "name": "ばいい",
+    "description": "Expresses suggestion or advice meaning 'should do' or 'it would be good if'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 5
+  },
+  {
+    "patternId": "n3_ba_yokatta",
+    "name": "ばよかった",
+    "description": "Expresses regret meaning 'should have done' or 'would have been better if'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 6
+  },
+  {
+    "patternId": "n3_ba_hodo",
+    "name": "ば～ほど",
+    "description": "Expresses proportional relationship meaning 'the more... the more'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 7
+  },
+  {
+    "patternId": "n3_ba_no_ni",
+    "name": "ば～のに",
+    "description": "Expresses regret or contrary expectation meaning 'would have' or 'if only'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba",
+      "n4_noni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 8
+  },
+  {
+    "patternId": "n3_bakari_de",
+    "name": "ばかりで",
+    "description": "Expresses 'only' or 'just' with negative connotation, describing limitation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_bakari"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 9
+  },
+  {
+    "patternId": "n3_bakari_de_naku",
+    "name": "ばかりでなく",
+    "description": "Expresses 'not only... but also' to add additional information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_bakari"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 10
+  },
+  {
+    "patternId": "n3_beki_da",
+    "name": "べきだ",
+    "description": "Expresses strong obligation or moral duty meaning 'should do' or 'must do'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 11
+  },
+  {
+    "patternId": "n3_beki_dewa_nai",
+    "name": "べきではない",
+    "description": "Expresses strong prohibition meaning 'should not do' or 'must not do'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 12
+  },
+  {
+    "patternId": "n3_betsu_ni_nai",
+    "name": "別に～ない",
+    "description": "Expresses 'not really' or 'not particularly' to downplay or deny something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 13
+  },
+  {
+    "patternId": "n3_buri_ni",
+    "name": "ぶりに",
+    "description": "Expresses 'for the first time in (period of time)' indicating a long interval",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 14
+  },
+  {
+    "patternId": "n3_chuu",
+    "name": "中",
+    "description": "Expresses 'currently', 'during', or 'throughout' a period or state",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 15
+  },
+  {
+    "patternId": "n3_dake_extent",
+    "name": "だけ",
+    "description": "Expresses extent or degree meaning 'as much as' or 'to the extent that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_dake"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 16
+  },
+  {
+    "patternId": "n3_dake_de_naku",
+    "name": "だけでなく",
+    "description": "Expresses 'not only... but also' to add additional information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_dake"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 17
+  },
+  {
+    "patternId": "n3_dakedo",
+    "name": "だけど",
+    "description": "Casual conjunction meaning 'however' or 'but' to show contrast",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_kedo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 18
+  },
+  {
+    "patternId": "n3_darake",
+    "name": "だらけ",
+    "description": "Expresses 'full of' or 'covered with' something undesirable",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 19
+  },
+  {
+    "patternId": "n3_donna_ni_te_mo",
+    "name": "どんなに～ても",
+    "description": "Expresses 'no matter how much' or 'regardless of how' with concessive meaning",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_donna",
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 20
+  },
+  {
+    "patternId": "n3_doushite_mo",
+    "name": "どうしても",
+    "description": "Expresses 'no matter what', 'at any cost', or 'by all means'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_doushite"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 21
+  },
+  {
+    "patternId": "n3_furi_wo_suru",
+    "name": "ふりをする",
+    "description": "Expresses 'to pretend' or 'to act as if' something is true",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 22
+  },
+  {
+    "patternId": "n3_futo",
+    "name": "ふと",
+    "description": "Adverb meaning 'suddenly', 'accidentally', or 'unexpectedly'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 23
+  },
+  {
+    "patternId": "n3_gachi",
+    "name": "がち",
+    "description": "Expresses tendency or inclination meaning 'tend to' or 'often'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 24
+  },
+  {
+    "patternId": "n3_gatai",
+    "name": "がたい",
+    "description": "Expresses 'very difficult to' or 'impossible to' do something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 25
+  },
+  {
+    "patternId": "n3_gimi",
+    "name": "気味",
+    "description": "Suffix meaning '-like', 'tending to', or 'showing signs of'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 26
+  },
+  {
+    "patternId": "n3_goto_ni",
+    "name": "ごとに",
+    "description": "Expresses 'each', 'every', or 'at intervals of' for regular occurrence",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 27
+  },
+  {
+    "patternId": "n3_hodo_degree",
+    "name": "ほど",
+    "description": "Expresses degree, extent, or upper limit meaning 'to the extent of'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 28
+  },
+  {
+    "patternId": "n3_hodo_nai",
+    "name": "ほど～ない",
+    "description": "Expresses comparison meaning 'is not as... as' for negative comparison",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 29
+  },
+  {
+    "patternId": "n3_ichido_ni",
+    "name": "一度に",
+    "description": "Expresses 'all at once' or 'at the same time' for simultaneous action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 30
+  },
+  {
+    "patternId": "n3_ikura_te_mo",
+    "name": "いくら～ても",
+    "description": "Expresses 'no matter how much' or 'regardless of how much'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 31
+  },
+  {
+    "patternId": "n3_ippou_da",
+    "name": "一方だ",
+    "description": "Expresses 'more and more' or 'continue to' for ongoing progression",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 32
+  },
+  {
+    "patternId": "n3_ittai",
+    "name": "一体",
+    "description": "Emphatic word meaning 'what on earth' or 'just what' for strong questioning",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 33
+  },
+  {
+    "patternId": "n3_ja_nai_confirmation",
+    "name": "じゃない",
+    "description": "Sentence-ending particle for confirmation meaning 'isn't it' or 'right'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 34
+  },
+  {
+    "patternId": "n3_ka_nanika",
+    "name": "か何か",
+    "description": "Expresses 'or something' to suggest uncertainty or vague alternatives",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ka"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 35
+  },
+  {
+    "patternId": "n3_kakeru_half",
+    "name": "かける",
+    "description": "Auxiliary verb meaning 'half-', 'not yet finished', or 'in the middle of'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 36
+  },
+  {
+    "patternId": "n3_kara_ni_kakete",
+    "name": "から〜にかけて",
+    "description": "Expresses 'from A to B' or 'through' for time or location ranges",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_kara",
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 37
+  },
+  {
+    "patternId": "n3_kawari_ni",
+    "name": "代わりに",
+    "description": "Expresses 'instead of' or 'in exchange for' to show substitution",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 38
+  },
+  {
+    "patternId": "n3_kekka",
+    "name": "結果",
+    "description": "Expresses 'as a result of' or 'after' to show consequence",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 39
+  },
+  {
+    "patternId": "n3_kekkyoku",
+    "name": "結局",
+    "description": "Adverb meaning 'after all', 'eventually', or 'in the end'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 40
+  },
+  {
+    "patternId": "n3_kesshite_nai",
+    "name": "決して～ない",
+    "description": "Express 'never' or 'by no means' with strong emphasis on absolute negation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_nai"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 41
+  },
+  {
+    "patternId": "n3_kirenai",
+    "name": "切れない",
+    "description": "Express inability to complete something or that something is too much to finish",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 42
+  },
+  {
+    "patternId": "n3_kiri",
+    "name": "きり",
+    "description": "Express 'only', 'just', or indicate something hasn't happened since a certain time",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_dake"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 43
+  },
+  {
+    "patternId": "n3_kiru",
+    "name": "切る",
+    "description": "Express doing something completely to the end or finishing thoroughly",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 44
+  },
+  {
+    "patternId": "n3_kke",
+    "name": "っけ",
+    "description": "Casual suffix used to confirm something or recall information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 45
+  },
+  {
+    "patternId": "n3_komu",
+    "name": "込む",
+    "description": "Express moving inside something or doing something for a long time intensively",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 46
+  },
+  {
+    "patternId": "n3_koso",
+    "name": "こそ",
+    "description": "Emphasize 'for sure', 'precisely', or 'definitely' with strong emphasis",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 47
+  },
+  {
+    "patternId": "n3_koto_must",
+    "name": "こと",
+    "description": "Express obligation or necessity, meaning '(must) do'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_koto_nominalizer"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 48
+  },
+  {
+    "patternId": "n3_koto_kara",
+    "name": "ことから",
+    "description": "Express reasoning 'from the fact that' or 'because of the fact that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_koto_nominalizer",
+      "n5_kara"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 49
+  },
+  {
+    "patternId": "n3_koto_ni_natteiru",
+    "name": "ことになっている",
+    "description": "Express that something is expected to happen or has been decided",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_koto_ni_naru",
+      "n5_te_iru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 50
+  },
+  {
+    "patternId": "n3_koto_wa_nai",
+    "name": "ことはない",
+    "description": "Express 'there is no need to' or 'no possibility that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_koto_nominalizer",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 51
+  },
+  {
+    "patternId": "n3_koto_wa_ga",
+    "name": "ことは～が",
+    "description": "Express 'although' or 'but' when acknowledging one thing while contrasting it",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_koto_nominalizer",
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 52
+  },
+  {
+    "patternId": "n3_kurai_gurai",
+    "name": "くらい・ぐらい",
+    "description": "Express approximation 'about' or extent 'to the degree that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 53
+  },
+  {
+    "patternId": "n3_kuse_ni",
+    "name": "くせに",
+    "description": "Express criticism meaning 'although' or 'despite the fact that' with negative nuance",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 54
+  },
+  {
+    "patternId": "n3_marude",
+    "name": "まるで",
+    "description": "Express comparison meaning 'as if', 'as though', or 'just like'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 55
+  },
+  {
+    "patternId": "n3_masaka",
+    "name": "まさか",
+    "description": "Express disbelief meaning 'there's no way' or 'that's impossible'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 56
+  },
+  {
+    "patternId": "n3_metta_ni_nai",
+    "name": "めったに～ない",
+    "description": "Express rarity meaning 'hardly', 'rarely', or 'seldom'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 57
+  },
+  {
+    "patternId": "n3_mo_ba_mo",
+    "name": "も～ば～も",
+    "description": "Express 'both...and' or 'either...or' listing multiple items",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_mo",
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 58
+  },
+  {
+    "patternId": "n3_moshikashitara",
+    "name": "もしかしたら",
+    "description": "Express possibility meaning 'perhaps', 'maybe', or 'by chance'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 59
+  },
+  {
+    "patternId": "n3_moshimo_tara",
+    "name": "もしも〜たら",
+    "description": "Express hypothetical condition meaning 'if' or 'supposing that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_tara"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 60
+  },
+  {
+    "patternId": "n3_muke",
+    "name": "向け",
+    "description": "Express target audience meaning 'intended for' or 'aimed at'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 61
+  },
+  {
+    "patternId": "n3_muki",
+    "name": "向き",
+    "description": "Express suitability meaning 'suitable for' or 'appropriate for'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 62
+  },
+  {
+    "patternId": "n3_mushiro",
+    "name": "むしろ",
+    "description": "Express preference meaning 'rather', 'instead', or 'better'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 63
+  },
+  {
+    "patternId": "n3_nagara_mo",
+    "name": "ながらも",
+    "description": "Express contrast meaning 'but', 'although', or 'despite' with formal nuance",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_nagara",
+      "n5_particle_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 64
+  },
+  {
+    "patternId": "n3_nai_koto_wa_nai",
+    "name": "ないことはない",
+    "description": "Express possibility meaning 'can do' or 'is not impossible to' with double negative",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_nai",
+      "n4_koto_nominalizer"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 65
+  },
+  {
+    "patternId": "n3_nai_to",
+    "name": "ないと",
+    "description": "Express necessity meaning 'must do' or 'unless/if you don't'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_nai",
+      "n5_particle_to"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 66
+  },
+  {
+    "patternId": "n3_nakanaka_degree",
+    "name": "なかなか",
+    "description": "Express degree meaning 'quite', 'pretty', 'rather', or 'just not' depending on context",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 67
+  },
+  {
+    "patternId": "n3_nanka_nante",
+    "name": "なんか / なんて",
+    "description": "Express examples, modesty, or making light of something in casual speech",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 68
+  },
+  {
+    "patternId": "n3_naosu",
+    "name": "直す",
+    "description": "Express doing something again or doing something over to correct it",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 69
+  },
+  {
+    "patternId": "n3_narubeku",
+    "name": "なるべく",
+    "description": "Express effort meaning 'as much as possible' or 'if possible'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 70
+  },
+  {
+    "patternId": "n3_naze_nara",
+    "name": "なぜなら",
+    "description": "Express reason meaning 'because' or 'the reason is' to introduce explanation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 71
+  },
+  {
+    "patternId": "n3_n_datte",
+    "name": "んだって",
+    "description": "Express hearsay meaning 'I hear that' or 'heard that' in casual speech",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_tte"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 72
+  },
+  {
+    "patternId": "n3_ni_chigai_nai",
+    "name": "に違いない",
+    "description": "Express strong certainty meaning 'I'm sure/certain' or 'no doubt that'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_nai"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 73
+  },
+  {
+    "patternId": "n3_ni_hanshite",
+    "name": "に反して",
+    "description": "Express opposition meaning 'against', 'contrary to', or 'in contrast to'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 74
+  },
+  {
+    "patternId": "n3_ni_kakete",
+    "name": "にかけて",
+    "description": "Express time period meaning 'over (a period)' or scope 'concerning/regarding'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 75
+  },
+  {
+    "patternId": "n3_ni_kansuru",
+    "name": "に関する",
+    "description": "Express relation meaning 'about', 'regarding', or 'related to'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 76
+  },
+  {
+    "patternId": "n3_ni_kawatte",
+    "name": "にかわって",
+    "description": "Express substitution meaning 'instead of', 'replacing', or 'on behalf of'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 77
+  },
+  {
+    "patternId": "n3_ni_kurabete",
+    "name": "に比べて",
+    "description": "Express comparison meaning 'compared to' or 'in comparison to'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 78
+  },
+  {
+    "patternId": "n3_ni_nareru",
+    "name": "に慣れる",
+    "description": "Express habituation meaning 'to be used to something' or 'to get accustomed to'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 79
+  },
+  {
+    "patternId": "n3_ni_oite",
+    "name": "において",
+    "description": "Express location or context meaning 'in', 'at (place)', 'regarding', or 'as for'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 80
+  },
+  {
+    "patternId": "n3_ni_shitagatte",
+    "name": "にしたがって",
+    "description": "Expresses that something changes in accordance with or in proportion to something else; as one thing changes, another changes accordingly",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 81
+  },
+  {
+    "patternId": "n3_ni_shite_mo",
+    "name": "にしても",
+    "description": "Expresses 'even if' or 'even though'; indicates that regardless of the condition mentioned, the result remains the same",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 82
+  },
+  {
+    "patternId": "n3_ni_shite_wa",
+    "name": "にしては",
+    "description": "Expresses 'for' or 'considering'; used when something is unexpected or unusual given the circumstances",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 83
+  },
+  {
+    "patternId": "n3_ni_taishite",
+    "name": "に対して",
+    "description": "Expresses direction of action, attitude, or feeling towards someone or something; 'towards', 'against', or 'regarding'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 84
+  },
+  {
+    "patternId": "n3_ni_totte",
+    "name": "にとって",
+    "description": "Expresses 'to' or 'for' someone; indicates from whose perspective or for whose benefit something is considered",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 85
+  },
+  {
+    "patternId": "n3_ni_tsuite",
+    "name": "について",
+    "description": "Expresses 'concerning', 'regarding', or 'about'; used to indicate the topic or subject matter being discussed",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 86
+  },
+  {
+    "patternId": "n3_ni_tsurete",
+    "name": "につれて",
+    "description": "Expresses proportional change; as one thing changes, another changes accordingly; 'as', 'in proportion to'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 87
+  },
+  {
+    "patternId": "n3_ni_wa",
+    "name": "には",
+    "description": "Expresses purpose or requirement; 'for the purpose of', 'in order to', or indicates what is needed for something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 88
+  },
+  {
+    "patternId": "n3_ni_yoru_to",
+    "name": "によると/によれば",
+    "description": "Expresses 'according to' or 'based on'; used to cite a source of information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 89
+  },
+  {
+    "patternId": "n3_ni_yotte",
+    "name": "によって/による",
+    "description": "Expresses means, method, cause, or agent; 'by means of', 'due to', 'because of', or indicates who/what performs an action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 90
+  },
+  {
+    "patternId": "n3_no_deshou_ka",
+    "name": "のでしょうか",
+    "description": "Polite way to ask a question; more formal and softer than だろうか; expresses uncertainty or seeks confirmation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_no",
+      "n5_deshou"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 91
+  },
+  {
+    "patternId": "n3_wo_chuushin_ni",
+    "name": "を中心に",
+    "description": "Expresses 'centered on' or 'focused on'; indicates that something is the main focus or center of activity",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 92
+  },
+  {
+    "patternId": "n3_wo_hajime",
+    "name": "をはじめ",
+    "description": "Expresses 'starting with' or 'for example'; used to give examples with the first one being representative",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 93
+  },
+  {
+    "patternId": "n3_wo_komete",
+    "name": "を込めて",
+    "description": "Expresses doing something with a particular feeling or intention; 'filled with', 'putting one's heart into'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 94
+  },
+  {
+    "patternId": "n3_wo_tsujite",
+    "name": "を通じて/を通して",
+    "description": "Expresses 'through', 'via', or 'throughout'; indicates the means, method, or duration of something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 95
+  },
+  {
+    "patternId": "n3_okage_de",
+    "name": "おかげで",
+    "description": "Expresses gratitude or positive result; 'thanks to', 'owing to', 'because of' (used for positive outcomes)",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_de"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 96
+  },
+  {
+    "patternId": "n3_ppanashi",
+    "name": "っぱなし",
+    "description": "Expresses leaving something in a continuous state; 'leaving something on/open/running' without stopping or changing",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 97
+  },
+  {
+    "patternId": "n3_ppoi",
+    "name": "っぽい",
+    "description": "Expresses resemblance or tendency; 'seems like', 'somewhat', '-ish', or indicates something easily happens",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 98
+  },
+  {
+    "patternId": "n3_sae",
+    "name": "さえ",
+    "description": "Expresses 'even' or emphasis; indicates an extreme example or minimum requirement",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 99
+  },
+  {
+    "patternId": "n3_sae_ba",
+    "name": "さえ～ば",
+    "description": "Expresses 'if only' or 'as long as'; indicates that one condition is sufficient for a desired result",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 100
+  },
+  {
+    "patternId": "n3_sai_ni",
+    "name": "際に",
+    "description": "Expresses 'when', 'at the time of', or 'in the case of'; used for formal or important occasions",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 101
+  },
+  {
+    "patternId": "n3_saichuu_ni",
+    "name": "最中に",
+    "description": "Expresses 'while', 'during', or 'in the middle of'; indicates something happens during an ongoing action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 102
+  },
+  {
+    "patternId": "n3_sara_ni",
+    "name": "さらに",
+    "description": "Expresses 'furthermore', 'moreover', or 'even more'; used to add additional information or emphasis",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 103
+  },
+  {
+    "patternId": "n3_sate",
+    "name": "さて",
+    "description": "Conjunction meaning 'well', 'now', or 'then'; used to change topics or move to the next point in conversation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 104
+  },
+  {
+    "patternId": "n3_sei_de",
+    "name": "せいで",
+    "description": "Expresses negative cause or blame; 'because of', 'due to', 'as a result of' (used for negative outcomes)",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_de"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 105
+  },
+  {
+    "patternId": "n3_seizei",
+    "name": "せいぜい",
+    "description": "Expresses 'at most', 'at best', or 'to the utmost'; indicates the maximum limit or extent of something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 106
+  },
+  {
+    "patternId": "n3_shibaraku",
+    "name": "しばらく",
+    "description": "Expresses 'for a while', 'for some time', or 'for a moment'; indicates a moderate duration of time",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 107
+  },
+  {
+    "patternId": "n3_shika_nai",
+    "name": "しかない",
+    "description": "Expresses 'have no choice but to' or 'can only'; indicates that there is only one option available",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 108
+  },
+  {
+    "patternId": "n3_sono_tame_ni",
+    "name": "そのために",
+    "description": "Expresses 'for that reason', 'hence', or 'because of that'; indicates purpose or cause-effect relationship",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 109
+  },
+  {
+    "patternId": "n3_sore_tomo",
+    "name": "それとも",
+    "description": "Expresses 'or' or 'or else'; used to present an alternative option in questions",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 110
+  },
+  {
+    "patternId": "n3_sou_mo_nai",
+    "name": "そうもない",
+    "description": "Expresses 'very unlikely to' or 'showing no signs of'; indicates something is improbable or impossible",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_sou_da_appearance",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 111
+  },
+  {
+    "patternId": "n3_sude_ni",
+    "name": "すでに",
+    "description": "Expresses 'already' or 'previously'; indicates that something has been completed or occurred before now",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 112
+  },
+  {
+    "patternId": "n3_sunawachi",
+    "name": "すなわち",
+    "description": "Expresses 'in other words', 'namely', or 'that is to say'; used to clarify or rephrase something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 113
+  },
+  {
+    "patternId": "n3_suuryou_wa",
+    "name": "数量+は",
+    "description": "Expresses 'at least' when used with quantities; indicates a minimum amount or number",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 114
+  },
+  {
+    "patternId": "n3_ta_mono_da",
+    "name": "たものだ",
+    "description": "Expresses past habits or nostalgic recollection; 'used to do', 'would often do' (reminiscing about the past)",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 115
+  },
+  {
+    "patternId": "n3_ta_totan",
+    "name": "たとたん",
+    "description": "Expresses 'as soon as' or 'the moment that'; indicates immediate succession of events",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 116
+  },
+  {
+    "patternId": "n3_tabi_ni",
+    "name": "たびに",
+    "description": "Expresses 'whenever' or 'every time'; indicates that something happens repeatedly under the same conditions",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 117
+  },
+  {
+    "patternId": "n3_tame_ni",
+    "name": "ために",
+    "description": "Expresses purpose or benefit; 'for', 'in order to', 'for the sake of', or indicates the reason or beneficiary",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 118
+  },
+  {
+    "patternId": "n3_tashika_ni",
+    "name": "確かに",
+    "description": "Expresses certainty or agreement; 'surely', 'certainly', 'indeed'; used to confirm or acknowledge something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 119
+  },
+  {
+    "patternId": "n3_tate",
+    "name": "たて",
+    "description": "Expresses something just completed or freshly done; 'just done', 'newly made', indicates recent completion",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 120
+  },
+  {
+    "patternId": "n3_tatoe_te_mo",
+    "name": "たとえ～ても",
+    "description": "Even if... is the case; expresses that something will happen regardless of the condition",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 121
+  },
+  {
+    "patternId": "n3_tatoeba",
+    "name": "例えば",
+    "description": "For example; used to introduce an example or illustration",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 122
+  },
+  {
+    "patternId": "n3_tatte",
+    "name": "たって",
+    "description": "Even if; even though; no matter how; expresses that the result won't change regardless",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 123
+  },
+  {
+    "patternId": "n3_te_bakari_iru",
+    "name": "てばかりいる",
+    "description": "Only; nothing but; expresses doing only one thing continuously",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_iru",
+      "n4_bakari"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 124
+  },
+  {
+    "patternId": "n3_te_goran",
+    "name": "てごらん",
+    "description": "(Please) try to; (please) look; gentle imperative form encouraging someone to try",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_kudasai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 125
+  },
+  {
+    "patternId": "n3_te_hajimete",
+    "name": "てはじめて",
+    "description": "Not until; only after [x] did I; expresses that something happens for the first time after doing something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_hajimeru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 126
+  },
+  {
+    "patternId": "n3_te_kara_de_nai_to",
+    "name": "てからでないと",
+    "description": "Must first do; cannot do without; expresses that one action must be completed before another",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_kara",
+      "n3_nai_to"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 127
+  },
+  {
+    "patternId": "n3_te_shouganai",
+    "name": "てしょうがない",
+    "description": "Can't help but; very; extremely; expresses inability to control a feeling or situation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_shimau"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 128
+  },
+  {
+    "patternId": "n3_te_sumu",
+    "name": "て済む",
+    "description": "Sufficient by; resolve by; expresses that something can be settled or resolved by doing an action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 129
+  },
+  {
+    "patternId": "n3_te_wa_ikenai_kara",
+    "name": "てはいけないから",
+    "description": "In order to not; because one must not; expresses reason for avoiding an action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_wa_ikenai",
+      "n5_kara"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 130
+  },
+  {
+    "patternId": "n3_te_iru_baai_ja_nai",
+    "name": "ている場合じゃない",
+    "description": "This is no time to be doing; expresses that the current situation doesn't allow for a particular action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_te_iru",
+      "n4_baai_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 131
+  },
+  {
+    "patternId": "n3_teki",
+    "name": "的",
+    "description": "Change noun into na-adjective or adverb; suffix that creates adjectives meaning 'like' or 'characteristic of'",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_adjective_na"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 132
+  },
+  {
+    "patternId": "n3_te_mo_hajimaranai",
+    "name": "ても始まらない",
+    "description": "Even if you... it's no use; expresses that doing something won't lead to any progress",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo",
+      "n4_hajimeru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 133
+  },
+  {
+    "patternId": "n3_te_mo_kamawanai",
+    "name": "てもかまわない",
+    "description": "It doesn't matter if; it's okay if; expresses permission or indifference",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 134
+  },
+  {
+    "patternId": "n3_te_mo_shouganai",
+    "name": "てもしょうがない",
+    "description": "There's no point to; it's no use to; expresses futility of an action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 135
+  },
+  {
+    "patternId": "n3_to_ieba",
+    "name": "と言えば",
+    "description": "Speaking of; when you talk of; used to change topics or add related information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 136
+  },
+  {
+    "patternId": "n3_to_ii_tara_ii",
+    "name": "といい / たらいい",
+    "description": "It would be nice if; should; I hope; expresses wishes or suggestions",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_tara",
+      "n5_hou_ga_ii"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 137
+  },
+  {
+    "patternId": "n3_to_itte_mo",
+    "name": "といっても",
+    "description": "Although I say; although one might say; expresses qualification or limitation of a statement",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu",
+      "n4_te_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 138
+  },
+  {
+    "patternId": "n3_to_iu_koto_da",
+    "name": "ということだ",
+    "description": "I heard; it means; in other words; expresses hearsay or explanation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu_koto"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 139
+  },
+  {
+    "patternId": "n3_to_iu_no_wa",
+    "name": "というのは",
+    "description": "This means; because; that is to say; used to explain or define something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 140
+  },
+  {
+    "patternId": "n3_to_iu_to",
+    "name": "と言うと",
+    "description": "Speaking of; when you say; used to respond to or elaborate on a topic",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 141
+  },
+  {
+    "patternId": "n3_to_iu_yori",
+    "name": "というより",
+    "description": "Rather than; more than; used to correct or refine a previous statement",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_to_iu",
+      "n4_yori"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 142
+  },
+  {
+    "patternId": "n3_to_mieru",
+    "name": "とみえる / とみえて",
+    "description": "It seems that; appears that; expresses inference based on observation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_ni_mieru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 143
+  },
+  {
+    "patternId": "n3_to_sureba",
+    "name": "とすれば",
+    "description": "In the case of; assuming; if A then B; expresses hypothetical reasoning",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_conditional_ba"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 144
+  },
+  {
+    "patternId": "n3_to_tomo_ni",
+    "name": "と共に",
+    "description": "Together with; at the same time as; expresses simultaneous actions or accompaniment",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_to"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 145
+  },
+  {
+    "patternId": "n3_tochuu_de",
+    "name": "途中で",
+    "description": "On the way; in the middle of; expresses interruption or something happening during a process",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_de"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 146
+  },
+  {
+    "patternId": "n3_tokoro_de",
+    "name": "ところで",
+    "description": "By the way; used to change topics in conversation",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 147
+  },
+  {
+    "patternId": "n3_tokoro_ga",
+    "name": "ところが",
+    "description": "Even so; however; even though; expresses unexpected contrast or contradiction",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 148
+  },
+  {
+    "patternId": "n3_toori_ni",
+    "name": "とおりに",
+    "description": "In the same way as; in the way; as; expresses doing something exactly as described",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 149
+  },
+  {
+    "patternId": "n3_toosu",
+    "name": "通す",
+    "description": "To do until the end; to continually do; expresses persistence or completion",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 150
+  },
+  {
+    "patternId": "n3_to_shite",
+    "name": "として",
+    "description": "As; in the role of; expresses capacity, role, or standpoint",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_to"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 151
+  },
+  {
+    "patternId": "n3_totemo_nai",
+    "name": "とても～ない",
+    "description": "Cannot possibly be; hardly; expresses impossibility or extreme difficulty",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_totemo",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 152
+  },
+  {
+    "patternId": "n3_to_wa_kagiranai",
+    "name": "とは限らない",
+    "description": "Not necessarily so; is not always true; expresses that something is not always the case",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 153
+  },
+  {
+    "patternId": "n3_tsui",
+    "name": "つい",
+    "description": "Accidentally; unintentionally; expresses doing something without meaning to",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 154
+  },
+  {
+    "patternId": "n3_tsui_ni",
+    "name": "ついに",
+    "description": "Finally; at last; in the end; expresses the culmination of a long process",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 155
+  },
+  {
+    "patternId": "n3_tsuide_ni",
+    "name": "ついでに",
+    "description": "While; incidentally; at the same time; expresses doing something as an additional action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 156
+  },
+  {
+    "patternId": "n3_tsumari",
+    "name": "つまり",
+    "description": "In other words; in summary; in short; used to clarify or summarize",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 157
+  },
+  {
+    "patternId": "n3_tsumori_datta",
+    "name": "つもりだった",
+    "description": "I thought I; I believe I did; expresses past intention or belief",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_tsumori"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 158
+  },
+  {
+    "patternId": "n3_tsumori_de",
+    "name": "つもりで",
+    "description": "With the intention of doing; expresses acting with a particular mindset or purpose",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_tsumori",
+      "n5_particle_de"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 159
+  },
+  {
+    "patternId": "n3_uchi_ni",
+    "name": "うちに",
+    "description": "While; before; expresses doing something during a limited time period",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 160
+  },
+  {
+    "patternId": "n3_ue_de",
+    "name": "上で",
+    "description": "Expresses 'upon', 'after', 'when', 'for', or 'in order to' - indicates something done as a basis or prerequisite for another action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_de",
+      "n5_te_iru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 161
+  },
+  {
+    "patternId": "n3_ue_ni",
+    "name": "上に",
+    "description": "Expresses 'as well', 'not only... but also' - adds additional information or emphasizes multiple qualities",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 162
+  },
+  {
+    "patternId": "n3_wa_betsu_to_shite",
+    "name": "は別として",
+    "description": "Expresses 'aside from', 'whether or not' - sets something aside from consideration",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wa",
+      "n3_to_shite"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 163
+  },
+  {
+    "patternId": "n3_wa_mochiron",
+    "name": "はもちろん",
+    "description": "Expresses 'not to mention', 'not only... but also' - emphasizes that something is obvious while adding more information",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 164
+  },
+  {
+    "patternId": "n3_wa_de_yuumei",
+    "name": "は～で有名",
+    "description": "Expresses 'famous for' - indicates what someone or something is well-known for",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_wa",
+      "n5_particle_de"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 165
+  },
+  {
+    "patternId": "n3_wake_da",
+    "name": "わけだ",
+    "description": "Expresses 'for that reason', 'no wonder' - indicates a logical conclusion or natural result",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 166
+  },
+  {
+    "patternId": "n3_wake_dewa_nai",
+    "name": "わけではない",
+    "description": "Expresses 'it doesn't mean that' - denies or clarifies that something is not necessarily the case",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 167
+  },
+  {
+    "patternId": "n3_wake_ga_nai",
+    "name": "わけがない",
+    "description": "Expresses 'there is no way that' - strongly denies the possibility of something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ga",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 168
+  },
+  {
+    "patternId": "n3_wake_ni_wa_ikanai",
+    "name": "わけにはいかない",
+    "description": "Expresses 'must not', 'cannot afford to' - indicates something that cannot be done due to circumstances or social expectations",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 169
+  },
+  {
+    "patternId": "n3_wari_ni",
+    "name": "割に",
+    "description": "Expresses 'considering', 'for', 'despite' - indicates something unexpected given the circumstances",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 170
+  },
+  {
+    "patternId": "n3_waza_to",
+    "name": "わざと",
+    "description": "Expresses 'on purpose', 'intentionally' - indicates deliberate action",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 171
+  },
+  {
+    "patternId": "n3_waza_waza",
+    "name": "わざわざ",
+    "description": "Expresses 'to go to the trouble of' - indicates making special effort or going out of one's way",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 172
+  },
+  {
+    "patternId": "n3_yori_mo",
+    "name": "よりも",
+    "description": "Expresses 'rather than', 'more than' - makes comparisons with emphasis",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_yori",
+      "n5_particle_mo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 173
+  },
+  {
+    "patternId": "n3_you_ga_nai",
+    "name": "ようがない",
+    "description": "Expresses 'there is no way to', 'it's impossible to' - indicates complete impossibility of doing something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_da",
+      "n5_particle_ga",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 174
+  },
+  {
+    "patternId": "n3_you_na_ki_ga_suru",
+    "name": "ような気がする",
+    "description": "Expresses 'have a feeling that', 'feels like', 'seems like' - indicates intuitive impression or vague feeling",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_na",
+      "n4_ga_suru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 175
+  },
+  {
+    "patternId": "n3_you_ni",
+    "name": "ように",
+    "description": "Expresses 'in order to', 'so that' - indicates purpose or desired outcome",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_ni_you_na"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 176
+  },
+  {
+    "patternId": "n3_you_ni_mieru",
+    "name": "ように見える",
+    "description": "Expresses 'to look', 'to seem', 'to appear' - indicates visual impression or appearance",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_ni_you_na",
+      "n4_ni_mieru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 177
+  },
+  {
+    "patternId": "n3_you_to_shinai",
+    "name": "ようとしない",
+    "description": "Expresses 'not try to', 'not make an effort to' - indicates unwillingness to attempt something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_to_omou",
+      "n5_ja_nai"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 178
+  },
+  {
+    "patternId": "n3_you_to_suru",
+    "name": "ようとする",
+    "description": "Expresses 'try to', 'attempt to', 'be about to' - indicates effort or intention to do something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n4_you_to_omou",
+      "n5_ni_suru"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 179
+  },
+  {
+    "patternId": "n3_zu_ni",
+    "name": "ずに",
+    "description": "Expresses 'without doing' - indicates performing an action without doing something else",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_naide"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 180
+  },
+  {
+    "patternId": "n3_zu_ni_wa_irarenai",
+    "name": "ずにはいられない",
+    "description": "Expresses 'can't help but feel', 'can't help but do' - indicates inability to resist doing something",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [
+      "n5_particle_ni",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 181
+  },
+  {
+    "patternId": "n3_zutsu",
+    "name": "ずつ",
+    "description": "Expresses 'apiece', 'each', 'at a time' - indicates equal distribution or gradual progression",
+    "cefrLevel": "B1",
+    "jlptLevel": "N3",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 182
+  }
+]

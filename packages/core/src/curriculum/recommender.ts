@@ -22,6 +22,7 @@ export interface RecommendationInput {
   knownPatternIds: Set<string>
   dailyNewItemLimit: number
   tomBriefInput: ExpandedBriefInput | null
+  spineBoosts?: Map<string, number> // refId/surfaceForm -> boost value from spine
 }
 
 // ── Scoring ──
@@ -46,7 +47,7 @@ interface ScoredCandidate {
 export function generateRecommendations(
   input: RecommendationInput
 ): CurriculumRecommendation[] {
-  const { bubble, knownSurfaceForms, knownPatternIds, dailyNewItemLimit, tomBriefInput } = input
+  const { bubble, knownSurfaceForms, knownPatternIds, dailyNewItemLimit, tomBriefInput, spineBoosts } = input
   log.debug('Generating recommendations', {
     currentLevel: bubble.currentLevel,
     frontierLevel: bubble.frontierLevel,
@@ -104,6 +105,17 @@ export function generateRecommendations(
     // Boost if fills avoidance gap
     if (avoidanceItemIds.size > 0 && candidate.itemType === 'grammar') {
       candidate.score += 0.2
+    }
+
+    // Apply spine boost: items in the current curriculum unit get a priority bump
+    if (spineBoosts) {
+      const surfaceBoost = candidate.surfaceForm ? spineBoosts.get(candidate.surfaceForm) : undefined
+      const patternBoost = candidate.patternId ? spineBoosts.get(candidate.patternId) : undefined
+      const boost = surfaceBoost ?? patternBoost ?? 0
+      if (boost > 0) {
+        candidate.score += boost
+        candidate.reason += '; in current curriculum unit'
+      }
     }
   }
 

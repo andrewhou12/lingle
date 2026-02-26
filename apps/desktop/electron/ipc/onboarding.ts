@@ -13,6 +13,11 @@ import {
   computeLevelFromChallenges,
   getLevelCefrMapping,
 } from '@core/onboarding'
+import {
+  getItemsBelowLevel,
+  getItemsForLevel,
+  loadJapaneseReferenceCorpus,
+} from '@core/curriculum/reference-data'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
 
 const log = createLogger('ipc:onboarding')
@@ -103,6 +108,19 @@ export function registerOnboardingHandlers(): void {
 
       const knownSet = new Set(result.knownItemIndices)
 
+      // Build a set of surface forms / pattern IDs the learner marked as known
+      const knownSurfaceForms = new Set<string>()
+      const knownPatternIds = new Set<string>()
+      for (let i = 0; i < assessmentItems.length; i++) {
+        if (knownSet.has(i)) {
+          if (assessmentItems[i].type === 'vocabulary') {
+            knownSurfaceForms.add(assessmentItems[i].surfaceForm)
+          } else if (assessmentItems[i].patternId) {
+            knownPatternIds.add(assessmentItems[i].patternId!)
+          }
+        }
+      }
+
       // Clean slate: remove items seeded by a previous onboarding run
       await db.lexicalItem.deleteMany({ where: { userId, source: 'onboarding' } })
       await db.grammarItem.deleteMany({
@@ -153,90 +171,100 @@ export function registerOnboardingHandlers(): void {
         last_review: new Date().toISOString(),
       }
 
-      // Seed items based on assessment results
-      for (let i = 0; i < assessmentItems.length; i++) {
-        const item = assessmentItems[i]
-        const isKnown = knownSet.has(i)
+      // ── Seed from the full corpus ──
 
-        if (item.type === 'vocabulary') {
-          await db.lexicalItem.create({
-            data: {
-              userId,
-              surfaceForm: item.surfaceForm,
-              reading: item.reading,
-              meaning: item.meaning,
-              partOfSpeech: item.partOfSpeech,
-              masteryState: isKnown ? 'apprentice_2' : 'unseen',
-              recognitionFsrs: (isKnown ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
-              productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-              tags: [item.level],
-              cefrLevel: getLevelCefrMapping(item.level),
-              source: 'onboarding',
-              exposureCount: isKnown ? 1 : 0,
-            },
-          })
-        } else if (item.type === 'grammar' && item.patternId) {
-          await db.grammarItem.create({
-            data: {
-              userId,
-              patternId: item.patternId,
-              name: item.surfaceForm,
-              description: item.meaning,
-              cefrLevel: getLevelCefrMapping(item.level),
-              masteryState: isKnown ? 'apprentice_2' : 'unseen',
-              recognitionFsrs: (isKnown ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
-              productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-            },
-          })
-        }
+      // 1. Items BELOW the learner's computed level → 'introduced' (bulk seed)
+      const belowLevel = getItemsBelowLevel(cefrLevel)
+      let seededBelow = 0
+
+      for (const vocab of belowLevel.vocabulary) {
+        const isKnownFromAssessment = knownSurfaceForms.has(vocab.surfaceForm)
+        await db.lexicalItem.create({
+          data: {
+            userId,
+            surfaceForm: vocab.surfaceForm,
+            reading: vocab.reading,
+            meaning: vocab.meaning,
+            partOfSpeech: vocab.partOfSpeech,
+            masteryState: isKnownFromAssessment ? 'apprentice_2' : 'introduced',
+            recognitionFsrs: (isKnownFromAssessment ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
+            productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+            tags: [vocab.jlptLevel],
+            cefrLevel: vocab.cefrLevel,
+            frequencyRank: vocab.frequencyRank,
+            source: 'onboarding',
+            exposureCount: isKnownFromAssessment ? 1 : 0,
+          },
+        })
+        seededBelow++
       }
 
-      // Also seed items from levels below the self-reported level as "introduced"
-      const levelOrder = ['N5', 'N4', 'N3', 'N2', 'N1']
-      const reportedIdx = levelOrder.indexOf(result.selfReportedLevel)
-      if (reportedIdx > 0) {
-        const lowerLevels = levelOrder.slice(0, reportedIdx)
-        const lowerItems = ASSESSMENT_ITEMS.filter(
-          (item) =>
-            lowerLevels.includes(item.level) &&
-            !assessmentItems.some(
-              (a) => a.surfaceForm === item.surfaceForm && a.level === item.level
-            )
-        )
-
-        for (const item of lowerItems) {
-          if (item.type === 'vocabulary') {
-            await db.lexicalItem.create({
-              data: {
-                userId,
-                surfaceForm: item.surfaceForm,
-                reading: item.reading,
-                meaning: item.meaning,
-                partOfSpeech: item.partOfSpeech,
-                masteryState: 'introduced',
-                recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-                productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-                tags: [item.level],
-                cefrLevel: getLevelCefrMapping(item.level),
-                source: 'onboarding',
-              },
-            })
-          } else if (item.type === 'grammar' && item.patternId) {
-            await db.grammarItem.create({
-              data: {
-                userId,
-                patternId: item.patternId,
-                name: item.surfaceForm,
-                description: item.meaning,
-                cefrLevel: getLevelCefrMapping(item.level),
-                masteryState: 'introduced',
-                recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-                productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
-              },
-            })
-          }
-        }
+      for (const grammar of belowLevel.grammar) {
+        const isKnownFromAssessment = knownPatternIds.has(grammar.patternId)
+        await db.grammarItem.create({
+          data: {
+            userId,
+            patternId: grammar.patternId,
+            name: grammar.name,
+            description: grammar.description,
+            cefrLevel: grammar.cefrLevel,
+            frequencyRank: grammar.frequencyRank,
+            masteryState: isKnownFromAssessment ? 'apprentice_2' : 'introduced',
+            recognitionFsrs: (isKnownFromAssessment ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
+            productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+            prerequisiteIds: grammar.prerequisiteIds,
+          },
+        })
+        seededBelow++
       }
+
+      // 2. Items AT the learner's computed level → assessment-known as 'apprentice_2', rest as 'unseen'
+      const atLevel = getItemsForLevel(cefrLevel)
+      let seededAtLevel = 0
+
+      for (const vocab of atLevel.vocabulary) {
+        const isKnown = knownSurfaceForms.has(vocab.surfaceForm)
+        await db.lexicalItem.create({
+          data: {
+            userId,
+            surfaceForm: vocab.surfaceForm,
+            reading: vocab.reading,
+            meaning: vocab.meaning,
+            partOfSpeech: vocab.partOfSpeech,
+            masteryState: isKnown ? 'apprentice_2' : 'unseen',
+            recognitionFsrs: (isKnown ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
+            productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+            tags: [vocab.jlptLevel],
+            cefrLevel: vocab.cefrLevel,
+            frequencyRank: vocab.frequencyRank,
+            source: 'onboarding',
+            exposureCount: isKnown ? 1 : 0,
+          },
+        })
+        seededAtLevel++
+      }
+
+      for (const grammar of atLevel.grammar) {
+        const isKnown = knownPatternIds.has(grammar.patternId)
+        await db.grammarItem.create({
+          data: {
+            userId,
+            patternId: grammar.patternId,
+            name: grammar.name,
+            description: grammar.description,
+            cefrLevel: grammar.cefrLevel,
+            frequencyRank: grammar.frequencyRank,
+            masteryState: isKnown ? 'apprentice_2' : 'unseen',
+            recognitionFsrs: (isKnown ? knownFsrs : initialFsrs) as unknown as Prisma.InputJsonValue,
+            productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+            prerequisiteIds: grammar.prerequisiteIds,
+          },
+        })
+        seededAtLevel++
+      }
+
+      // Items ABOVE the learner's level are NOT seeded — the curriculum generator
+      // introduces these when the learner is ready (level-up seeding)
 
       // Wipe stale curriculum so it regenerates from the new knowledge state
       await db.curriculumItem.deleteMany({ where: { userId } })
@@ -249,7 +277,9 @@ export function registerOnboardingHandlers(): void {
       log.info('onboarding:complete finished', {
         userId,
         computedLevel: cefrLevel,
-        itemsSeeded: assessmentItems.length,
+        seededBelow,
+        seededAtLevel,
+        totalSeeded: seededBelow + seededAtLevel,
         elapsedMs: elapsed(),
       })
 

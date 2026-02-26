@@ -10,12 +10,78 @@ import type { Prisma } from '@prisma/client'
 import { getDb } from '../db'
 import { getCurrentUserId } from '../auth-state'
 import { computeKnowledgeBubble } from '@core/curriculum/bubble'
-import { generateRecommendations } from '@core/curriculum/recommender'
+import { generateCurriculumPlan, type CurriculumPlan } from '@core/curriculum/planner'
+import { getItemsForLevel } from '@core/curriculum/reference-data'
 import { createInitialFsrsState } from '@core/fsrs/scheduler'
 import { gatherBubbleItems } from './_helpers/gather-items'
 import { createLogger } from '../logger'
 
 const log = createLogger('ipc:curriculum')
+
+/**
+ * Seeds next-level corpus items as 'unseen' when the learner is ready to advance.
+ */
+async function seedNextLevelItems(userId: string, frontierLevel: string): Promise<number> {
+  const db = getDb()
+  const frontier = getItemsForLevel(frontierLevel)
+  let seeded = 0
+
+  // Get existing items at the frontier level to avoid duplicates
+  const existingLexical = await db.lexicalItem.findMany({
+    where: { userId, cefrLevel: frontierLevel },
+    select: { surfaceForm: true },
+  })
+  const existingGrammar = await db.grammarItem.findMany({
+    where: { userId, cefrLevel: frontierLevel },
+    select: { patternId: true },
+  })
+  const existingSurfaceForms = new Set(existingLexical.map((i) => i.surfaceForm))
+  const existingPatternIds = new Set(existingGrammar.map((i) => i.patternId))
+
+  const initialFsrs = createInitialFsrsState()
+
+  for (const vocab of frontier.vocabulary) {
+    if (existingSurfaceForms.has(vocab.surfaceForm)) continue
+    await db.lexicalItem.create({
+      data: {
+        userId,
+        surfaceForm: vocab.surfaceForm,
+        reading: vocab.reading,
+        meaning: vocab.meaning,
+        partOfSpeech: vocab.partOfSpeech,
+        masteryState: 'unseen',
+        recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+        productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+        tags: [vocab.jlptLevel],
+        cefrLevel: vocab.cefrLevel,
+        frequencyRank: vocab.frequencyRank,
+        source: 'curriculum',
+      },
+    })
+    seeded++
+  }
+
+  for (const grammar of frontier.grammar) {
+    if (existingPatternIds.has(grammar.patternId)) continue
+    await db.grammarItem.create({
+      data: {
+        userId,
+        patternId: grammar.patternId,
+        name: grammar.name,
+        description: grammar.description,
+        cefrLevel: grammar.cefrLevel,
+        frequencyRank: grammar.frequencyRank,
+        masteryState: 'unseen',
+        recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+        productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+        prerequisiteIds: grammar.prerequisiteIds,
+      },
+    })
+    seeded++
+  }
+
+  return seeded
+}
 
 export function registerCurriculumHandlers(): void {
   ipcMain.handle(
@@ -69,15 +135,46 @@ export function registerCurriculumHandlers(): void {
         }))
       }
 
-      const recommendations = generateRecommendations({
+      // Compute due review count for pacing
+      const now = new Date().toISOString()
+      const dueReviews = lexicalItems.filter((i) => {
+        const fsrs = i.recognitionFsrs as unknown as FsrsState
+        return fsrs?.due && fsrs.due <= now
+      }).length + grammarItems.filter((i) => {
+        const fsrs = i.recognitionFsrs as unknown as FsrsState
+        return fsrs?.due && fsrs.due <= now
+      }).length
+
+      // Compute recent accuracy
+      const recentEvents = await db.reviewEvent.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' },
+        take: 50,
+      })
+      const recentAccuracy = recentEvents.length > 0
+        ? recentEvents.filter((e) => e.grade === 'good' || e.grade === 'easy').length / recentEvents.length
+        : 0.8 // default for new learners
+
+      // Use the new planner
+      const plan = generateCurriculumPlan({
         bubble,
+        items,
         knownSurfaceForms,
         knownPatternIds,
         dailyNewItemLimit: dailyLimit,
+        dueReviewCount: dueReviews,
+        recentAccuracy,
         tomBriefInput: null,
       })
 
-      for (const rec of recommendations) {
+      // Trigger level-up seeding if ready
+      if (plan.levelUpReady) {
+        const seeded = await seedNextLevelItems(userId, plan.frontierLevel)
+        log.info('Level-up seeding triggered', { frontierLevel: plan.frontierLevel, seeded })
+      }
+
+      // Persist recommendations
+      for (const rec of plan.newItems) {
         const created = await db.curriculumItem.create({
           data: {
             userId,
@@ -96,8 +193,12 @@ export function registerCurriculumHandlers(): void {
         rec.id = created.id
       }
 
-      log.info('curriculum:getRecommendations completed', { count: recommendations.length })
-      return recommendations
+      log.info('curriculum:getRecommendations completed', {
+        count: plan.newItems.length,
+        pacing: plan.pacing.reason,
+        reviewFocus: plan.reviewFocus.length,
+      })
+      return plan.newItems
     }
   )
 
@@ -207,15 +308,44 @@ export function registerCurriculumHandlers(): void {
       const profile = await db.learnerProfile.findUnique({ where: { userId } })
       const dailyLimit = profile?.dailyNewItemLimit ?? 10
 
-      const recommendations = generateRecommendations({
+      // Compute due review count
+      const now = new Date().toISOString()
+      const dueReviews = lexicalItems.filter((i) => {
+        const fsrs = i.recognitionFsrs as unknown as FsrsState
+        return fsrs?.due && fsrs.due <= now
+      }).length + grammarItems.filter((i) => {
+        const fsrs = i.recognitionFsrs as unknown as FsrsState
+        return fsrs?.due && fsrs.due <= now
+      }).length
+
+      // Compute recent accuracy
+      const recentEvents = await db.reviewEvent.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' },
+        take: 50,
+      })
+      const recentAccuracy = recentEvents.length > 0
+        ? recentEvents.filter((e) => e.grade === 'good' || e.grade === 'easy').length / recentEvents.length
+        : 0.8
+
+      const plan = generateCurriculumPlan({
         bubble,
+        items,
         knownSurfaceForms,
         knownPatternIds,
         dailyNewItemLimit: dailyLimit,
+        dueReviewCount: dueReviews,
+        recentAccuracy,
         tomBriefInput: null,
       })
 
-      for (const rec of recommendations) {
+      // Trigger level-up seeding if ready
+      if (plan.levelUpReady) {
+        const seeded = await seedNextLevelItems(userId, plan.frontierLevel)
+        log.info('Level-up seeding triggered during regenerate', { frontierLevel: plan.frontierLevel, seeded })
+      }
+
+      for (const rec of plan.newItems) {
         const created = await db.curriculumItem.create({
           data: {
             userId,
@@ -234,8 +364,11 @@ export function registerCurriculumHandlers(): void {
         rec.id = created.id
       }
 
-      log.info('curriculum:regenerate completed', { count: recommendations.length })
-      return recommendations
+      log.info('curriculum:regenerate completed', {
+        count: plan.newItems.length,
+        pacing: plan.pacing.reason,
+      })
+      return plan.newItems
     }
   )
 }

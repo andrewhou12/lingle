@@ -20,6 +20,7 @@ model User {
   pragmaticProfile     PragmaticProfile?
   lexicalItems         LexicalItem[]
   grammarItems         GrammarItem[]
+  chunkItems           ChunkItem[]
   reviewEvents         ReviewEvent[]
   conversationSessions ConversationSession[]
   tomInferences        TomInference[]
@@ -116,6 +117,41 @@ model GrammarItem {
   @@index([userId])
 }
 
+model ChunkItem {
+  id                  Int              @id @default(autoincrement())
+  userId              String
+  user                User             @relation(fields: [userId], references: [id])
+  itemKind            String           // "collocation" | "chunk" | "pragmatic_formula"
+  referenceId         String
+  phrase              String
+  reading             String?
+  meaning             String
+  componentItemIds    Int[]            // LexicalItem IDs
+  grammarDependencies String[]         @default([])
+  register            String?
+  domain              String?
+  cefrLevel           String?
+  masteryState        String           @default("unseen")
+  recognitionFsrs     Json
+  productionFsrs      Json
+  firstSeen           DateTime         @default(now())
+  lastReviewed        DateTime?
+  exposureCount       Int              @default(0)
+  productionCount     Int              @default(0)
+  productionWeight    Float            @default(0)
+  contextTypes        String[]         @default([])
+  contextCount        Int              @default(0)
+  frequencyRank       Int?
+  tags                String[]
+  source              String           @default("curriculum")
+  reviewEvents        ReviewEvent[]
+  contextLogs         ItemContextLog[]
+
+  @@unique([userId, referenceId])
+  @@index([userId])
+  @@index([userId, itemKind])
+}
+
 model ReviewEvent {
   id               Int          @id @default(autoincrement())
   userId           String
@@ -131,6 +167,8 @@ model ReviewEvent {
   lexicalItemId    Int?
   grammarItem      GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId    Int?
+  chunkItem        ChunkItem?   @relation(fields: [chunkItemId], references: [id])
+  chunkItemId      Int?
 
   @@index([userId])
 }
@@ -182,10 +220,13 @@ model ItemContextLog {
   lexicalItemId Int?
   grammarItem   GrammarItem? @relation(fields: [grammarItemId], references: [id])
   grammarItemId Int?
+  chunkItem     ChunkItem?   @relation(fields: [chunkItemId], references: [id])
+  chunkItemId   Int?
 
   @@index([userId])
   @@index([lexicalItemId, timestamp])
   @@index([grammarItemId, timestamp])
+  @@index([chunkItemId, timestamp])
 }
 
 model PragmaticProfile {

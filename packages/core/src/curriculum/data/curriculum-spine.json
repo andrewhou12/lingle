@@ -1,0 +1,1162 @@
+[
+  {
+    "unitId": "a1-01",
+    "unitNumber": 1,
+    "title": "First Contact",
+    "communicativeGoal": "Introduce yourself, greet people, and exchange basic information",
+    "domain": "self-introduction",
+    "vocabulary": [
+      { "refId": "jmdict-1531710", "surfaceForm": "名前", "role": "core" },
+      { "refId": "jmdict-1311110", "surfaceForm": "私", "role": "core" },
+      { "refId": "jmdict-1580640", "surfaceForm": "人", "role": "core" },
+      { "refId": "jmdict-1206900", "surfaceForm": "学生", "role": "core" },
+      { "refId": "jmdict-1387990", "surfaceForm": "先生", "role": "core" },
+      { "refId": "jmdict-1582710", "surfaceForm": "日本", "role": "supporting" },
+      { "refId": "jmdict-1577100", "surfaceForm": "何", "role": "supporting" },
+      { "refId": "jmdict-1198550", "surfaceForm": "会社", "role": "supporting" },
+      { "refId": "jmdict-1304970", "surfaceForm": "仕事", "role": "supporting" },
+      { "refId": "jmdict-1540170", "surfaceForm": "友達", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_particle_wa", "name": "は (topic)", "role": "core" },
+      { "refId": "n5_desu", "name": "だ・です", "role": "core" },
+      { "refId": "n5_particle_ka", "name": "か (question)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-014", "phrase": "名前を書く", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-055", "phrase": "田中と申します", "role": "supporting" },
+      { "refId": "chunk-057", "phrase": "はじめまして", "role": "core" },
+      { "refId": "chunk-058", "phrase": "よろしくお願いします", "role": "core" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-011", "phrase": "はじめまして", "role": "core" },
+      { "refId": "prag-012", "phrase": "よろしくお願いします", "role": "core" },
+      { "refId": "prag-014", "phrase": "〜と申します", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["prag-011", "prag-012"], "reason": "Self-introduction formulas always taught together as a pair" },
+      { "itemIds": ["n5_particle_wa", "n5_desu"], "reason": "Topic marker and copula form the basic sentence pattern XはYです" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-055", "requiredItems": ["n5_desu", "n5_particle_wa"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": []
+  },
+  {
+    "unitId": "a1-02",
+    "unitNumber": 2,
+    "title": "What Is This?",
+    "communicativeGoal": "Identify and ask about objects around you",
+    "domain": "objects",
+    "vocabulary": [
+      { "refId": "jmdict-1178590", "surfaceForm": "鉛筆", "role": "core" },
+      { "refId": "jmdict-1121380", "surfaceForm": "ペン", "role": "core" },
+      { "refId": "jmdict-1093450", "surfaceForm": "ノート", "role": "core" },
+      { "refId": "jmdict-1522150", "surfaceForm": "本", "role": "core" },
+      { "refId": "jmdict-1316140", "surfaceForm": "時計", "role": "core" },
+      { "refId": "jmdict-1078630", "surfaceForm": "テーブル", "role": "supporting" },
+      { "refId": "jmdict-1157070", "surfaceForm": "椅子", "role": "supporting" },
+      { "refId": "jmdict-1220210", "surfaceForm": "机", "role": "supporting" },
+      { "refId": "jmdict-1321900", "surfaceForm": "写真", "role": "supporting" },
+      { "refId": "jmdict-1443000", "surfaceForm": "電気", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_particle_no", "name": "の (possessive)", "role": "core" },
+      { "refId": "n5_particle_ka", "name": "か (question)", "role": "core" },
+      { "refId": "n5_ja_nai", "name": "じゃない (negative)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-009", "phrase": "写真を撮る", "role": "supporting" },
+      { "refId": "coll-031", "phrase": "電気をつける", "role": "supporting" },
+      { "refId": "coll-032", "phrase": "電気を消す", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-018", "phrase": "何がありますか", "role": "core" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-019", "phrase": "すみません", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_particle_no", "n5_particle_ka"], "reason": "Possessive and question markers enable asking 'Whose is this?' pattern" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-018", "requiredItems": ["n5_particle_ga", "n5_ga_arimasu", "n5_particle_ka"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": []
+  },
+  {
+    "unitId": "a1-03",
+    "unitNumber": 3,
+    "title": "Numbers & Counting",
+    "communicativeGoal": "Count things and talk about quantities using counters",
+    "domain": "numbers",
+    "vocabulary": [
+      { "refId": "jmdict-1160790", "surfaceForm": "一", "role": "core" },
+      { "refId": "jmdict-1461140", "surfaceForm": "二", "role": "core" },
+      { "refId": "jmdict-1579350", "surfaceForm": "三", "role": "core" },
+      { "refId": "jmdict-1579470", "surfaceForm": "四", "role": "core" },
+      { "refId": "jmdict-1268060", "surfaceForm": "五", "role": "core" },
+      { "refId": "jmdict-1585310", "surfaceForm": "六", "role": "core" },
+      { "refId": "jmdict-1319210", "surfaceForm": "七", "role": "core" },
+      { "refId": "jmdict-1583090", "surfaceForm": "八", "role": "core" },
+      { "refId": "jmdict-1578150", "surfaceForm": "九", "role": "core" },
+      { "refId": "jmdict-1579840", "surfaceForm": "十", "role": "core" },
+      { "refId": "jmdict-1488000", "surfaceForm": "百", "role": "supporting" },
+      { "refId": "jmdict-1388740", "surfaceForm": "千", "role": "supporting" },
+      { "refId": "jmdict-1584460", "surfaceForm": "万", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_particle_mo", "name": "も (also)", "role": "core" },
+      { "refId": "n5_particle_ga", "name": "が (subject)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-047", "phrase": "時間がある", "role": "supporting" },
+      { "refId": "coll-048", "phrase": "時間がない", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-015", "phrase": "時間がありません", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1160790", "jmdict-1461140", "jmdict-1579350"], "reason": "Numbers 1-3 taught together as initial counting set" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-015", "requiredItems": ["n5_ga_arimasu", "n5_particle_ga"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": []
+  },
+  {
+    "unitId": "a1-04",
+    "unitNumber": 4,
+    "title": "Where Things Are",
+    "communicativeGoal": "Describe where things are located and talk about existence",
+    "domain": "location",
+    "vocabulary": [
+      { "refId": "jmdict-1352130", "surfaceForm": "上", "role": "core" },
+      { "refId": "jmdict-1184140", "surfaceForm": "下", "role": "core" },
+      { "refId": "jmdict-1423310", "surfaceForm": "中", "role": "core" },
+      { "refId": "jmdict-1392580", "surfaceForm": "前", "role": "core" },
+      { "refId": "jmdict-1269410", "surfaceForm": "後ろ", "role": "core" },
+      { "refId": "jmdict-1171010", "surfaceForm": "右", "role": "core" },
+      { "refId": "jmdict-1290800", "surfaceForm": "左", "role": "core" },
+      { "refId": "jmdict-1555830", "surfaceForm": "隣", "role": "supporting" },
+      { "refId": "jmdict-1242160", "surfaceForm": "近く", "role": "supporting" },
+      { "refId": "jmdict-1499320", "surfaceForm": "部屋", "role": "supporting" },
+      { "refId": "jmdict-1084810", "surfaceForm": "トイレ", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_particle_ni", "name": "に (location)", "role": "core" },
+      { "refId": "n5_ga_arimasu", "name": "があります", "role": "core" },
+      { "refId": "n5_ga_imasu", "name": "がいます", "role": "core" },
+      { "refId": "n5_particle_no", "name": "の (possessive)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-033", "phrase": "ドアを開ける", "role": "supporting" },
+      { "refId": "coll-034", "phrase": "ドアを閉める", "role": "supporting" },
+      { "refId": "coll-035", "phrase": "窓を開ける", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-011", "phrase": "机の上に本があります", "role": "core" },
+      { "refId": "chunk-012", "phrase": "部屋に猫がいます", "role": "core" },
+      { "refId": "chunk-013", "phrase": "トイレはどこですか", "role": "core" },
+      { "refId": "chunk-014", "phrase": "駅はどこですか", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-019", "phrase": "すみません", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_ga_arimasu", "n5_ga_imasu"], "reason": "Existence verbs for inanimate and animate objects taught as a contrasting pair" },
+      { "itemIds": ["jmdict-1352130", "jmdict-1184140"], "reason": "上 and 下 taught as spatial antonym pair" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-011", "requiredItems": ["n5_particle_no", "n5_particle_ni", "n5_ga_arimasu"], "masteryThreshold": "apprentice_2" },
+      { "chunkRefId": "chunk-012", "requiredItems": ["n5_particle_ni", "n5_ga_imasu"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-05",
+    "unitNumber": 5,
+    "title": "My Daily Routine",
+    "communicativeGoal": "Talk about daily activities and tell time",
+    "domain": "daily-life",
+    "vocabulary": [
+      { "refId": "jmdict-1428280", "surfaceForm": "朝", "role": "core" },
+      { "refId": "jmdict-1426250", "surfaceForm": "昼", "role": "core" },
+      { "refId": "jmdict-1536350", "surfaceForm": "夜", "role": "core" },
+      { "refId": "jmdict-1524720", "surfaceForm": "毎日", "role": "core" },
+      { "refId": "jmdict-1223640", "surfaceForm": "起きる", "role": "core" },
+      { "refId": "jmdict-1360010", "surfaceForm": "寝る", "role": "core" },
+      { "refId": "jmdict-1358280", "surfaceForm": "食べる", "role": "core" },
+      { "refId": "jmdict-1169870", "surfaceForm": "飲む", "role": "core" },
+      { "refId": "jmdict-2020680", "surfaceForm": "時", "role": "supporting" },
+      { "refId": "jmdict-1502860", "surfaceForm": "分", "role": "supporting" },
+      { "refId": "jmdict-1478750", "surfaceForm": "半", "role": "supporting" },
+      { "refId": "jmdict-1269060", "surfaceForm": "午前", "role": "supporting" },
+      { "refId": "jmdict-1268990", "surfaceForm": "午後", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_te_iru", "name": "ている (habitual)", "role": "core" },
+      { "refId": "n5_particle_ni", "name": "に (time)", "role": "core" },
+      { "refId": "n5_sore_kara", "name": "それから (and then)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-018", "phrase": "朝ごはんを食べる", "role": "core" },
+      { "refId": "coll-019", "phrase": "昼ごはんを食べる", "role": "core" },
+      { "refId": "coll-020", "phrase": "晩ごはんを食べる", "role": "core" },
+      { "refId": "coll-012", "phrase": "お風呂に入る", "role": "supporting" },
+      { "refId": "coll-057", "phrase": "歯を磨く", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-027", "phrase": "毎日勉強します", "role": "supporting" },
+      { "refId": "chunk-028", "phrase": "毎朝走ります", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-001", "phrase": "おはようございます", "role": "core" },
+      { "refId": "prag-003", "phrase": "こんにちは", "role": "core" },
+      { "refId": "prag-004", "phrase": "こんばんは", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1223640", "jmdict-1360010"], "reason": "起きる and 寝る taught as antonym pair for daily routine bookends" },
+      { "itemIds": ["prag-001", "prag-003", "prag-004"], "reason": "Time-of-day greetings taught together" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-027", "requiredItems": ["n5_particle_wo", "n5_te_iru"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-06",
+    "unitNumber": 6,
+    "title": "Going Places",
+    "communicativeGoal": "Discuss transportation and describe where you are going",
+    "domain": "movement",
+    "vocabulary": [
+      { "refId": "jmdict-1578850", "surfaceForm": "行く", "role": "core" },
+      { "refId": "jmdict-1547720", "surfaceForm": "来る", "role": "core" },
+      { "refId": "jmdict-1221270", "surfaceForm": "帰る", "role": "core" },
+      { "refId": "jmdict-1443530", "surfaceForm": "電車", "role": "core" },
+      { "refId": "jmdict-1098390", "surfaceForm": "バス", "role": "core" },
+      { "refId": "jmdict-1323080", "surfaceForm": "車", "role": "core" },
+      { "refId": "jmdict-1318290", "surfaceForm": "自転車", "role": "supporting" },
+      { "refId": "jmdict-1175140", "surfaceForm": "駅", "role": "core" },
+      { "refId": "jmdict-1245570", "surfaceForm": "空港", "role": "supporting" },
+      { "refId": "jmdict-1076190", "surfaceForm": "タクシー", "role": "supporting" },
+      { "refId": "jmdict-1206730", "surfaceForm": "学校", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_ni_he_direction", "name": "に/へ (direction)", "role": "core" },
+      { "refId": "n5_particle_de", "name": "で (means)", "role": "core" },
+      { "refId": "n5_particle_wo", "name": "を (object/route)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-002", "phrase": "電車に乗る", "role": "core" },
+      { "refId": "coll-013", "phrase": "バスに乗る", "role": "core" },
+      { "refId": "coll-021", "phrase": "学校に行く", "role": "core" },
+      { "refId": "coll-023", "phrase": "家に帰る", "role": "core" },
+      { "refId": "coll-053", "phrase": "タクシーに乗る", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-010", "phrase": "いってきます", "role": "supporting" },
+      { "refId": "prag-008", "phrase": "ただいま", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1578850", "jmdict-1547720", "jmdict-1221270"], "reason": "Core movement verbs 行く/来る/帰る taught as a triad" },
+      { "itemIds": ["prag-010", "prag-008"], "reason": "Departure and return greetings taught as a pair" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-07",
+    "unitNumber": 7,
+    "title": "Describing Things",
+    "communicativeGoal": "Describe people, places, and things using adjectives",
+    "domain": "description",
+    "vocabulary": [
+      { "refId": "jmdict-1588880", "surfaceForm": "大きい", "role": "core" },
+      { "refId": "jmdict-1347750", "surfaceForm": "小さい", "role": "core" },
+      { "refId": "jmdict-1361490", "surfaceForm": "新しい", "role": "core" },
+      { "refId": "jmdict-1265070", "surfaceForm": "古い", "role": "core" },
+      { "refId": "jmdict-1283190", "surfaceForm": "高い", "role": "core" },
+      { "refId": "jmdict-1153670", "surfaceForm": "安い", "role": "core" },
+      { "refId": "jmdict-1429750", "surfaceForm": "長い", "role": "supporting" },
+      { "refId": "jmdict-1418620", "surfaceForm": "短い", "role": "supporting" },
+      { "refId": "jmdict-1260720", "surfaceForm": "元気", "role": "supporting" },
+      { "refId": "jmdict-1381820", "surfaceForm": "静か", "role": "supporting" },
+      { "refId": "jmdict-1591900", "surfaceForm": "綺麗", "role": "supporting" },
+      { "refId": "jmdict-1541620", "surfaceForm": "有名", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_adjective_i", "name": "い-adjectives", "role": "core" },
+      { "refId": "n5_adjective_na", "name": "な-adjectives", "role": "core" },
+      { "refId": "n5_totemo", "name": "とても (very)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-006", "phrase": "天気がいい", "role": "supporting" },
+      { "refId": "coll-007", "phrase": "天気が悪い", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1588880", "jmdict-1347750"], "reason": "大きい/小さい taught as antonym pair" },
+      { "itemIds": ["jmdict-1361490", "jmdict-1265070"], "reason": "新しい/古い taught as antonym pair" },
+      { "itemIds": ["n5_adjective_i", "n5_adjective_na"], "reason": "Both adjective types introduced together to learn the distinction early" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-08",
+    "unitNumber": 8,
+    "title": "What I Like",
+    "communicativeGoal": "Express preferences, likes, and dislikes",
+    "domain": "preferences",
+    "vocabulary": [
+      { "refId": "jmdict-1277450", "surfaceForm": "好き", "role": "core" },
+      { "refId": "jmdict-1257240", "surfaceForm": "嫌い", "role": "core" },
+      { "refId": "jmdict-1353320", "surfaceForm": "上手", "role": "core" },
+      { "refId": "jmdict-1185200", "surfaceForm": "下手", "role": "core" },
+      { "refId": "jmdict-1183720", "surfaceForm": "音楽", "role": "core" },
+      { "refId": "jmdict-1173720", "surfaceForm": "映画", "role": "core" },
+      { "refId": "jmdict-1073210", "surfaceForm": "スポーツ", "role": "supporting" },
+      { "refId": "jmdict-1553170", "surfaceForm": "旅行", "role": "supporting" },
+      { "refId": "jmdict-1554310", "surfaceForm": "料理", "role": "supporting" },
+      { "refId": "jmdict-1172910", "surfaceForm": "運動", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_no_ga_suki", "name": "のが好き", "role": "core" },
+      { "refId": "n5_no_ga_jouzu", "name": "のが上手", "role": "supporting" },
+      { "refId": "n5_no_ga_heta", "name": "のが下手", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-076", "phrase": "日本語が好き", "role": "core" },
+      { "refId": "coll-077", "phrase": "猫が嫌い", "role": "supporting" },
+      { "refId": "coll-075", "phrase": "日本語が上手", "role": "supporting" },
+      { "refId": "coll-025", "phrase": "音楽を聞く", "role": "supporting" },
+      { "refId": "coll-027", "phrase": "映画を見る", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-001", "phrase": "食べるのが好き", "role": "core" },
+      { "refId": "chunk-005", "phrase": "音楽が好きです", "role": "core" },
+      { "refId": "chunk-006", "phrase": "日本語が好きです", "role": "supporting" },
+      { "refId": "chunk-009", "phrase": "猫が好きじゃない", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1277450", "jmdict-1257240"], "reason": "好き/嫌い taught as preference antonym pair" },
+      { "itemIds": ["jmdict-1353320", "jmdict-1185200"], "reason": "上手/下手 taught as ability antonym pair" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-001", "requiredItems": ["n5_no_ga_suki", "n5_particle_ga"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-09",
+    "unitNumber": 9,
+    "title": "Eating & Drinking",
+    "communicativeGoal": "Order food, talk about meals, and express hunger",
+    "domain": "food",
+    "vocabulary": [
+      { "refId": "jmdict-1371260", "surfaceForm": "水", "role": "core" },
+      { "refId": "jmdict-1002430", "surfaceForm": "お茶", "role": "core" },
+      { "refId": "jmdict-1463480", "surfaceForm": "肉", "role": "core" },
+      { "refId": "jmdict-1578010", "surfaceForm": "魚", "role": "core" },
+      { "refId": "jmdict-1537370", "surfaceForm": "野菜", "role": "core" },
+      { "refId": "jmdict-1193060", "surfaceForm": "果物", "role": "supporting" },
+      { "refId": "jmdict-1103090", "surfaceForm": "パン", "role": "core" },
+      { "refId": "jmdict-1270590", "surfaceForm": "ご飯", "role": "core" },
+      { "refId": "jmdict-1549140", "surfaceForm": "卵", "role": "supporting" },
+      { "refId": "jmdict-1133790", "surfaceForm": "メニュー", "role": "supporting" },
+      { "refId": "jmdict-1426650", "surfaceForm": "注文", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_particle_wo", "name": "を (object)", "role": "core" },
+      { "refId": "n5_wo_kudasai", "name": "をください", "role": "core" },
+      { "refId": "n5_ga_hoshii", "name": "がほしい", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-016", "phrase": "お茶を飲む", "role": "core" },
+      { "refId": "coll-017", "phrase": "水を飲む", "role": "core" },
+      { "refId": "coll-004", "phrase": "食事をする", "role": "core" },
+      { "refId": "coll-039", "phrase": "料理をする", "role": "supporting" },
+      { "refId": "coll-069", "phrase": "お腹が空く", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-026", "phrase": "水をください", "role": "core" },
+      { "refId": "chunk-010", "phrase": "コーヒーが欲しい", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-023", "phrase": "いただきます", "role": "core" },
+      { "refId": "prag-024", "phrase": "ごちそうさまでした", "role": "core" },
+      { "refId": "prag-029", "phrase": "これをください", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["prag-023", "prag-024"], "reason": "Meal-time formulas いただきます/ごちそうさまでした always taught as a pair" },
+      { "itemIds": ["n5_particle_wo", "n5_wo_kudasai"], "reason": "Object marker を leads naturally into をください request pattern" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-026", "requiredItems": ["n5_wo_kudasai"], "masteryThreshold": "apprentice_1" }
+    ],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-10",
+    "unitNumber": 10,
+    "title": "Shopping",
+    "communicativeGoal": "Buy things, ask about prices, and handle money",
+    "domain": "shopping",
+    "vocabulary": [
+      { "refId": "jmdict-1582125", "surfaceForm": "店", "role": "core" },
+      { "refId": "jmdict-1500940", "surfaceForm": "服", "role": "core" },
+      { "refId": "jmdict-1246700", "surfaceForm": "靴", "role": "core" },
+      { "refId": "jmdict-1519170", "surfaceForm": "帽子", "role": "supporting" },
+      { "refId": "jmdict-1001820", "surfaceForm": "お金", "role": "core" },
+      { "refId": "jmdict-1600160", "surfaceForm": "値段", "role": "core" },
+      { "refId": "jmdict-1296970", "surfaceForm": "財布", "role": "supporting" },
+      { "refId": "jmdict-1473740", "surfaceForm": "買う", "role": "core" },
+      { "refId": "jmdict-1001710", "surfaceForm": "お菓子", "role": "supporting" },
+      { "refId": "jmdict-1000420", "surfaceForm": "彼の", "role": "core" }
+    ],
+    "grammar": [
+      { "refId": "n5_adjective_i", "name": "い-adjectives (高い/安い)", "role": "core" },
+      { "refId": "n5_particle_wo", "name": "を (object)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-010", "phrase": "買い物をする", "role": "core" },
+      { "refId": "coll-038", "phrase": "お金を払う", "role": "core" },
+      { "refId": "coll-058", "phrase": "服を着る", "role": "supporting" },
+      { "refId": "coll-059", "phrase": "靴を履く", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-016", "phrase": "お金がない", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-027", "phrase": "いらっしゃいませ", "role": "core" },
+      { "refId": "prag-028", "phrase": "お会計お願いします", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1283190", "jmdict-1153670"], "reason": "高い/安い price adjectives taught together in shopping context" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01"]
+  },
+  {
+    "unitId": "a1-11",
+    "unitNumber": 11,
+    "title": "Talking About the Past",
+    "communicativeGoal": "Narrate past events and describe how things were",
+    "domain": "narratives",
+    "vocabulary": [
+      { "refId": "jmdict-1579260", "surfaceForm": "昨日", "role": "core" },
+      { "refId": "jmdict-1579110", "surfaceForm": "今日", "role": "core" },
+      { "refId": "jmdict-1584660", "surfaceForm": "明日", "role": "core" },
+      { "refId": "jmdict-1231690", "surfaceForm": "去年", "role": "supporting" },
+      { "refId": "jmdict-1579130", "surfaceForm": "今年", "role": "supporting" },
+      { "refId": "jmdict-1548220", "surfaceForm": "来年", "role": "supporting" },
+      { "refId": "jmdict-1207240", "surfaceForm": "楽しい", "role": "core" },
+      { "refId": "jmdict-1553170", "surfaceForm": "旅行", "role": "supporting" },
+      { "refId": "jmdict-1173720", "surfaceForm": "映画", "role": "supporting" },
+      { "refId": "jmdict-1460850", "surfaceForm": "難しい", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_ta_koto_ga_aru", "name": "たことがある (experience)", "role": "core" },
+      { "refId": "n5_te_kara", "name": "てから (after doing)", "role": "supporting" },
+      { "refId": "n5_ne", "name": "ね (agreement)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-078", "phrase": "旅行に行く", "role": "core" },
+      { "refId": "coll-027", "phrase": "映画を見る", "role": "supporting" },
+      { "refId": "coll-003", "phrase": "勉強をする", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1579260", "jmdict-1579110", "jmdict-1584660"], "reason": "Temporal trio 昨日/今日/明日 taught together" },
+      { "itemIds": ["jmdict-1231690", "jmdict-1579130", "jmdict-1548220"], "reason": "Year temporal trio 去年/今年/来年 taught together" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05"]
+  },
+  {
+    "unitId": "a1-12",
+    "unitNumber": 12,
+    "title": "Wanting & Planning",
+    "communicativeGoal": "Express desires and describe future plans",
+    "domain": "desires",
+    "vocabulary": [
+      { "refId": "jmdict-1547330", "surfaceForm": "欲しい", "role": "core" },
+      { "refId": "jmdict-1553170", "surfaceForm": "旅行", "role": "supporting" },
+      { "refId": "jmdict-1512670", "surfaceForm": "勉強", "role": "supporting" },
+      { "refId": "jmdict-1304970", "surfaceForm": "仕事", "role": "supporting" },
+      { "refId": "jmdict-1584660", "surfaceForm": "明日", "role": "supporting" },
+      { "refId": "jmdict-1548220", "surfaceForm": "来年", "role": "supporting" },
+      { "refId": "jmdict-1419110", "surfaceForm": "誕生日", "role": "supporting" },
+      { "refId": "jmdict-1116840", "surfaceForm": "プレゼント", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_tai", "name": "たい (want to)", "role": "core" },
+      { "refId": "n5_tsumori", "name": "つもり (intend to)", "role": "core" },
+      { "refId": "n5_ga_hoshii", "name": "がほしい (want thing)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-078", "phrase": "旅行に行く", "role": "supporting" },
+      { "refId": "coll-003", "phrase": "勉強をする", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-037", "phrase": "日本に行きたいです", "role": "core" },
+      { "refId": "chunk-038", "phrase": "寿司を食べたいです", "role": "core" },
+      { "refId": "chunk-040", "phrase": "もっと勉強したい", "role": "supporting" },
+      { "refId": "chunk-042", "phrase": "何をしたいですか", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_tai", "n5_ga_hoshii"], "reason": "Want to do (たい) vs want a thing (ほしい) contrasted together" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-037", "requiredItems": ["n5_tai", "n5_ni_he_direction"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05"]
+  },
+  {
+    "unitId": "a1-13",
+    "unitNumber": 13,
+    "title": "Asking Permission",
+    "communicativeGoal": "Make polite requests and ask for permission",
+    "domain": "requests",
+    "vocabulary": [
+      { "refId": "jmdict-1321900", "surfaceForm": "写真", "role": "core" },
+      { "refId": "jmdict-1401400", "surfaceForm": "窓", "role": "supporting" },
+      { "refId": "jmdict-1087820", "surfaceForm": "ドア", "role": "supporting" },
+      { "refId": "jmdict-1202450", "surfaceForm": "開ける", "role": "core" },
+      { "refId": "jmdict-1508590", "surfaceForm": "閉める", "role": "core" },
+      { "refId": "jmdict-1259290", "surfaceForm": "見る", "role": "supporting" },
+      { "refId": "jmdict-1410590", "surfaceForm": "待つ", "role": "supporting" },
+      { "refId": "jmdict-1291800", "surfaceForm": "座る", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_te_mo_ii_desu", "name": "てもいいです (permission)", "role": "core" },
+      { "refId": "n5_te_kudasai", "name": "てください (please do)", "role": "core" },
+      { "refId": "n5_te_wa_ikenai", "name": "てはいけない (must not)", "role": "supporting" },
+      { "refId": "n5_naide_kudasai", "name": "ないでください (please don't)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-033", "phrase": "ドアを開ける", "role": "supporting" },
+      { "refId": "coll-034", "phrase": "ドアを閉める", "role": "supporting" },
+      { "refId": "coll-009", "phrase": "写真を撮る", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-022", "phrase": "写真を撮ってもいいですか", "role": "core" },
+      { "refId": "chunk-023", "phrase": "座ってもいいですか", "role": "core" },
+      { "refId": "chunk-020", "phrase": "待ってください", "role": "core" },
+      { "refId": "chunk-019", "phrase": "見てください", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-019", "phrase": "すみません", "role": "core" },
+      { "refId": "prag-022", "phrase": "どういたしまして", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_te_mo_ii_desu", "n5_te_wa_ikenai"], "reason": "Permission and prohibition て-form patterns taught as contrasting pair" },
+      { "itemIds": ["n5_te_kudasai", "n5_naide_kudasai"], "reason": "Positive and negative request patterns taught together" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-022", "requiredItems": ["n5_te_mo_ii_desu", "n5_particle_ka"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05"]
+  },
+  {
+    "unitId": "a1-14",
+    "unitNumber": 14,
+    "title": "Giving Reasons",
+    "communicativeGoal": "Explain why and give reasons for actions",
+    "domain": "explanation",
+    "vocabulary": [
+      { "refId": "jmdict-1550140", "surfaceForm": "理由", "role": "supporting" },
+      { "refId": "jmdict-1519290", "surfaceForm": "忙しい", "role": "core" },
+      { "refId": "jmdict-1577000", "surfaceForm": "暇", "role": "core" },
+      { "refId": "jmdict-1414150", "surfaceForm": "大丈夫", "role": "core" },
+      { "refId": "jmdict-1536010", "surfaceForm": "問題", "role": "supporting" },
+      { "refId": "jmdict-1415000", "surfaceForm": "大変", "role": "supporting" },
+      { "refId": "jmdict-1171900", "surfaceForm": "雨", "role": "supporting" },
+      { "refId": "jmdict-1438690", "surfaceForm": "天気", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_kara", "name": "から (because)", "role": "core" },
+      { "refId": "n5_node", "name": "ので (since)", "role": "core" },
+      { "refId": "n5_doushite", "name": "どうして (why)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-011", "phrase": "仕事をする", "role": "supporting" },
+      { "refId": "coll-044", "phrase": "雨が降る", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-049", "phrase": "雨が降っているから", "role": "core" },
+      { "refId": "chunk-050", "phrase": "忙しいから行けない", "role": "core" },
+      { "refId": "chunk-051", "phrase": "明日は休みなので", "role": "core" },
+      { "refId": "chunk-054", "phrase": "疲れたので早く寝たい", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_kara", "n5_node"], "reason": "から (casual) and ので (polite) taught together as register pair for giving reasons" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-049", "requiredItems": ["n5_kara", "n5_te_iru"], "masteryThreshold": "apprentice_2" },
+      { "chunkRefId": "chunk-051", "requiredItems": ["n5_node", "n5_adjective_na"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05"]
+  },
+  {
+    "unitId": "a1-15",
+    "unitNumber": 15,
+    "title": "Comparing Things",
+    "communicativeGoal": "Compare items and express superlatives",
+    "domain": "comparison",
+    "vocabulary": [
+      { "refId": "jmdict-1191320", "surfaceForm": "夏", "role": "supporting" },
+      { "refId": "jmdict-1446070", "surfaceForm": "冬", "role": "supporting" },
+      { "refId": "jmdict-1341000", "surfaceForm": "春", "role": "supporting" },
+      { "refId": "jmdict-1332650", "surfaceForm": "秋", "role": "supporting" },
+      { "refId": "jmdict-1193060", "surfaceForm": "果物", "role": "supporting" },
+      { "refId": "jmdict-1443530", "surfaceForm": "電車", "role": "supporting" },
+      { "refId": "jmdict-1098390", "surfaceForm": "バス", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_yori_hou_ga", "name": "より〜のほうが", "role": "core" },
+      { "refId": "n5_ichiban", "name": "一番 (superlative)", "role": "core" },
+      { "refId": "n5_no_naka_de_ichiban", "name": "の中で一番", "role": "core" },
+      { "refId": "n5_wa_dou_desu_ka", "name": "はどうですか", "role": "supporting" }
+    ],
+    "collocations": [],
+    "chunks": [
+      { "refId": "chunk-043", "phrase": "夏より冬のほうが好き", "role": "core" },
+      { "refId": "chunk-044", "phrase": "バスより電車のほうが速い", "role": "core" },
+      { "refId": "chunk-046", "phrase": "果物の中でりんごが一番好き", "role": "core" },
+      { "refId": "chunk-048", "phrase": "どちらのほうが好きですか", "role": "core" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_yori_hou_ga", "n5_ichiban"], "reason": "Comparative and superlative patterns taught together" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-043", "requiredItems": ["n5_yori_hou_ga", "n5_no_ga_suki"], "masteryThreshold": "apprentice_2" },
+      { "chunkRefId": "chunk-046", "requiredItems": ["n5_no_naka_de_ichiban", "n5_particle_ga"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05"]
+  },
+  {
+    "unitId": "a1-16",
+    "unitNumber": 16,
+    "title": "Making Plans Together",
+    "communicativeGoal": "Invite people and suggest activities together",
+    "domain": "invitations",
+    "vocabulary": [
+      { "refId": "jmdict-1163400", "surfaceForm": "一緒", "role": "core" },
+      { "refId": "jmdict-1538130", "surfaceForm": "約束", "role": "core" },
+      { "refId": "jmdict-1100760", "surfaceForm": "パーティー", "role": "supporting" },
+      { "refId": "jmdict-1419110", "surfaceForm": "誕生日", "role": "supporting" },
+      { "refId": "jmdict-1273270", "surfaceForm": "公園", "role": "supporting" },
+      { "refId": "jmdict-1173750", "surfaceForm": "映画館", "role": "supporting" },
+      { "refId": "jmdict-1145310", "surfaceForm": "レストラン", "role": "supporting" },
+      { "refId": "jmdict-1540170", "surfaceForm": "友達", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_masen_ka", "name": "ませんか (invitation)", "role": "core" },
+      { "refId": "n5_mashou", "name": "ましょう (let's)", "role": "core" },
+      { "refId": "n5_mashou_ka", "name": "ましょうか (shall we)", "role": "supporting" },
+      { "refId": "n5_issho_ni", "name": "一緒に (together)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-049", "phrase": "約束をする", "role": "core" },
+      { "refId": "coll-024", "phrase": "友達に会う", "role": "core" },
+      { "refId": "coll-072", "phrase": "パーティーに出る", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-016", "phrase": "ありがとうございます", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_masen_ka", "n5_mashou"], "reason": "Invitation (ませんか) and suggestion (ましょう) taught as a functional pair" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10"]
+  },
+  {
+    "unitId": "a1-17",
+    "unitNumber": 17,
+    "title": "How Things Are Done",
+    "communicativeGoal": "Describe how actions are performed using adverbs",
+    "domain": "manner",
+    "vocabulary": [
+      { "refId": "jmdict-1402540", "surfaceForm": "走る", "role": "core" },
+      { "refId": "jmdict-1514320", "surfaceForm": "歩く", "role": "core" },
+      { "refId": "jmdict-1562350", "surfaceForm": "話す", "role": "core" },
+      { "refId": "jmdict-1343950", "surfaceForm": "書く", "role": "core" },
+      { "refId": "jmdict-1421970", "surfaceForm": "遅い", "role": "supporting" },
+      { "refId": "jmdict-1348870", "surfaceForm": "少し", "role": "supporting" },
+      { "refId": "jmdict-1598680", "surfaceForm": "時々", "role": "supporting" },
+      { "refId": "jmdict-1512670", "surfaceForm": "勉強", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_itsumo", "name": "いつも (always)", "role": "core" },
+      { "refId": "n5_totemo", "name": "とても (very)", "role": "supporting" },
+      { "refId": "n4_nagara", "name": "ながら (while doing)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-025", "phrase": "音楽を聞く", "role": "supporting" },
+      { "refId": "coll-030", "phrase": "日本語を話す", "role": "core" },
+      { "refId": "coll-028", "phrase": "本を読む", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-027", "phrase": "毎日勉強します", "role": "supporting" },
+      { "refId": "chunk-034", "phrase": "日曜日にいつも寝ます", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_itsumo", "n4_nagara"], "reason": "Frequency adverb and simultaneous action pattern together show manner of doing things" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10"]
+  },
+  {
+    "unitId": "a1-18",
+    "unitNumber": 18,
+    "title": "Ability & Possibility",
+    "communicativeGoal": "Discuss what you can and cannot do",
+    "domain": "ability",
+    "vocabulary": [
+      { "refId": "jmdict-1562350", "surfaceForm": "話す", "role": "core" },
+      { "refId": "jmdict-1456360", "surfaceForm": "読む", "role": "core" },
+      { "refId": "jmdict-1343950", "surfaceForm": "書く", "role": "core" },
+      { "refId": "jmdict-1597890", "surfaceForm": "作る", "role": "supporting" },
+      { "refId": "jmdict-1305990", "surfaceForm": "使う", "role": "supporting" },
+      { "refId": "jmdict-1554310", "surfaceForm": "料理", "role": "supporting" },
+      { "refId": "jmdict-1323080", "surfaceForm": "車", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n4_koto_ga_dekiru", "name": "ことができる (ability)", "role": "core" },
+      { "refId": "n4_potential", "name": "potential form", "role": "core" },
+      { "refId": "n5_mada", "name": "まだ (not yet)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-030", "phrase": "日本語を話す", "role": "core" },
+      { "refId": "coll-079", "phrase": "日本語が分かる", "role": "core" }
+    ],
+    "chunks": [
+      { "refId": "chunk-035", "phrase": "日本語を話すことができる", "role": "core" },
+      { "refId": "chunk-036", "phrase": "漢字を読むことができる", "role": "core" },
+      { "refId": "chunk-041", "phrase": "車を運転することができない", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n4_koto_ga_dekiru", "n4_potential"], "reason": "ことができる and potential form are two ways to express ability, taught together for contrast" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-035", "requiredItems": ["n4_koto_ga_dekiru", "n5_particle_wo"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10"]
+  },
+  {
+    "unitId": "a1-19",
+    "unitNumber": 19,
+    "title": "Giving & Receiving",
+    "communicativeGoal": "Talk about giving and receiving things and favors",
+    "domain": "exchange",
+    "vocabulary": [
+      { "refId": "jmdict-1116840", "surfaceForm": "プレゼント", "role": "core" },
+      { "refId": "jmdict-1419110", "surfaceForm": "誕生日", "role": "core" },
+      { "refId": "jmdict-1327190", "surfaceForm": "手", "role": "supporting" },
+      { "refId": "jmdict-1540170", "surfaceForm": "友達", "role": "supporting" },
+      { "refId": "jmdict-1192150", "surfaceForm": "家族", "role": "supporting" },
+      { "refId": "jmdict-1002650", "surfaceForm": "お母さん", "role": "supporting" },
+      { "refId": "jmdict-1002590", "surfaceForm": "お父さん", "role": "supporting" },
+      { "refId": "jmdict-1327720", "surfaceForm": "手紙", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n4_te_ageru", "name": "てあげる (give favor)", "role": "core" },
+      { "refId": "n4_te_morau", "name": "てもらう (receive favor)", "role": "core" },
+      { "refId": "n4_te_kureru", "name": "てくれる (receive favor, speaker-oriented)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-073", "phrase": "プレゼントをあげる", "role": "core" },
+      { "refId": "coll-074", "phrase": "プレゼントをもらう", "role": "core" },
+      { "refId": "coll-015", "phrase": "手紙を書く", "role": "supporting" },
+      { "refId": "coll-066", "phrase": "返事をする", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-016", "phrase": "ありがとうございます", "role": "core" },
+      { "refId": "prag-018", "phrase": "どうも", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n4_te_ageru", "n4_te_morau", "n4_te_kureru"], "reason": "Giving/receiving triad あげる/もらう/くれる must be taught together to understand perspective differences" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10"]
+  },
+  {
+    "unitId": "a1-20",
+    "unitNumber": 20,
+    "title": "Sequencing Events",
+    "communicativeGoal": "Sequence events in time using before, after, and when",
+    "domain": "time",
+    "vocabulary": [
+      { "refId": "jmdict-1392580", "surfaceForm": "前", "role": "core" },
+      { "refId": "jmdict-1269320", "surfaceForm": "後", "role": "core" },
+      { "refId": "jmdict-1315840", "surfaceForm": "時", "role": "core" },
+      { "refId": "jmdict-1330290", "surfaceForm": "授業", "role": "supporting" },
+      { "refId": "jmdict-1337270", "surfaceForm": "宿題", "role": "supporting" },
+      { "refId": "jmdict-1307550", "surfaceForm": "始める", "role": "supporting" },
+      { "refId": "jmdict-1589600", "surfaceForm": "終わる", "role": "supporting" },
+      { "refId": "jmdict-1303620", "surfaceForm": "散歩", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_mae_ni", "name": "前に (before)", "role": "core" },
+      { "refId": "n4_ato_de", "name": "後で (after)", "role": "core" },
+      { "refId": "n5_toki", "name": "時 (when)", "role": "core" },
+      { "refId": "n5_te_kara", "name": "てから (after doing)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-063", "phrase": "宿題をする", "role": "core" },
+      { "refId": "coll-005", "phrase": "散歩をする", "role": "supporting" },
+      { "refId": "coll-055", "phrase": "顔を洗う", "role": "supporting" },
+      { "refId": "coll-056", "phrase": "手を洗う", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-029", "phrase": "食べる前に手を洗う", "role": "core" },
+      { "refId": "chunk-030", "phrase": "寝る前に本を読む", "role": "core" },
+      { "refId": "chunk-031", "phrase": "食べた後で散歩する", "role": "core" },
+      { "refId": "chunk-032", "phrase": "授業が終わった後で", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_mae_ni", "n4_ato_de"], "reason": "前に and 後で taught as temporal antonym pair" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-029", "requiredItems": ["n5_mae_ni", "n5_particle_wo"], "masteryThreshold": "apprentice_2" },
+      { "chunkRefId": "chunk-031", "requiredItems": ["n4_ato_de", "n5_particle_de"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10"]
+  },
+  {
+    "unitId": "a1-21",
+    "unitNumber": 21,
+    "title": "At the Doctor",
+    "communicativeGoal": "Describe symptoms and talk about health",
+    "domain": "health",
+    "vocabulary": [
+      { "refId": "jmdict-1490220", "surfaceForm": "病院", "role": "core" },
+      { "refId": "jmdict-1159980", "surfaceForm": "医者", "role": "core" },
+      { "refId": "jmdict-1432680", "surfaceForm": "痛い", "role": "core" },
+      { "refId": "jmdict-1582310", "surfaceForm": "頭", "role": "core" },
+      { "refId": "jmdict-1002610", "surfaceForm": "お腹", "role": "core" },
+      { "refId": "jmdict-1409140", "surfaceForm": "体", "role": "core" },
+      { "refId": "jmdict-1538160", "surfaceForm": "薬", "role": "core" },
+      { "refId": "jmdict-1260720", "surfaceForm": "元気", "role": "supporting" },
+      { "refId": "jmdict-1604890", "surfaceForm": "目", "role": "supporting" },
+      { "refId": "jmdict-1317170", "surfaceForm": "耳", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_adjective_i", "name": "い-adjectives (痛い)", "role": "core" },
+      { "refId": "n5_n_desu", "name": "んです (explanatory)", "role": "core" },
+      { "refId": "n5_hou_ga_ii", "name": "ほうがいい (had better)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-068", "phrase": "頭が痛い", "role": "core" },
+      { "refId": "coll-037", "phrase": "病院に行く", "role": "core" },
+      { "refId": "coll-036", "phrase": "薬を飲む", "role": "core" },
+      { "refId": "coll-008", "phrase": "元気がない", "role": "supporting" },
+      { "refId": "coll-080", "phrase": "運動をする", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-019", "phrase": "すみません", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1582310", "jmdict-1002610", "jmdict-1409140"], "reason": "Body part vocabulary 頭/お腹/体 taught together in health context" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-22",
+    "unitNumber": 22,
+    "title": "Weather Talk",
+    "communicativeGoal": "Discuss weather conditions and forecasts",
+    "domain": "weather",
+    "vocabulary": [
+      { "refId": "jmdict-1438690", "surfaceForm": "天気", "role": "core" },
+      { "refId": "jmdict-1171900", "surfaceForm": "雨", "role": "core" },
+      { "refId": "jmdict-1386500", "surfaceForm": "雪", "role": "core" },
+      { "refId": "jmdict-1499720", "surfaceForm": "風", "role": "core" },
+      { "refId": "jmdict-1592340", "surfaceForm": "曇り", "role": "core" },
+      { "refId": "jmdict-1343460", "surfaceForm": "暑い", "role": "core" },
+      { "refId": "jmdict-1210360", "surfaceForm": "寒い", "role": "core" },
+      { "refId": "jmdict-1586420", "surfaceForm": "暖かい", "role": "supporting" },
+      { "refId": "jmdict-1554370", "surfaceForm": "涼しい", "role": "supporting" },
+      { "refId": "jmdict-1301940", "surfaceForm": "傘", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_deshou", "name": "でしょう (probability)", "role": "core" },
+      { "refId": "n5_darou", "name": "だろう (probably, casual)", "role": "core" },
+      { "refId": "n5_naru", "name": "なる (become)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-006", "phrase": "天気がいい", "role": "core" },
+      { "refId": "coll-007", "phrase": "天気が悪い", "role": "core" },
+      { "refId": "coll-044", "phrase": "雨が降る", "role": "core" },
+      { "refId": "coll-045", "phrase": "雪が降る", "role": "core" },
+      { "refId": "coll-046", "phrase": "風が吹く", "role": "supporting" },
+      { "refId": "coll-043", "phrase": "傘をさす", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-053", "phrase": "明日は雨だと思います", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_deshou", "n5_darou"], "reason": "でしょう (polite) and だろう (casual) taught as register pair for probability" },
+      { "itemIds": ["jmdict-1343460", "jmdict-1210360"], "reason": "暑い/寒い temperature antonym pair" },
+      { "itemIds": ["jmdict-1586420", "jmdict-1554370"], "reason": "暖かい/涼しい mild temperature antonym pair" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-23",
+    "unitNumber": 23,
+    "title": "Getting Around",
+    "communicativeGoal": "Give and follow directions to navigate a city",
+    "domain": "navigation",
+    "vocabulary": [
+      { "refId": "jmdict-1454080", "surfaceForm": "道", "role": "core" },
+      { "refId": "jmdict-1237410", "surfaceForm": "橋", "role": "core" },
+      { "refId": "jmdict-1592970", "surfaceForm": "交差点", "role": "core" },
+      { "refId": "jmdict-1171010", "surfaceForm": "右", "role": "core" },
+      { "refId": "jmdict-1290800", "surfaceForm": "左", "role": "core" },
+      { "refId": "jmdict-1580600", "surfaceForm": "真っ直ぐ", "role": "core" },
+      { "refId": "jmdict-1239730", "surfaceForm": "曲がる", "role": "core" },
+      { "refId": "jmdict-1444680", "surfaceForm": "渡る", "role": "core" },
+      { "refId": "jmdict-1310620", "surfaceForm": "止まる", "role": "supporting" },
+      { "refId": "jmdict-1514320", "surfaceForm": "歩く", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_te_kudasai", "name": "てください (direction giving)", "role": "core" },
+      { "refId": "n5_te_kara", "name": "てから (after doing)", "role": "supporting" },
+      { "refId": "n5_made", "name": "まで (until/to)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-051", "phrase": "道を歩く", "role": "core" },
+      { "refId": "coll-052", "phrase": "駅に着く", "role": "supporting" }
+    ],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-019", "phrase": "すみません", "role": "core" },
+      { "refId": "prag-016", "phrase": "ありがとうございます", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1171010", "jmdict-1290800", "jmdict-1580600"], "reason": "Direction words 右/左/真っ直ぐ taught together" },
+      { "itemIds": ["jmdict-1239730", "jmdict-1444680"], "reason": "曲がる and 渡る are key direction-giving verbs" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-24",
+    "unitNumber": 24,
+    "title": "Phone & Messages",
+    "communicativeGoal": "Make phone calls, send messages, and report what others said",
+    "domain": "communication",
+    "vocabulary": [
+      { "refId": "jmdict-1443840", "surfaceForm": "電話", "role": "core" },
+      { "refId": "jmdict-1327720", "surfaceForm": "手紙", "role": "core" },
+      { "refId": "jmdict-1320760", "surfaceForm": "質問", "role": "supporting" },
+      { "refId": "jmdict-1512220", "surfaceForm": "返事", "role": "supporting" },
+      { "refId": "jmdict-1402730", "surfaceForm": "送る", "role": "core" },
+      { "refId": "jmdict-1591110", "surfaceForm": "聞く", "role": "core" },
+      { "refId": "jmdict-1562350", "surfaceForm": "話す", "role": "core" },
+      { "refId": "jmdict-1420470", "surfaceForm": "知る", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n4_to_iu", "name": "と言う (quotation)", "role": "core" },
+      { "refId": "n4_to_omou", "name": "と思う (I think)", "role": "core" },
+      { "refId": "n5_particle_to", "name": "と (quotation particle)", "role": "core" }
+    ],
+    "collocations": [
+      { "refId": "coll-001", "phrase": "電話をかける", "role": "core" },
+      { "refId": "coll-042", "phrase": "電話に出る", "role": "core" },
+      { "refId": "coll-015", "phrase": "手紙を書く", "role": "supporting" },
+      { "refId": "coll-065", "phrase": "質問をする", "role": "supporting" },
+      { "refId": "coll-066", "phrase": "返事をする", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-052", "phrase": "おいしいと思います", "role": "core" },
+      { "refId": "chunk-021", "phrase": "もう一度言ってください", "role": "core" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-030", "phrase": "もう一度お願いします", "role": "core" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n4_to_iu", "n4_to_omou"], "reason": "Quotation (と言う) and opinion (と思う) patterns taught together" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-052", "requiredItems": ["n4_to_omou", "n5_particle_to"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-25",
+    "unitNumber": 25,
+    "title": "Rules & Obligations",
+    "communicativeGoal": "Express rules, obligations, and prohibitions",
+    "domain": "negation",
+    "vocabulary": [
+      { "refId": "jmdict-1206730", "surfaceForm": "学校", "role": "supporting" },
+      { "refId": "jmdict-1198550", "surfaceForm": "会社", "role": "supporting" },
+      { "refId": "jmdict-1536010", "surfaceForm": "問題", "role": "supporting" },
+      { "refId": "jmdict-1414150", "surfaceForm": "大丈夫", "role": "supporting" },
+      { "refId": "jmdict-1519290", "surfaceForm": "忙しい", "role": "supporting" },
+      { "refId": "jmdict-1512670", "surfaceForm": "勉強", "role": "supporting" },
+      { "refId": "jmdict-1337270", "surfaceForm": "宿題", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_naide", "name": "ないで (without doing)", "role": "core" },
+      { "refId": "n5_nakute_wa_ikenai", "name": "なくてはいけない (must)", "role": "core" },
+      { "refId": "n5_naito_ikenai", "name": "ないといけない (have to)", "role": "supporting" },
+      { "refId": "n5_nakutemo_ii", "name": "なくてもいい (don't have to)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-063", "phrase": "宿題をする", "role": "supporting" },
+      { "refId": "coll-003", "phrase": "勉強をする", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-024", "phrase": "ここに触らないでください", "role": "supporting" },
+      { "refId": "chunk-025", "phrase": "心配しないでください", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-020", "phrase": "ごめんなさい", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_nakute_wa_ikenai", "n5_nakutemo_ii"], "reason": "Must do vs don't have to do contrasted together" },
+      { "itemIds": ["n5_naide", "n5_naito_ikenai"], "reason": "Without doing vs have to do — negative form patterns" }
+    ],
+    "chunkTriggers": [
+      { "chunkRefId": "chunk-024", "requiredItems": ["n5_naide_kudasai"], "masteryThreshold": "apprentice_2" }
+    ],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-26",
+    "unitNumber": 26,
+    "title": "Connecting Ideas",
+    "communicativeGoal": "Connect ideas fluently using conjunctions and て-form chaining",
+    "domain": "discourse",
+    "vocabulary": [
+      { "refId": "jmdict-1288850", "surfaceForm": "今", "role": "supporting" },
+      { "refId": "jmdict-1269320", "surfaceForm": "後", "role": "supporting" },
+      { "refId": "jmdict-1357600", "surfaceForm": "色", "role": "supporting" },
+      { "refId": "jmdict-1396130", "surfaceForm": "全部", "role": "supporting" },
+      { "refId": "jmdict-1415000", "surfaceForm": "大変", "role": "supporting" },
+      { "refId": "jmdict-1207240", "surfaceForm": "楽しい", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_kedo", "name": "けど (but)", "role": "core" },
+      { "refId": "n4_shi", "name": "し (and also, listing reasons)", "role": "core" },
+      { "refId": "n4_te_de_conjunctive", "name": "て-form chaining", "role": "core" },
+      { "refId": "n5_soshite", "name": "そして (and then)", "role": "supporting" }
+    ],
+    "collocations": [],
+    "chunks": [
+      { "refId": "chunk-033", "phrase": "朝起きてから", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [],
+    "coIntroductionRules": [
+      { "itemIds": ["n5_kedo", "n4_shi"], "reason": "Contrastive けど and additive し taught together for discourse connectors" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-27",
+    "unitNumber": 27,
+    "title": "Expressing Feelings",
+    "communicativeGoal": "Express emotions and react to situations naturally",
+    "domain": "emotion",
+    "vocabulary": [
+      { "refId": "jmdict-1219510", "surfaceForm": "嬉しい", "role": "core" },
+      { "refId": "jmdict-1483190", "surfaceForm": "悲しい", "role": "core" },
+      { "refId": "jmdict-1207240", "surfaceForm": "楽しい", "role": "core" },
+      { "refId": "jmdict-1579720", "surfaceForm": "寂しい", "role": "core" },
+      { "refId": "jmdict-1593480", "surfaceForm": "怖い", "role": "core" },
+      { "refId": "jmdict-1445690", "surfaceForm": "怒る", "role": "core" },
+      { "refId": "jmdict-1351360", "surfaceForm": "笑う", "role": "core" },
+      { "refId": "jmdict-1229840", "surfaceForm": "泣く", "role": "supporting" },
+      { "refId": "jmdict-1289590", "surfaceForm": "困る", "role": "supporting" },
+      { "refId": "jmdict-1414150", "surfaceForm": "大丈夫", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_adjective_i", "name": "い-adjectives (emotion)", "role": "core" },
+      { "refId": "n5_naru", "name": "なる (become)", "role": "core" },
+      { "refId": "n5_yo", "name": "よ (assertion)", "role": "supporting" }
+    ],
+    "collocations": [],
+    "chunks": [],
+    "pragmaticFormulas": [
+      { "refId": "prag-016", "phrase": "ありがとうございます", "role": "supporting" },
+      { "refId": "prag-020", "phrase": "ごめんなさい", "role": "supporting" }
+    ],
+    "coIntroductionRules": [
+      { "itemIds": ["jmdict-1219510", "jmdict-1483190"], "reason": "嬉しい/悲しい emotion antonym pair" },
+      { "itemIds": ["jmdict-1445690", "jmdict-1351360"], "reason": "怒る/笑う taught as contrasting emotional reactions" }
+    ],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15"]
+  },
+  {
+    "unitId": "a1-28",
+    "unitNumber": 28,
+    "title": "Review & Integration",
+    "communicativeGoal": "Use all A1 patterns in mixed real-world contexts",
+    "domain": "mixed",
+    "vocabulary": [
+      { "refId": "jmdict-1582710", "surfaceForm": "日本", "role": "core" },
+      { "refId": "jmdict-1553170", "surfaceForm": "旅行", "role": "core" },
+      { "refId": "jmdict-1192150", "surfaceForm": "家族", "role": "core" },
+      { "refId": "jmdict-1540170", "surfaceForm": "友達", "role": "core" },
+      { "refId": "jmdict-1207240", "surfaceForm": "楽しい", "role": "core" },
+      { "refId": "jmdict-1438690", "surfaceForm": "天気", "role": "supporting" },
+      { "refId": "jmdict-1277450", "surfaceForm": "好き", "role": "supporting" },
+      { "refId": "jmdict-1554310", "surfaceForm": "料理", "role": "supporting" },
+      { "refId": "jmdict-1512670", "surfaceForm": "勉強", "role": "supporting" },
+      { "refId": "jmdict-1304970", "surfaceForm": "仕事", "role": "supporting" }
+    ],
+    "grammar": [
+      { "refId": "n5_te_iru", "name": "ている (progressive/state)", "role": "core" },
+      { "refId": "n5_tai", "name": "たい (want to)", "role": "core" },
+      { "refId": "n5_kara", "name": "から (because)", "role": "core" },
+      { "refId": "n5_te_kudasai", "name": "てください (request)", "role": "supporting" }
+    ],
+    "collocations": [
+      { "refId": "coll-078", "phrase": "旅行に行く", "role": "core" },
+      { "refId": "coll-024", "phrase": "友達に会う", "role": "core" },
+      { "refId": "coll-039", "phrase": "料理をする", "role": "supporting" },
+      { "refId": "coll-003", "phrase": "勉強をする", "role": "supporting" },
+      { "refId": "coll-011", "phrase": "仕事をする", "role": "supporting" }
+    ],
+    "chunks": [
+      { "refId": "chunk-037", "phrase": "日本に行きたいです", "role": "core" },
+      { "refId": "chunk-052", "phrase": "おいしいと思います", "role": "supporting" },
+      { "refId": "chunk-050", "phrase": "忙しいから行けない", "role": "supporting" }
+    ],
+    "pragmaticFormulas": [
+      { "refId": "prag-011", "phrase": "はじめまして", "role": "supporting" },
+      { "refId": "prag-012", "phrase": "よろしくお願いします", "role": "supporting" },
+      { "refId": "prag-016", "phrase": "ありがとうございます", "role": "supporting" }
+    ],
+    "coIntroductionRules": [],
+    "chunkTriggers": [],
+    "prerequisites": ["a1-01", "a1-02", "a1-03", "a1-04", "a1-05", "a1-06", "a1-07", "a1-08", "a1-09", "a1-10", "a1-11", "a1-12", "a1-13", "a1-14", "a1-15", "a1-16", "a1-17", "a1-18", "a1-19", "a1-20", "a1-21", "a1-22", "a1-23", "a1-24", "a1-25", "a1-26", "a1-27"]
+  }
+]

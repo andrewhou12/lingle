@@ -32,12 +32,15 @@ export function computeKnowledgeBubble(items: BubbleItemInput[]): KnowledgeBubbl
   log.debug('Computing knowledge bubble', { totalItems: items.length })
   const corpus = loadJapaneseReferenceCorpus()
 
-  // Count reference items per level
+  // Count reference items per level (including collocations, chunks, pragmatic formulas)
   const refCountByLevel = new Map<string, number>()
   for (const level of CEFR_LEVELS) {
     const vocabCount = corpus.vocabulary.filter((v) => v.cefrLevel === level).length
     const grammarCount = corpus.grammar.filter((g) => g.cefrLevel === level).length
-    refCountByLevel.set(level, vocabCount + grammarCount)
+    const collocationCount = corpus.collocations.filter((c) => c.cefrLevel === level).length
+    const chunkCount = corpus.chunks.filter((c) => c.cefrLevel === level).length
+    const pragmaticCount = corpus.pragmaticFormulas.filter((p) => p.cefrLevel === level).length
+    refCountByLevel.set(level, vocabCount + grammarCount + collocationCount + chunkCount + pragmaticCount)
   }
 
   // Group learner items by level

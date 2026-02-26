@@ -1,0 +1,933 @@
+[
+  {
+    "patternId": "n5_chaikenai",
+    "name": "ちゃいけない",
+    "description": "Must not do something; prohibition in casual spoken Japanese",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 1
+  },
+  {
+    "patternId": "n5_desu",
+    "name": "だ・です",
+    "description": "Copula meaning 'to be' (am, is, are, were); used to state facts or descriptions",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 2
+  },
+  {
+    "patternId": "n5_dake",
+    "name": "だけ",
+    "description": "Only, just, as much as; indicates limitation or restriction",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 3
+  },
+  {
+    "patternId": "n5_darou",
+    "name": "だろう",
+    "description": "I think, it seems, probably; expresses probability or seeks confirmation (casual)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 4
+  },
+  {
+    "patternId": "n5_particle_de",
+    "name": "で",
+    "description": "Particle indicating location of action, means/method, or material used",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 5
+  },
+  {
+    "patternId": "n5_demo",
+    "name": "でも",
+    "description": "But, however; conjunction used to contrast or contradict previous statement",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 6
+  },
+  {
+    "patternId": "n5_deshou",
+    "name": "でしょう",
+    "description": "I think, it seems, probably; expresses probability or seeks confirmation (polite)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 7
+  },
+  {
+    "patternId": "n5_donna",
+    "name": "どんな",
+    "description": "What kind of, what sort of; interrogative word asking about type or nature",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 8
+  },
+  {
+    "patternId": "n5_doushite",
+    "name": "どうして",
+    "description": "Why, for what reason; interrogative word asking for cause or reason",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 9
+  },
+  {
+    "patternId": "n5_douyatte",
+    "name": "どうやって",
+    "description": "How, in what way, by what means; interrogative asking about method or procedure",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 10
+  },
+  {
+    "patternId": "n5_particle_ga",
+    "name": "が",
+    "description": "Subject marker particle; also conjunction meaning 'however' or 'but'",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 11
+  },
+  {
+    "patternId": "n5_ga_arimasu",
+    "name": "があります",
+    "description": "There is, exists; used for non-living things and abstract concepts",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 12
+  },
+  {
+    "patternId": "n5_ga_hoshii",
+    "name": "がほしい",
+    "description": "To want something; expresses desire for objects or things",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 13
+  },
+  {
+    "patternId": "n5_ga_imasu",
+    "name": "がいます",
+    "description": "There is, exists; used for living things like people and animals",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 14
+  },
+  {
+    "patternId": "n5_hou_ga_ii",
+    "name": "ほうがいい",
+    "description": "Had better, it'd be better to, should; gives advice or recommendations",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 15
+  },
+  {
+    "patternId": "n5_adjective_i",
+    "name": "い-adjectives",
+    "description": "I-adjectives that end in い and conjugate by changing the い ending",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 16
+  },
+  {
+    "patternId": "n5_ichiban",
+    "name": "一番",
+    "description": "The most, the best; superlative marker indicating highest degree",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 17
+  },
+  {
+    "patternId": "n5_issho_ni",
+    "name": "一緒に",
+    "description": "Together; indicates doing something with someone else",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 18
+  },
+  {
+    "patternId": "n5_itsumo",
+    "name": "いつも",
+    "description": "Always, usually, habitually; indicates regular or constant occurrence",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 19
+  },
+  {
+    "patternId": "n5_ja_nai",
+    "name": "じゃない",
+    "description": "To not be (am not, is not, are not); negative form of だ in casual speech",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 20
+  },
+  {
+    "patternId": "n5_particle_ka",
+    "name": "か",
+    "description": "Question particle placed at end of sentence to form questions",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 21
+  },
+  {
+    "patternId": "n5_ka_ka",
+    "name": "か～か",
+    "description": "Or; presents alternatives or choices between options",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ka"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 22
+  },
+  {
+    "patternId": "n5_kara",
+    "name": "から",
+    "description": "Because, since, from; indicates reason/cause or starting point",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 23
+  },
+  {
+    "patternId": "n5_kata",
+    "name": "方",
+    "description": "Way of doing something, how to do; indicates method or manner",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 24
+  },
+  {
+    "patternId": "n5_kedo",
+    "name": "けど",
+    "description": "But, however, although; casual conjunction for contrast (short form of けれども)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 25
+  },
+  {
+    "patternId": "n5_keredomo",
+    "name": "けれども",
+    "description": "But, however, although; formal conjunction used to show contrast or contradiction",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 26
+  },
+  {
+    "patternId": "n5_mada",
+    "name": "まだ",
+    "description": "Still, not yet; indicates continuation of state or incomplete action",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 27
+  },
+  {
+    "patternId": "n5_mada_teimasen",
+    "name": "まだ～ていません",
+    "description": "Have not yet done something; indicates incomplete action up to present",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 28
+  },
+  {
+    "patternId": "n5_made",
+    "name": "まで",
+    "description": "Until, as far as, to (an extent); indicates endpoint in time or space",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 29
+  },
+  {
+    "patternId": "n5_mae_ni",
+    "name": "前に",
+    "description": "Before, in front of; indicates temporal precedence or spatial position",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 30
+  },
+  {
+    "patternId": "n5_masen_ka",
+    "name": "ませんか",
+    "description": "Would you, do you want to, shall we; polite invitation or suggestion",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_masu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 31
+  },
+  {
+    "patternId": "n5_mashou",
+    "name": "ましょう",
+    "description": "Let's, shall we; volitional form expressing suggestion or invitation",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_masu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 32
+  },
+  {
+    "patternId": "n5_mashou_ka",
+    "name": "ましょうか",
+    "description": "Shall I; used to offer help or suggest doing something for someone",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_masu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 33
+  },
+  {
+    "patternId": "n5_particle_mo",
+    "name": "も",
+    "description": "Too, also, as well; particle indicating addition or inclusion",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 34
+  },
+  {
+    "patternId": "n5_mou",
+    "name": "もう",
+    "description": "Already, anymore, again, other; indicates completion or change of state",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 35
+  },
+  {
+    "patternId": "n5_adjective_na",
+    "name": "な-adjectives",
+    "description": "Na-adjectives that require な when modifying nouns directly",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 36
+  },
+  {
+    "patternId": "n5_naa",
+    "name": "なあ",
+    "description": "Sentence-ending particle expressing confirmation, admiration, or emotional emphasis",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 37
+  },
+  {
+    "patternId": "n5_naide",
+    "name": "ないで",
+    "description": "Without doing something; indicates performing one action without doing another",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 38
+  },
+  {
+    "patternId": "n5_naide_kudasai",
+    "name": "ないでください",
+    "description": "Please don't do; polite negative request or prohibition",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 39
+  },
+  {
+    "patternId": "n5_naito_ikenai",
+    "name": "ないといけない",
+    "description": "Must do, have an obligation to do; expresses necessity or duty",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 40
+  },
+  {
+    "patternId": "n5_nakutemo_ii",
+    "name": "なくてもいい",
+    "description": "Expresses that something is not necessary or that you don't have to do something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 41
+  },
+  {
+    "patternId": "n5_nakucha",
+    "name": "なくちゃ",
+    "description": "Casual form expressing necessity or obligation; must do, need to, gotta do",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 42
+  },
+  {
+    "patternId": "n5_nakute_wa_ikenai",
+    "name": "なくてはいけない",
+    "description": "Expresses strong necessity or obligation; must do, need to do",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 43
+  },
+  {
+    "patternId": "n5_nakute_wa_naranai",
+    "name": "なくてはならない",
+    "description": "Expresses strong necessity or obligation; must do, need to do (formal)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_nai_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 44
+  },
+  {
+    "patternId": "n5_naru",
+    "name": "なる",
+    "description": "Expresses change of state or transformation; to become",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 45
+  },
+  {
+    "patternId": "n5_n_desu",
+    "name": "んです",
+    "description": "Explanatory form used to explain something or add emphasis to a statement",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 46
+  },
+  {
+    "patternId": "n5_ne",
+    "name": "ね",
+    "description": "Sentence-ending particle seeking agreement or confirmation; isn't it? right?",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 47
+  },
+  {
+    "patternId": "n5_particle_ni",
+    "name": "に",
+    "description": "Particle indicating destination, location, time, or indirect object; in, at, on, to",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 48
+  },
+  {
+    "patternId": "n5_ni_iku",
+    "name": "にいく",
+    "description": "Expresses going somewhere to do something; go to do",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 49
+  },
+  {
+    "patternId": "n5_ni_suru",
+    "name": "にする",
+    "description": "Expresses making a decision or choice; to decide on",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_ni"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 50
+  },
+  {
+    "patternId": "n5_ni_he_direction",
+    "name": "に/へ",
+    "description": "Particles indicating direction or destination; to (indicates direction/destination)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 51
+  },
+  {
+    "patternId": "n5_particle_no",
+    "name": "の",
+    "description": "Possessive particle connecting nouns to show ownership or relationship",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 52
+  },
+  {
+    "patternId": "n5_no_desu",
+    "name": "のです",
+    "description": "Explanatory form used to explain something or add emphasis (formal version of んです)",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu",
+      "n5_particle_no"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 53
+  },
+  {
+    "patternId": "n5_no_ga_heta",
+    "name": "のが下手",
+    "description": "Expresses being bad at doing something or lacking skill in an activity",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_no",
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 54
+  },
+  {
+    "patternId": "n5_no_ga_jouzu",
+    "name": "のが上手",
+    "description": "Expresses being good at or skilled in doing something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_no",
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 55
+  },
+  {
+    "patternId": "n5_no_ga_suki",
+    "name": "のが好き",
+    "description": "Expresses liking to do something or enjoying an activity",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_no",
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 56
+  },
+  {
+    "patternId": "n5_no_naka_de_ichiban",
+    "name": "の中で[A]が一番",
+    "description": "Expresses superlative comparison; A is the most/best among a group",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_no",
+      "n5_particle_ga",
+      "n5_ichiban"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 57
+  },
+  {
+    "patternId": "n5_node",
+    "name": "ので",
+    "description": "Expresses reason or cause; because of, given that, since",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_no"
+    ],
+    "assessmentCandidate": true,
+    "frequencyRank": 58
+  },
+  {
+    "patternId": "n5_o_go_honorific",
+    "name": "お/ご",
+    "description": "Honorific prefixes used to make words more polite or respectful",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 59
+  },
+  {
+    "patternId": "n5_particle_wo",
+    "name": "を",
+    "description": "Object marker particle indicating the direct object of a transitive verb",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": true,
+    "frequencyRank": 60
+  },
+  {
+    "patternId": "n5_wo_kudasai",
+    "name": "をください",
+    "description": "Polite request form asking for something; please give me",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_wo"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 61
+  },
+  {
+    "patternId": "n5_shikashi",
+    "name": "しかし",
+    "description": "Conjunction expressing contrast or opposition; but, however",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 62
+  },
+  {
+    "patternId": "n5_sore_kara",
+    "name": "それから",
+    "description": "Conjunction indicating sequence or continuation; and then, after that, since then",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 63
+  },
+  {
+    "patternId": "n5_soshite",
+    "name": "そして",
+    "description": "Conjunction connecting sentences or clauses; and then, thus, and now",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 64
+  },
+  {
+    "patternId": "n5_sugiru",
+    "name": "すぎる",
+    "description": "Expresses excess or going beyond a normal degree; too much",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 65
+  },
+  {
+    "patternId": "n5_ta_koto_ga_aru",
+    "name": "たことがある",
+    "description": "Expresses past experience; to have done something before",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_past_ta",
+      "n5_particle_ga"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 66
+  },
+  {
+    "patternId": "n5_tai",
+    "name": "たい",
+    "description": "Expresses desire or want; want to do something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 67
+  },
+  {
+    "patternId": "n5_tari_tari",
+    "name": "たり～たり",
+    "description": "Lists examples of actions or states; do such things as A and B",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_past_ta"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 68
+  },
+  {
+    "patternId": "n5_te_aru",
+    "name": "てある",
+    "description": "Expresses a resulting state from a completed action; is/has been done",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 69
+  },
+  {
+    "patternId": "n5_te_iru",
+    "name": "ている",
+    "description": "Expresses ongoing action or current state; progressive or continuous aspect",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 70
+  },
+  {
+    "patternId": "n5_te_kara",
+    "name": "てから",
+    "description": "Expresses sequence of actions; after doing something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form",
+      "n5_kara"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 71
+  },
+  {
+    "patternId": "n5_te_kudasai",
+    "name": "てください",
+    "description": "Polite request form; please do something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 72
+  },
+  {
+    "patternId": "n5_te_wa_ikenai",
+    "name": "てはいけない",
+    "description": "Expresses prohibition; must not, may not, cannot do something",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 73
+  },
+  {
+    "patternId": "n5_te_mo_ii_desu",
+    "name": "てもいいです",
+    "description": "Expresses permission; it's OK to, it's alright to, may I",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_te_form",
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 74
+  },
+  {
+    "patternId": "n5_particle_to",
+    "name": "と",
+    "description": "Particle meaning 'and', 'with', or 'as'; connecting particle for nouns",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 75
+  },
+  {
+    "patternId": "n5_toki",
+    "name": "とき",
+    "description": "Expresses time or occasion; when, at the time when",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 76
+  },
+  {
+    "patternId": "n5_totemo",
+    "name": "とても",
+    "description": "Adverb expressing high degree; very, awfully, exceedingly",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 77
+  },
+  {
+    "patternId": "n5_tsumori",
+    "name": "つもり",
+    "description": "Expresses intention or plan; plan to, intend to",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 78
+  },
+  {
+    "patternId": "n5_particle_wa",
+    "name": "は",
+    "description": "Topic marker particle indicating the topic or theme of a sentence",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 79
+  },
+  {
+    "patternId": "n5_wa_yori_desu",
+    "name": "は〜より・・・です",
+    "description": "Comparative structure expressing that A is more something than B",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_particle_wa",
+      "n5_desu"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 80
+  },
+  {
+    "patternId": "n5_wa_dou_desu_ka",
+    "name": "はどうですか",
+    "description": "Used to ask for opinions or suggestions about something, meaning 'how about' or 'how is'. Often used when making suggestions or asking for evaluations.",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_desu",
+      "n5_particle_wa"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 81
+  },
+  {
+    "patternId": "n5_particle_ya",
+    "name": "や",
+    "description": "Connecting particle used to list items in a non-exhaustive way, meaning 'and' or 'or'. Implies there are other items not mentioned in the list.",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 82
+  },
+  {
+    "patternId": "n5_yo",
+    "name": "よ",
+    "description": "Sentence-ending particle used for emphasis or to assert information. Indicates the speaker wants to inform or convince the listener of something.",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [],
+    "assessmentCandidate": false,
+    "frequencyRank": 83
+  },
+  {
+    "patternId": "n5_yori_hou_ga",
+    "name": "より～ほうが",
+    "description": "Comparative pattern meaning '[A] is more than [B]'. Used to compare two things and indicate which one has more of a certain quality.",
+    "cefrLevel": "A1",
+    "jlptLevel": "N5",
+    "prerequisiteIds": [
+      "n5_hou_ga_ii"
+    ],
+    "assessmentCandidate": false,
+    "frequencyRank": 84
+  }
+]

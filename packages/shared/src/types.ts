@@ -15,7 +15,7 @@ export enum MasteryState {
 
 export type ReviewGrade = 'again' | 'hard' | 'good' | 'easy'
 export type ReviewModality = 'recognition' | 'production' | 'cloze'
-export type ItemType = 'lexical' | 'grammar'
+export type ItemType = 'lexical' | 'grammar' | 'collocation' | 'chunk' | 'pragmatic_formula'
 export type LearningModality = 'reading' | 'listening' | 'speaking' | 'writing'
 export type ContextType = 'srs_review' | 'conversation' | 'reading' | 'textbook' | 'drill'
 
@@ -70,6 +70,10 @@ export const IPC_CHANNELS = {
   CURRICULUM_INTRODUCE_ITEM: 'curriculum:introduce-item',
   CURRICULUM_SKIP_ITEM: 'curriculum:skip-item',
   CURRICULUM_REGENERATE: 'curriculum:regenerate',
+
+  // Curriculum Spine
+  CURRICULUM_GET_UNIT_PROGRESS: 'curriculum:get-unit-progress',
+  CURRICULUM_EVALUATE_TRIGGERS: 'curriculum:evaluate-triggers',
 
   // Pragmatics
   PRAGMATIC_GET_STATE: 'pragmatic:get-state',
@@ -471,6 +475,87 @@ export interface OnboardingResult {
   knownItemIndices: number[]
   readingChallengeResults: ReadingChallengeResult[]
   comprehensionResults: ComprehensionResult[]
+}
+
+// ── Chunk / Multi-word Unit Types ──
+
+export interface WordBankChunkEntry {
+  id: number
+  itemKind: 'collocation' | 'chunk' | 'pragmatic_formula'
+  referenceId: string
+  phrase: string
+  reading: string | null
+  meaning: string
+  componentItemIds: number[]
+  grammarDependencies: string[]
+  register: string | null
+  domain: string | null
+  cefrLevel: string | null
+  masteryState: MasteryState
+  recognitionFsrs: FsrsState
+  productionFsrs: FsrsState
+  firstSeen: string
+  lastReviewed: string | null
+  exposureCount: number
+  productionCount: number
+  tags: string[]
+  source: string
+}
+
+export interface ChunkTriggerResult {
+  referenceId: string
+  phrase: string
+  itemKind: 'collocation' | 'chunk' | 'pragmatic_formula'
+  ready: boolean
+  reason: string
+  missingComponents: string[]
+}
+
+export interface UnitProgress {
+  unitId: string
+  unitNumber: number
+  title: string
+  totalItems: number
+  knownItems: number
+  completionPercent: number
+  coreItemsComplete: boolean
+}
+
+// ── Curriculum Spine Types ──
+
+export interface SpineUnit {
+  unitId: string
+  unitNumber: number
+  title: string
+  communicativeGoal: string
+  domain: string
+  vocabulary: SpineItemRef[]
+  grammar: SpineItemRef[]
+  collocations: SpineItemRef[]
+  chunks: SpineItemRef[]
+  pragmaticFormulas: SpineItemRef[]
+  coIntroductionRules: CoIntroductionRule[]
+  chunkTriggers: ChunkTrigger[]
+  prerequisites: string[]
+}
+
+export interface SpineItemRef {
+  refId: string
+  surfaceForm?: string
+  name?: string
+  phrase?: string
+  role: 'core' | 'supporting'
+}
+
+export interface CoIntroductionRule {
+  itemIds: string[]
+  reason: string
+}
+
+export interface ChunkTrigger {
+  chunkRefId: string
+  requiredItems: string[]
+  masteryThreshold: MasteryState
 }
 
 export interface ExpandedPostSessionAnalysis extends PostSessionAnalysis {
