@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Linguist Architecture Diagram Generator (v2 — Monorepo)
+ * Linguist Architecture Diagram Generator (v3 — Curriculum Engine)
  * Generates a comprehensive .excalidraw file representing the full codebase architecture.
  *
- * Updated: 2026-02-23 to reflect Turborepo + pnpm monorepo with Next.js web app.
+ * Updated: 2026-02-26 to reflect curriculum spine system, multi-word units, and authoritative corpus.
  *
  * Run: node scripts/generate-architecture-diagram.mjs
  * Output: architecture.excalidraw (open in https://excalidraw.com or the VS Code extension)
@@ -291,7 +291,7 @@ const z0BodyLines = [
   '│   ├── desktop/   @linguist/desktop     Electron 34 + electron-vite + React 19   (apps/desktop/electron/ + apps/desktop/src/)',
   '│   └── web/       @linguist/web          Next.js 15 + App Router + Turbopack      (apps/web/app/ + apps/web/lib/)',
   '├── packages/',
-  '│   ├── core/      @linguist/core         Pure TS business logic (FSRS, mastery, ToM, conversation, curriculum, pragmatics, onboarding)',
+  '│   ├── core/      @linguist/core         Pure TS business logic (FSRS, mastery, ToM, conversation, curriculum engine + spine, pragmatics, onboarding)',
   '│   ├── shared/    @linguist/shared        TypeScript types + enums only — importable everywhere',
   '│   └── db/        @linguist/db            Prisma client singleton + schema + migrations',
   '├── prisma/                                schema.prisma, migrations/, seed.ts',
@@ -717,16 +717,31 @@ const coreModules = [
     ],
   },
   {
-    name: "core/curriculum/  (bubble.ts + recommender.ts)",
+    name: "core/curriculum/  (planner + spine-loader + recommender + bubble + reference-data)",
     bg: COLORS.green, border: COLORS.greenBorder,
     lines: [
-      "computeKnowledgeBubble(items, corpus)",
-      "  -> levelBreakdowns[], currentLevel, frontierLevel, gaps",
-      "generateRecommendations(gaps, tom, items)",
-      "  -> CurriculumRecommendation[] (priority scored)",
+      "planner.ts — generateCurriculumPlan(input) -> CurriculumPlan",
+      "  computePacing() | filterByPrerequisites() | balanceVariety()",
+      "  applyGrammarCap() | identifyReviewFocus() | checkLevelProgression()",
+      "  generateSpineAwarePlan() OR generateFrequencyRecommendations()",
       "",
-      "Scoring: frequency (log) + gap location + ToM boost",
-      "Corpus: japanese-reference.json (~2000 items/level)",
+      "spine-loader.ts — loadCurriculumSpine() (cached JSON)",
+      "  getNextUnit() | getUnitProgress() | evaluateChunkTriggers()",
+      "  getSpineBoosts() -> score boosts for current unit items",
+      "",
+      "recommender.ts — generateRecommendations(gaps, tom, items, spineBoosts?)",
+      "  -> CurriculumRecommendation[] (freq + gap + ToM + spine boost)",
+      "",
+      "bubble.ts — computeKnowledgeBubble(items, corpus)",
+      "  -> levelBreakdowns[] (5 item types), currentLevel, frontierLevel, gaps",
+      "  Level-up: 80% coverage -> seed frontier level items",
+      "",
+      "reference-data.ts — Unified corpus loader (JMDict + JLPT grammar)",
+      "  5 item types: vocabulary, grammar, collocations, chunks, pragmatic formulas",
+      "  data/vocabulary.json (117K lines, JMDict-sourced)",
+      "  data/grammar.json (10K lines, jlptsensei-sourced)",
+      "  data/collocations.json | chunks.json | pragmatic-formulas.json",
+      "  data/curriculum-spine.json (unit-based pedagogical ordering)",
     ],
   },
   {
@@ -744,13 +759,15 @@ const coreModules = [
     name: "core/onboarding/  (assessment-data.ts + index.ts)",
     bg: COLORS.blue, border: COLORS.blueBorder,
     lines: [
-      "ASSESSMENT_ITEMS: 55 static items across N5->N1",
-      "  N5: 10v+5g=15 | N4: 8v+4g=12 | N3: 8v+4g=12",
-      "  N2: 6v+3g=9   | N1: 4v+2g=6",
-      "",
-      "getAssessmentItemsForLevel(level) -> items[]",
+      "Assessment candidates sourced from reference corpus",
+      "getAssessmentCandidates(jlptLevel?) -> curated items by level",
       "getLevelCefrMapping() -> JLPT<->CEFR map",
-      "Placement scoring + item seeding logic",
+      "",
+      "Three-tier seeding strategy:",
+      "  Below level -> introduced (known = apprentice_2)",
+      "  At level    -> unseen (known = apprentice_2)",
+      "  Above level -> NOT seeded (curriculum engine introduces)",
+      "Wipes stale CurriculumItem queue on complete",
     ],
   },
 ];
@@ -782,26 +799,29 @@ const sharedLines = [
   "",
   "State Machine:",
   "  MasteryState, ReviewGrade, ReviewModality",
-  "  ItemType, LearningModality, ContextType",
+  "  ItemType (lexical|grammar|collocation|chunk|pragmatic_formula)",
+  "  LearningModality, ContextType",
   "",
   "FSRS:",
   "  FsrsState { due, stability, difficulty, ... }",
+  "",
+  "Curriculum Spine:",
+  "  SpineUnit, SpineItemRef, ChunkTrigger",
+  "  UnitProgress, ChunkTriggerResult",
+  "  CurriculumPlan, CurriculumRecommendation",
+  "  KnowledgeBubble, LevelBreakdown",
   "",
   "IPC (desktop):",
   "  IPC_CHANNELS (50+ method constants)",
   "  IpcChannel (union type)",
   "",
   "Auth & Onboarding:",
-  "  AuthUser { id, email, name, avatarUrl,",
-  "             onboardingCompleted }",
-  "  SelfReportedLevel, OnboardingResult",
-  "  AssessmentItem",
+  "  AuthUser, SelfReportedLevel, OnboardingResult",
   "",
   "Payloads:",
   "  ReviewSubmission, ReviewQueueItem",
   "  ConversationMessage, SessionPlan",
   "  PostSessionAnalysis, ExpandedTomBrief",
-  "  KnowledgeBubble, CurriculumRecommendation",
 ];
 const sharedH = autoH(sharedLines.length);
 {
@@ -824,7 +844,7 @@ const dbLines = [
   "  apps/desktop/electron/ipc/ (IPC handlers)",
   "  apps/web/app/api/          (API routes)",
   "",
-  "prisma/schema.prisma — 11 models, ~229 lines",
+  "prisma/schema.prisma — 12 models, ~270 lines",
   "prisma/seed.ts — user-scoped seeding",
 ];
 const dbH = autoH(dbLines.length);
@@ -999,15 +1019,31 @@ const models = [
     ],
   },
   {
+    name: "ChunkItem",
+    note: "multi-word units",
+    fields: [
+      "userId (FK -> User)",
+      "itemKind: collocation|chunk|pragmatic_formula",
+      "referenceId @@unique([userId, referenceId])",
+      "phrase, reading, meaning",
+      "componentItemIds[] (LexicalItem refs)",
+      "grammarDependencies[], register, domain",
+      "cefrLevel, masteryState (unseen->burned)",
+      "recognitionFsrs, productionFsrs (JSON)",
+      "-> reviewEvents[], contextLogs[]",
+    ],
+  },
+  {
     name: "CurriculumItem",
     note: "recommendation queue",
     fields: [
       "userId (FK -> User)",
-      "itemType, referenceItemId",
-      "surfaceForm, reading, meaning",
+      "itemType (5 types), referenceItemId",
+      "surfaceForm, reading, meaning, patternId",
       "cefrLevel, frequencyRank",
       "priority (float), reason",
       "status: queued|introduced|skipped",
+      "@@index([userId, status, priority])",
     ],
   },
 ];
@@ -1209,14 +1245,16 @@ const flowDLines = [
   " 4. LanguageStep: select native language (target = Japanese fixed)",
   " 5. LevelStep: self-report JLPT (Beginner/N5/N4/N3/N2/N1)",
   " 6. AssessmentStep:",
-  "    -> onboardingGetAssessment(level) -> @linguist/core/onboarding",
-  "    -> getAssessmentItemsForLevel(): 15-33 items (tap to mark known)",
+  "    -> getAssessmentCandidates(level) from reference corpus",
+  "    -> Curated items per JLPT level (tap to mark known)",
   " 7. PreferencesStep: daily new item limit slider (3-30, default 10)",
   " 8. CompleteStep -> onboardingComplete(result):",
   "    -> CREATE LearnerProfile + PragmaticProfile",
-  "    -> Known items seeded as apprentice_2 (FSRS pre-initialized)",
-  "    -> Unknown items seeded as unseen",
-  "    -> Lower-level items (not in test) seeded as introduced",
+  "    -> Three-tier seeding from authoritative corpus:",
+  "       Below level: introduced (known = apprentice_2)",
+  "       At level:    unseen (known = apprentice_2)",
+  "       Above level: NOT seeded (curriculum engine introduces later)",
+  "    -> Wipe stale CurriculumItem queue",
   "    -> User.onboardingCompleted = true -> main app loads",
 ];
 const flowDH = autoH(flowDLines.length);
@@ -1227,6 +1265,54 @@ const flowDH = autoH(flowDLines.length);
     titleBg: COLORS.blue, titleBorder: COLORS.blueBorder,
     bodyBg: "#f8f9fa", bodyBorder: COLORS.blueBorder,
     bodyLines: flowDLines,
+  });
+  elements.push(...els);
+}
+
+// --- Flow E: Curriculum Recommendation Pipeline ---
+const flowEX = flowBX;
+const flowEY = flowBY + flowBH + 30;
+const flowELines = [
+  "Triggered: user requests recommendations or opens Learn page",
+  "",
+  " 1. CURRICULUM_GET_RECOMMENDATIONS handler",
+  " 2. Check CurriculumItem queue — return cached if queued items exist",
+  " 3. gatherBubbleItems() -> fetch all learner items from DB",
+  " 4. computeKnowledgeBubble(items) -> {",
+  "      currentLevel (highest with >=80% coverage),",
+  "      frontierLevel, levelBreakdowns (5 item types), gaps }",
+  " 5. Compute: dueReviewCount + recentAccuracy (last 50 reviews)",
+  " 6. generateCurriculumPlan({bubble, items, knownForms, dailyLimit, ...})",
+  "    |-- computePacing() -> adjust daily target by debt/accuracy",
+  "    |-- generateSpineAwarePlan():",
+  "    |     Load curriculum-spine.json (cached)",
+  "    |     Identify next uncompleted unit",
+  "    |     getSpineBoosts() -> +0.5 supporting, +1.0 core items",
+  "    |     generateRecommendations(with spineBoosts)",
+  "    |-- filterByPrerequisites() -> remove gated grammar",
+  "    |-- applyGrammarCap() -> max 2 grammar per day",
+  "    |-- balanceVariety() -> interleave item types",
+  "    |-- identifyReviewFocus() -> flag stuck items",
+  "    |-- checkLevelProgression() -> levelUpReady?",
+  " 7. If levelUpReady: seedNextLevelItems(userId, frontierLevel)",
+  "    -> INSERT unseen items from frontier level in reference corpus",
+  " 8. Persist plan.newItems to CurriculumItem table (status=queued)",
+  " 9. Return CurriculumPlan to client",
+  "",
+  "USER INTRODUCES ITEM:",
+  "10. CURRICULUM_INTRODUCE_ITEM -> create LexicalItem/GrammarItem/ChunkItem",
+  "    with mastery=introduced, mark CurriculumItem status=introduced",
+  "",
+  "Item types: lexical | grammar | collocation | chunk | pragmatic_formula",
+];
+const flowEH = autoH(flowELines.length);
+{
+  const { elements: els } = titledBox({
+    x: flowEX, y: flowEY, w: 780, h: flowEH,
+    title: "Flow E: Curriculum Recommendation Pipeline (Spine-Aware)",
+    titleBg: COLORS.green, titleBorder: COLORS.greenBorder,
+    bodyBg: "#f0faf0", bodyBorder: COLORS.greenBorder,
+    bodyLines: flowELines,
   });
   elements.push(...els);
 }
@@ -1446,11 +1532,15 @@ const NUX = ARX + 420;
 const NUY = ARY;
 
 const nextLines = [
-  "Completed (this update):",
+  "Completed:",
   "  [x] Supabase Auth (Google OAuth)",
   "  [x] Monorepo migration (Turborepo)",
   "  [x] Next.js web app (feature parity)",
   "  [x] Onboarding / placement wizard",
+  "  [x] Curriculum spine + planner engine",
+  "  [x] Authoritative corpus (JMDict + JLPT)",
+  "  [x] Multi-word units (collocation/chunk/pragmatic)",
+  "  [x] Three-tier onboarding seeding",
   "",
   "Next priorities:",
   "  [ ] @linguist/ui shared component pkg",
@@ -1465,7 +1555,7 @@ const nextH = autoH(nextLines.length);
 {
   const { elements: els } = titledBox({
     x: NUX, y: NUY, w: 360, h: nextH,
-    title: "Next Up (Post-Monorepo)",
+    title: "Next Up (Post-Curriculum)",
     titleBg: "#f8f9fa", titleBorder: "#adb5bd",
     bodyBg: "#f8f9fa", bodyBorder: "#adb5bd",
     bodyLines: nextLines,
