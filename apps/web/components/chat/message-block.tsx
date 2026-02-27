@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { Volume2, Square } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,9 @@ interface MessageBlockProps {
   userName?: string
   children?: ReactNode
   showRomaji?: boolean
+  onPlay?: () => void
+  onStop?: () => void
+  isPlayingAudio?: boolean
 }
 
 function hasJapanese(text: string): boolean {
@@ -30,7 +34,7 @@ function formatTime(iso: string): string {
   }
 }
 
-export function MessageBlock({ role, content, timestamp, isStreaming, userName, children, showRomaji }: MessageBlockProps) {
+export function MessageBlock({ role, content, timestamp, isStreaming, userName, children, showRomaji, onPlay, onStop, isPlayingAudio }: MessageBlockProps) {
   if (role === 'user') {
     const isJp = hasJapanese(content)
     return (
@@ -78,6 +82,20 @@ export function MessageBlock({ role, content, timestamp, isStreaming, userName, 
               <span className="text-[10px] font-mono text-text-muted">
                 {formatTime(timestamp)}
               </span>
+            )}
+            {(onPlay || onStop) && !isStreaming && (
+              <button
+                className={cn(
+                  'flex items-center justify-center w-6 h-6 rounded-full border-none cursor-pointer transition-all',
+                  isPlayingAudio
+                    ? 'bg-accent-brand/10 text-accent-brand opacity-100'
+                    : 'bg-transparent text-text-muted opacity-0 group-hover:opacity-100 hover:text-text-primary hover:bg-bg-hover'
+                )}
+                onClick={isPlayingAudio ? onStop : onPlay}
+                title={isPlayingAudio ? 'Stop' : 'Play aloud'}
+              >
+                {isPlayingAudio ? <Square size={11} /> : <Volume2 size={13} />}
+              </button>
             )}
           </div>
           {(content || isStreaming) && (

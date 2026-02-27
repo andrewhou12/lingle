@@ -73,15 +73,6 @@ export function ChatInput({ value, onChange, onSend, disabled, placeholder, show
       {/* Bottom toolbar + hint */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-1.5">
-          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[12px] font-jp font-bold cursor-default hover:bg-bg-hover transition-colors" title="Japanese input">
-            あ
-          </button>
-          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[13px] cursor-default hover:bg-bg-hover transition-colors" title="Voice input">
-            🎤
-          </button>
-          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[15px] leading-none cursor-default hover:bg-bg-hover transition-colors" title="Attach">
-            +
-          </button>
           {onToggleRomaji && (
             <button
               className={cn(
@@ -97,6 +88,12 @@ export function ChatInput({ value, onChange, onSend, disabled, placeholder, show
               <span>→ a</span>
             </button>
           )}
+          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[13px] cursor-default hover:bg-bg-hover transition-colors" title="Voice input">
+            🎤
+          </button>
+          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[15px] leading-none cursor-default hover:bg-bg-hover transition-colors" title="Attach">
+            +
+          </button>
         </div>
         <span className="text-[11px] text-text-placeholder select-none">
           ⏎ send · ⇧⏎ newline

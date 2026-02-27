@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import { parseMessage, extractTargetsHit, type MessageSegment } from '@/lib/message-parser'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import { useRomaji, useAnnotatedTexts } from '@/hooks/use-romaji'
+import { useTTS } from '@/hooks/use-tts'
 import { RomajiText } from '@/components/romaji-text'
 import { VocabCard, GrammarCard, CorrectionCard, ReviewPromptCard } from '@/components/conversation-cards'
 import { ChallengeCard } from '@/components/challenge-card'
@@ -53,6 +54,7 @@ export default function ConversationPage() {
     [messages]
   )
   const { getAnnotated } = useAnnotatedTexts(assistantTexts, showRomaji)
+  const tts = useTTS()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -298,7 +300,15 @@ export default function ConversationPage() {
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-6 py-4">
           {messages.map((msg, i) => (
-            <MessageSegmentRenderer key={i} message={msg} showRomaji={showRomaji} getAnnotated={getAnnotated} />
+            <MessageSegmentRenderer
+              key={i}
+              message={msg}
+              showRomaji={showRomaji}
+              getAnnotated={getAnnotated}
+              onPlay={msg.role === 'assistant' ? () => tts.play(msg.timestamp, msg.content) : undefined}
+              onStop={msg.role === 'assistant' ? tts.stop : undefined}
+              isPlayingAudio={tts.playingId === msg.timestamp}
+            />
           ))}
 
           {/* Streaming content */}
@@ -352,7 +362,14 @@ export default function ConversationPage() {
 
 // Message rendering with structured cards
 
-function MessageSegmentRenderer({ message, showRomaji, getAnnotated }: { message: ConversationMessage; showRomaji: boolean; getAnnotated: (text: string) => string }) {
+function MessageSegmentRenderer({ message, showRomaji, getAnnotated, onPlay, onStop, isPlayingAudio }: {
+  message: ConversationMessage
+  showRomaji: boolean
+  getAnnotated: (text: string) => string
+  onPlay?: () => void
+  onStop?: () => void
+  isPlayingAudio?: boolean
+}) {
   if (message.role === 'user') {
     return (
       <MessageBlock
@@ -372,6 +389,9 @@ function MessageSegmentRenderer({ message, showRomaji, getAnnotated }: { message
       content=""
       timestamp={message.timestamp}
       showRomaji={showRomaji}
+      onPlay={onPlay}
+      onStop={onStop}
+      isPlayingAudio={isPlayingAudio}
     >
       {segments.map((segment, i) => (
         <SegmentComponent key={i} segment={segment} showRomaji={showRomaji} />
