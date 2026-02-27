@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ArrowUp, Square } from 'lucide-react'
+import { Square } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type {
@@ -13,11 +13,21 @@ import { api } from '@/lib/api'
 import { parseMessage, extractTargetsHit, type MessageSegment } from '@/lib/message-parser'
 import { VocabCard, GrammarCard, CorrectionCard, ReviewPromptCard } from '@/components/conversation-cards'
 import { ChallengeCard } from '@/components/challenge-card'
-import { SessionSummaryCard } from '@/components/session-summary'
+import { MessageBlock } from '@/components/chat/message-block'
+import { ChatInput } from '@/components/chat/chat-input'
+import { EscapeHatch } from '@/components/chat/escape-hatch'
+import { SuggestionChips } from '@/components/chat/suggestion-chips'
+import { SessionSummaryModal } from '@/components/chat/session-summary-modal'
 import { Spinner } from '@/components/spinner'
 import { cn } from '@/lib/utils'
 
 type Phase = 'planning' | 'conversation' | 'summary'
+
+const DEFAULT_SUGGESTIONS = [
+  'こんにちは！',
+  'What should we talk about?',
+  'もう一度お願いします',
+]
 
 export default function ConversationPage() {
   const [phase, setPhase] = useState<Phase>('planning')
@@ -31,9 +41,9 @@ export default function ConversationPage() {
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [targetsHit, setTargetsHit] = useState<Set<string>>(new Set())
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
   const sessionStartTime = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -61,7 +71,6 @@ export default function ConversationPage() {
     if (!input.trim() || !sessionId || isSending) return
     const text = input.trim()
     setInput('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
     const userMsg: ConversationMessage = {
       role: 'user',
@@ -101,6 +110,14 @@ export default function ConversationPage() {
     setIsSending(false)
   }, [input, sessionId, isSending])
 
+  const handleSuggestionSelect = useCallback((text: string) => {
+    setInput(text)
+  }, [])
+
+  const handleEscapeHatch = useCallback(() => {
+    setInput("I'd like to switch to English for a moment: ")
+  }, [])
+
   const handleEndSession = useCallback(async () => {
     if (!sessionId) return
     setIsLoading(true)
@@ -108,6 +125,7 @@ export default function ConversationPage() {
       const result = await api.conversationEnd(sessionId)
       setAnalysis(result)
       setPhase('summary')
+      setShowSummaryModal(true)
     } catch (err) {
       console.error('Failed to end session:', err)
     }
@@ -122,93 +140,116 @@ export default function ConversationPage() {
     setAnalysis(null)
     setTargetsHit(new Set())
     setStreamingContent('')
-  }, [])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleSend()
-      }
-    },
-    [handleSend]
-  )
-
-  const adjustTextarea = useCallback(() => {
-    const el = textareaRef.current
-    if (el) {
-      el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 200) + 'px'
-    }
+    setShowSummaryModal(false)
   }, [])
 
   // Planning Phase
   if (phase === 'planning') {
     return (
-      <div className="max-w-[640px] mx-auto">
-        <h1 className="text-[28px] font-bold mb-6">Conversation</h1>
-        <p className="text-[15px] text-text-muted mb-6">
-          Start a conversation session. The AI will plan targets based on your knowledge state.
-        </p>
-        {error && (
-          <div className="mb-3 p-3 bg-[rgba(200,87,42,.06)] rounded-md">
-            <span className="text-[13px] text-accent-warm">{error}</span>
+      <div className="h-full flex flex-col items-center justify-center">
+        <div className="max-w-[480px] w-full flex flex-col items-center text-center">
+          {/* Sensei avatar */}
+          <div className="w-16 h-16 rounded-2xl bg-accent-brand flex items-center justify-center mb-5 shadow-[var(--shadow-md)]">
+            <span className="text-[28px] font-jp font-bold text-white leading-none">先</span>
           </div>
-        )}
-        <button
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md bg-accent-brand px-5 py-2.5 text-[15px] font-medium text-white border-none cursor-pointer transition-opacity',
-            isLoading && 'opacity-50'
-          )}
-          onClick={handleStartSession}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Spinner size={16} />
-              Planning session...
-            </>
-          ) : (
-            'Start Session'
-          )}
-        </button>
-      </div>
-    )
-  }
 
-  // Summary Phase
-  if (phase === 'summary' && sessionPlan) {
-    const durationSeconds = Math.round((Date.now() - sessionStartTime.current) / 1000)
-    const totalTargets = (sessionPlan.targetVocabulary?.length ?? 0) + (sessionPlan.targetGrammar?.length ?? 0)
-    return (
-      <div className="max-w-[640px] mx-auto">
-        <h1 className="text-[28px] font-bold mb-4">Session Complete</h1>
-        {analysis && (
-          <SessionSummaryCard
-            analysis={analysis}
-            durationSeconds={durationSeconds}
-            totalTargets={totalTargets}
-          />
-        )}
-        <div className="flex gap-3 mt-4">
+          <h1 className="text-[26px] font-bold text-text-primary mb-2">Ready to practice?</h1>
+          <p className="text-[15px] text-text-secondary mb-8 max-w-[360px] leading-relaxed">
+            Sensei will tailor a conversation to your level, targeting vocabulary and grammar you need to reinforce.
+          </p>
+
+          {error && (
+            <div className="mb-4 p-3 bg-warm-soft rounded-lg w-full">
+              <span className="text-[13px] text-accent-warm">{error}</span>
+            </div>
+          )}
+
+          {/* Start button */}
           <button
-            className="rounded-md bg-accent-brand px-5 py-2.5 text-[15px] font-medium text-white border-none cursor-pointer transition-opacity hover:opacity-90"
-            onClick={handleNewSession}
+            className={cn(
+              'inline-flex items-center justify-center gap-2.5 rounded-xl bg-accent-brand px-8 py-3 text-[15px] font-semibold text-white border-none cursor-pointer transition-all hover:shadow-[var(--shadow-md)] hover:scale-[1.02] active:scale-[0.98]',
+              isLoading && 'opacity-60 pointer-events-none'
+            )}
+            onClick={handleStartSession}
+            disabled={isLoading}
           >
-            Start New Session
+            {isLoading ? (
+              <>
+                <Spinner size={16} />
+                Planning your session...
+              </>
+            ) : (
+              <>
+                <span className="text-[18px]">🗣️</span>
+                Start Conversation
+              </>
+            )}
           </button>
+
+          {/* Info cards */}
+          <div className="grid grid-cols-3 gap-4 mt-10 w-full">
+            <div className="flex flex-col items-center gap-2.5 p-5 rounded-xl bg-bg-pure border border-border-subtle">
+              <span className="text-[26px]">🎯</span>
+              <span className="text-[14px] font-medium text-text-secondary">Personalized</span>
+              <span className="text-[13px] text-text-muted leading-snug">Targets your weak spots</span>
+            </div>
+            <div className="flex flex-col items-center gap-2.5 p-5 rounded-xl bg-bg-pure border border-border-subtle">
+              <span className="text-[26px]">📝</span>
+              <span className="text-[14px] font-medium text-text-secondary">Gentle corrections</span>
+              <span className="text-[13px] text-text-muted leading-snug">Learn from mistakes</span>
+            </div>
+            <div className="flex flex-col items-center gap-2.5 p-5 rounded-xl bg-bg-pure border border-border-subtle">
+              <span className="text-[26px]">📊</span>
+              <span className="text-[14px] font-medium text-text-secondary">Session review</span>
+              <span className="text-[13px] text-text-muted leading-snug">Track your progress</span>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
+  // Summary Phase (modal overlay on conversation)
+  if (phase === 'summary' && sessionPlan) {
+    const durationSeconds = Math.round((Date.now() - sessionStartTime.current) / 1000)
+
+    return (
+      <>
+        <div className="max-w-[640px] mx-auto">
+          <h1 className="text-[28px] font-bold mb-4">Session Complete</h1>
+          <p className="text-[15px] text-text-muted mb-4">
+            {analysis?.overallAssessment || 'Great work on your conversation practice!'}
+          </p>
+          <div className="flex gap-3">
+            <button
+              className="rounded-xl bg-accent-brand px-5 py-2.5 text-[15px] font-medium text-white border-none cursor-pointer transition-opacity hover:opacity-90"
+              onClick={handleNewSession}
+            >
+              Start New Session
+            </button>
+          </div>
+        </div>
+
+        {analysis && (
+          <SessionSummaryModal
+            isOpen={showSummaryModal}
+            onClose={() => setShowSummaryModal(false)}
+            analysis={analysis}
+            plan={sessionPlan}
+            durationSeconds={durationSeconds}
+          />
+        )}
+      </>
+    )
+  }
+
   // Conversation Phase
   return (
-    <div className="h-full flex flex-col">
-      {/* Session info bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+    <div className="h-full flex flex-col -m-6">
+      {/* Session info sticky bar */}
+      <div className="flex items-center justify-between px-6 py-2.5 border-b border-border shrink-0 bg-bg">
         <div className="flex items-center gap-3">
-          <span className="text-[13px] font-medium">
+          <span className="text-[13px] font-medium text-text-primary">
             {sessionPlan?.sessionFocus ?? 'Conversation'}
           </span>
           {sessionPlan && (
@@ -224,7 +265,7 @@ export default function ConversationPage() {
         </div>
         <button
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md bg-[rgba(200,87,42,.06)] px-3 py-1.5 text-[13px] font-medium text-accent-warm border-none cursor-pointer transition-colors hover:bg-[rgba(200,87,42,.12)]',
+            'inline-flex items-center gap-1.5 rounded-lg bg-warm-soft px-3 py-1.5 text-[13px] font-medium text-accent-warm border-none cursor-pointer transition-colors hover:bg-warm-med',
             isLoading && 'opacity-50'
           )}
           onClick={handleEndSession}
@@ -251,18 +292,15 @@ export default function ConversationPage() {
             <MessageSegmentRenderer key={i} message={msg} />
           ))}
 
+          {/* Streaming content */}
           {streamingContent && (
-            <div className="py-3">
-              <div className="chat-markdown text-text-primary leading-[1.7] text-[15px]">
-                <Markdown remarkPlugins={[remarkGfm]}>{streamingContent}</Markdown>
-                <span className="blink-cursor" />
-              </div>
-            </div>
+            <MessageBlock role="assistant" content={streamingContent} isStreaming />
           )}
 
+          {/* Loading indicator */}
           {isSending && !streamingContent && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-            <div className="flex items-center gap-2 py-3">
-              <Spinner size={16} />
+            <div className="flex items-center gap-2.5 py-3 pl-10">
+              <Spinner size={14} />
               <span className="text-[13px] text-text-muted">Thinking...</span>
             </div>
           )}
@@ -271,34 +309,30 @@ export default function ConversationPage() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="px-6 pt-3 pb-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-end gap-2 border border-border rounded-3xl py-2 pr-2 pl-5 bg-bg-secondary">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                adjustTextarea()
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
-              rows={1}
-              style={{ maxHeight: 200 }}
-              className="flex-1 resize-none border-none bg-transparent text-text-primary text-[15px] leading-normal font-[inherit] outline-none py-1"
+      {/* Bottom area: escape hatch + chips + input */}
+      <div className="px-6 pt-2 pb-4 flex flex-col gap-3">
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-3">
+          {/* Escape hatch */}
+          {messages.length > 0 && !isSending && (
+            <EscapeHatch onUse={handleEscapeHatch} />
+          )}
+
+          {/* Suggestion chips — only show when no messages yet or after assistant reply */}
+          {(messages.length === 0 || (messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !isSending)) && (
+            <SuggestionChips
+              suggestions={DEFAULT_SUGGESTIONS}
+              onSelect={handleSuggestionSelect}
             />
-            <button
-              className={cn(
-                'flex items-center justify-center w-8 h-8 rounded-full bg-accent-brand text-white shrink-0 border-none cursor-pointer transition-opacity',
-                (!input.trim() || isSending) && 'opacity-40'
-              )}
-              onClick={handleSend}
-              disabled={!input.trim() || isSending}
-            >
-              <ArrowUp size={16} />
-            </button>
-          </div>
+          )}
+
+          {/* Chat input */}
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={handleSend}
+            disabled={isSending}
+            placeholder="Type your message..."
+          />
         </div>
       </div>
     </div>
@@ -310,22 +344,26 @@ export default function ConversationPage() {
 function MessageSegmentRenderer({ message }: { message: ConversationMessage }) {
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end py-1.5">
-        <div className="max-w-[75%] px-4 py-2.5 rounded-[20px] bg-bg-active text-text-primary leading-relaxed text-[15px] whitespace-pre-wrap">
-          {message.content}
-        </div>
-      </div>
+      <MessageBlock
+        role="user"
+        content={message.content}
+        timestamp={message.timestamp}
+      />
     )
   }
 
   const segments = parseMessage(message.content)
 
   return (
-    <div className="py-3">
+    <MessageBlock
+      role="assistant"
+      content=""
+      timestamp={message.timestamp}
+    >
       {segments.map((segment, i) => (
         <SegmentComponent key={i} segment={segment} />
       ))}
-    </div>
+    </MessageBlock>
   )
 }
 
@@ -345,7 +383,7 @@ function SegmentComponent({ segment }: { segment: MessageSegment }) {
     default:
       if (!segment.content.trim()) return null
       return (
-        <div className="chat-markdown text-text-primary leading-[1.7] text-[15px]">
+        <div className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]">
           <Markdown remarkPlugins={[remarkGfm]}>{segment.content}</Markdown>
         </div>
       )

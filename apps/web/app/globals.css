@@ -12,29 +12,88 @@
 
   /* App-specific colors (generates bg-bg-secondary, text-text-muted, etc.) */
   --color-bg: var(--bg);
+  --color-bg-pure: var(--bg-pure);
   --color-bg-secondary: var(--bg-secondary);
   --color-bg-hover: var(--bg-hover);
   --color-bg-active: var(--bg-active);
   --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+  --color-text-placeholder: var(--text-placeholder);
   --color-accent-brand: var(--accent-brand);
   --color-accent-warm: var(--accent-warm);
+
+  /* Mastery tier colors */
+  --color-tier-new: var(--tier-new);
+  --color-tier-app: var(--tier-app);
+  --color-tier-jour: var(--tier-jour);
+  --color-tier-exp: var(--tier-exp);
+  --color-tier-master: var(--tier-master);
+
+  /* Semantic colors */
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-green-med: var(--green-med);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-blue-med: var(--blue-med);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-red-med: var(--red-med);
+  --color-purple: var(--purple);
+  --color-purple-soft: var(--purple-soft);
+  --color-purple-med: var(--purple-med);
+  --color-warm: var(--warm);
+  --color-warm-soft: var(--warm-soft);
+  --color-warm-med: var(--warm-med);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 4px rgba(0,0,0,.03);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.06), 0 1px 4px rgba(0,0,0,.04);
+  --shadow-pop: 0 4px 24px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06);
 }
 
 /* ── Design tokens ── */
 :root {
-  --bg: #ffffff;
+  --bg: #fafaf8;
+  --bg-pure: #ffffff;
   --bg-secondary: #f7f7f5;
   --bg-hover: #f1f1ef;
   --bg-active: #ebebea;
+  --border-subtle: #eeeeea;
   --border-strong: #d4d4d1;
   --text-primary: #1a1a1a;
   --text-secondary: #6b6b6b;
   --text-muted: #9b9b9b;
+  --text-placeholder: #b8b8b0;
   --accent-brand: #2f2f2f;
   --accent-warm: #c8572a;
+
+  /* Mastery tiers */
+  --tier-new: #e8862a;
+  --tier-app: #3b6ec2;
+  --tier-jour: #8b5cf6;
+  --tier-exp: #22a355;
+  --tier-master: #9b9b9b;
+
+  /* Semantic colors */
+  --green: #22a355;
+  --green-soft: rgba(34,163,85,.08);
+  --green-med: rgba(34,163,85,.15);
+  --blue: #3b6ec2;
+  --blue-soft: rgba(59,110,194,.08);
+  --blue-med: rgba(59,110,194,.15);
+  --red: #dc3545;
+  --red-soft: rgba(220,53,69,.08);
+  --red-med: rgba(220,53,69,.15);
+  --purple: #8b5cf6;
+  --purple-soft: rgba(139,92,246,.08);
+  --purple-med: rgba(139,92,246,.15);
+  --warm: #c8572a;
+  --warm-soft: rgba(200,87,42,.07);
+  --warm-med: rgba(200,87,42,.14);
 
   /* shadcn/ui CSS variable mapping — maps our tokens to shadcn expectations */
   --radius: 0.5rem;
@@ -104,6 +163,23 @@
 .chat-markdown table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9em; }
 .chat-markdown th { border-bottom: 2px solid var(--border); padding: 8px 12px; text-align: left; font-weight: 600; }
 .chat-markdown td { border-bottom: 1px solid var(--border); padding: 8px 12px; }
+
+/* ── Calligraphy grid background ── */
+.calligraphy-grid {
+  position: relative;
+}
+.calligraphy-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: .3;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+}
 
 /* ── Animations ── */
 @keyframes blink-cursor { 50% { opacity: 0; } }
