@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Box, Heading, Text, Card, Flex, Button } from '@radix-ui/themes'
 import type { ReviewSummary, WeeklyStats } from '@linguist/shared/types'
 import { useFrontier } from '@/hooks/use-frontier'
 import { DailyBrief } from './daily-brief'
 import { FrontierContainer } from './frontier/frontier-container'
 import { Skeleton } from '@/components/skeleton'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<ReviewSummary | null>(null)
@@ -25,18 +25,17 @@ export default function DashboardPage() {
   const isLoading = summary === null || dueCount === null || weeklyStats === null
 
   return (
-    <Box>
-      <Heading size="7" mb="4">
-        Dashboard
-      </Heading>
+    <div>
+      <h1 className="text-[28px] font-bold mb-4">Dashboard</h1>
 
-      <Flex gap="4" wrap="wrap">
-        <Card style={{ minWidth: 200, flex: 1 }}>
-          <Flex direction="column" gap="2">
-            <Flex align="center" gap="2">
-              <span style={{ fontSize: 20 }}>📋</span>
-              <Text size="2" color="gray">Due for Review</Text>
-            </Flex>
+      <div className="flex gap-4 flex-wrap">
+        {/* Due for Review */}
+        <div className="min-w-[200px] flex-1 rounded-xl border border-border bg-bg p-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📋</span>
+              <span className="text-[13px] text-text-muted">Due for Review</span>
+            </div>
             {isLoading ? (
               <>
                 <Skeleton width={60} height={36} />
@@ -45,26 +44,28 @@ export default function DashboardPage() {
               </>
             ) : (
               <>
-                <Text size="8" weight="bold">
-                  {dueCount}
-                </Text>
-                <Text size="1" color="gray">
+                <span className="text-4xl font-bold">{dueCount}</span>
+                <span className="text-[11px] text-text-muted">
                   {dueCount === 0 ? 'All caught up!' : `${dueCount} card${dueCount === 1 ? '' : 's'} waiting`}
-                </Text>
-                <Button asChild variant="soft" mt="1">
-                  <Link href="/review">Start Review</Link>
-                </Button>
+                </span>
+                <Link
+                  href="/review"
+                  className="mt-1 inline-flex items-center justify-center rounded-md bg-bg-secondary px-4 py-2 text-[13px] font-medium text-text-secondary no-underline transition-colors duration-150 hover:bg-bg-hover"
+                >
+                  Start Review
+                </Link>
               </>
             )}
-          </Flex>
-        </Card>
+          </div>
+        </div>
 
-        <Card style={{ minWidth: 200, flex: 1 }}>
-          <Flex direction="column" gap="2">
-            <Flex align="center" gap="2">
-              <span style={{ fontSize: 20 }}>✅</span>
-              <Text size="2" color="gray">Reviewed Today</Text>
-            </Flex>
+        {/* Reviewed Today */}
+        <div className="min-w-[200px] flex-1 rounded-xl border border-border bg-bg p-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">✅</span>
+              <span className="text-[13px] text-text-muted">Reviewed Today</span>
+            </div>
             {isLoading ? (
               <>
                 <Skeleton width={60} height={36} />
@@ -72,93 +73,86 @@ export default function DashboardPage() {
               </>
             ) : (
               <>
-                <Text size="8" weight="bold">
-                  {summary?.totalReviewed ?? 0}
-                </Text>
-                <Flex align="center" gap="1">
-                  <span style={{ fontSize: 14 }}>🎯</span>
-                  <Text size="1" color="gray">
+                <span className="text-4xl font-bold">{summary?.totalReviewed ?? 0}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">🎯</span>
+                  <span className="text-[11px] text-text-muted">
                     Accuracy: {summary ? Math.round(summary.accuracy * 100) : 0}%
-                  </Text>
-                </Flex>
+                  </span>
+                </div>
               </>
             )}
-          </Flex>
-        </Card>
+          </div>
+        </div>
 
-        <Card style={{ minWidth: 360, flex: 2 }}>
-          <Flex direction="column" gap="3">
-            <Flex align="center" gap="2">
-              <span style={{ fontSize: 20 }}>📊</span>
-              <Text size="2" color="gray">This Week</Text>
-            </Flex>
+        {/* This Week */}
+        <div className="min-w-[360px] flex-[2] rounded-xl border border-border bg-bg p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📊</span>
+              <span className="text-[13px] text-text-muted">This Week</span>
+            </div>
             {isLoading ? (
-              <Flex align="stretch" style={{ gap: 0 }}>
+              <div className="flex items-stretch">
                 {['Streak', 'Reviews', 'Sessions', 'Learned'].map((label, i, arr) => (
-                  <Flex
+                  <div
                     key={label}
-                    direction="column"
-                    gap="2"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      borderRight: i < arr.length - 1 ? '1px solid var(--gray-a4)' : 'none',
-                    }}
+                    className={cn(
+                      'flex flex-col gap-2 flex-1 px-3 py-2',
+                      i < arr.length - 1 && 'border-r border-border'
+                    )}
                   >
                     <Skeleton width={50} height={24} />
                     <Skeleton width={60} height={10} />
-                  </Flex>
+                  </div>
                 ))}
-              </Flex>
+              </div>
             ) : (
               <>
-                <Flex align="stretch" style={{ gap: 0 }}>
+                <div className="flex items-stretch">
                   {[
                     { emoji: '🔥', value: weeklyStats?.currentStreak ?? 0, label: 'Streak' },
                     { emoji: '📝', value: weeklyStats?.reviewsThisWeek ?? 0, label: 'Reviews' },
                     { emoji: '💬', value: weeklyStats?.sessionsThisWeek ?? 0, label: 'Sessions' },
                     { emoji: '🧠', value: weeklyStats?.itemsLearned ?? 0, label: 'Learned' },
                   ].map((stat, i, arr) => (
-                    <Flex
+                    <div
                       key={stat.label}
-                      direction="column"
-                      gap="1"
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRight: i < arr.length - 1 ? '1px solid var(--gray-a4)' : 'none',
-                      }}
+                      className={cn(
+                        'flex flex-col gap-1 flex-1 px-3 py-2',
+                        i < arr.length - 1 && 'border-r border-border'
+                      )}
                     >
-                      <Flex align="center" gap="2">
-                        <span style={{ fontSize: 18 }}>{stat.emoji}</span>
-                        <Text size="5" weight="bold">{stat.value}</Text>
-                      </Flex>
-                      <Text size="1" color="gray">{stat.label}</Text>
-                    </Flex>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{stat.emoji}</span>
+                        <span className="text-xl font-bold">{stat.value}</span>
+                      </div>
+                      <span className="text-[11px] text-text-muted">{stat.label}</span>
+                    </div>
                   ))}
-                </Flex>
+                </div>
                 {weeklyStats && weeklyStats.reviewsThisWeek > 0 && (
-                  <Flex align="center" gap="1">
-                    <span style={{ fontSize: 14 }}>🎯</span>
-                    <Text size="1" color="gray">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm">🎯</span>
+                    <span className="text-[11px] text-text-muted">
                       {Math.round(weeklyStats.accuracyThisWeek * 100)}% accuracy
-                    </Text>
-                    <Text size="1" color="gray">·</Text>
-                    <span style={{ fontSize: 14 }}>🏆</span>
-                    <Text size="1" color="gray">
+                    </span>
+                    <span className="text-[11px] text-text-muted">·</span>
+                    <span className="text-sm">🏆</span>
+                    <span className="text-[11px] text-text-muted">
                       Best Streak {weeklyStats.longestStreak}
-                    </Text>
-                  </Flex>
+                    </span>
+                  </div>
                 )}
               </>
             )}
-          </Flex>
-        </Card>
-      </Flex>
+          </div>
+        </div>
+      </div>
 
       {frontierData && <DailyBrief frontier={frontierData} />}
 
       <FrontierContainer />
-    </Box>
+    </div>
   )
 }

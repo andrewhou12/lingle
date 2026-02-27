@@ -10,11 +10,18 @@ type AuthHandler = (
 
 export function withAuth(handler: AuthHandler) {
   return async (request: NextRequest) => {
+    let userId: string
     try {
-      const userId = await getUserId()
-      return await handler(request, { userId })
-    } catch {
+      userId = await getUserId()
+    } catch (err) {
+      console.error('[withAuth] Auth failed:', err)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    try {
+      return await handler(request, { userId })
+    } catch (err) {
+      console.error('[withAuth] Handler error:', err)
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
   }
 }

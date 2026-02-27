@@ -34,23 +34,23 @@ export function RadarChart({ reading, writing, listening, speaking }: RadarChart
   const guideLines = [0.25, 0.5, 0.75, 1.0]
 
   return (
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" height="100%" style={{ maxWidth: 220, maxHeight: 220 }}>
+    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" height="100%" className="max-w-[220px] max-h-[220px]">
       {guideLines.map((frac) => (
-        <polygon key={frac} points={polygonPoints([frac, frac, frac, frac])} fill="none" stroke="var(--gray-5)" strokeWidth={0.5} />
+        <polygon key={frac} points={polygonPoints([frac, frac, frac, frac])} fill="none" stroke="var(--border)" strokeWidth={0.5} />
       ))}
       {AXES.map((axis) => {
         const end = pointOnAxis(axis.angle, 1)
-        return <line key={axis.key} x1={CENTER} y1={CENTER} x2={end.x} y2={end.y} stroke="var(--gray-5)" strokeWidth={0.5} />
+        return <line key={axis.key} x1={CENTER} y1={CENTER} x2={end.x} y2={end.y} stroke="var(--border)" strokeWidth={0.5} />
       })}
-      <polygon points={polygonPoints(values)} fill="var(--accent-3)" stroke="var(--accent-9)" strokeWidth={1.5} opacity={0.8} />
+      <polygon points={polygonPoints(values)} fill="rgba(47,47,47,.06)" stroke="var(--accent-brand)" strokeWidth={1.5} opacity={0.8} />
       {AXES.map((axis, i) => {
         const pt = pointOnAxis(axis.angle, values[i])
-        return <circle key={axis.key} cx={pt.x} cy={pt.y} r={3} fill="var(--accent-9)" />
+        return <circle key={axis.key} cx={pt.x} cy={pt.y} r={3} fill="var(--accent-brand)" />
       })}
       {AXES.map((axis) => {
         const pt = pointOnAxis(axis.angle, 1.22)
         return (
-          <text key={axis.key} x={pt.x} y={pt.y} textAnchor="middle" dominantBaseline="central" fill="var(--gray-11)" fontSize={11} fontFamily="inherit">
+          <text key={axis.key} x={pt.x} y={pt.y} textAnchor="middle" dominantBaseline="central" fill="var(--text-secondary)" fontSize={11} fontFamily="inherit">
             {axis.label}
           </text>
         )

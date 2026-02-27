@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Box, Card, Flex, Text } from '@radix-ui/themes'
 import type { FrontierData, TomBrief } from '@linguist/shared/types'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 function getCacheKey(): string {
   const today = new Date().toISOString().slice(0, 10)
@@ -58,26 +58,15 @@ export function DailyBrief({ frontier }: { frontier: FrontierData }) {
   if (!text) return null
 
   return (
-    <Card
-      mt="5"
-      style={{
-        borderLeft: '3px solid var(--accent-9)',
-        background: 'var(--color-surface)',
-      }}
-    >
-      <Flex direction="column" gap="2">
-        <Text size="1" color="gray" weight="medium">
+    <div className="mt-5 rounded-xl border border-border bg-bg p-4 border-l-[3px] border-l-accent-brand">
+      <div className="flex flex-col gap-2">
+        <span className="text-[11px] text-text-muted font-medium">
           {isPolished ? 'AI summary' : 'Summary'}
-        </Text>
-        <Box>
-          <Text
-            size="2"
-            style={{ fontStyle: isPolished ? 'italic' : 'normal', lineHeight: 1.6 }}
-          >
-            {text}
-          </Text>
-        </Box>
-      </Flex>
-    </Card>
+        </span>
+        <p className={cn('text-[13px] leading-[1.6] m-0', isPolished ? 'italic' : 'not-italic')}>
+          {text}
+        </p>
+      </div>
+    </div>
   )
 }

@@ -2,18 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Box, Flex, Text } from '@radix-ui/themes'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import {
-  LayoutDashboard,
-  RotateCcw,
-  GraduationCap,
   BookOpen,
   MessageCircle,
+  Clock,
   Settings,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { UserMenu } from '@/components/user-menu'
+import { cn } from '@/lib/utils'
 
 interface NavItem {
   href: string
@@ -22,76 +20,82 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/review', label: 'Review', icon: RotateCcw },
-  { href: '/learn', label: 'Learn', icon: GraduationCap },
+  { href: '/conversation', label: 'Conversation', icon: MessageCircle },
   { href: '/knowledge', label: 'Knowledge Base', icon: BookOpen },
-  { href: '/chat', label: 'Chat', icon: MessageCircle },
+  { href: '/history', label: 'History', icon: Clock },
 ]
 
-function navLinkStyle(isActive: boolean): CSSProperties {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 12px',
-    borderRadius: 'var(--radius-2)',
-    textDecoration: 'none',
-    color: isActive ? 'var(--accent-11)' : 'var(--gray-11)',
-    backgroundColor: isActive ? 'var(--accent-3)' : 'transparent',
-    fontWeight: isActive ? 600 : 400,
-  }
+function LogoSVG() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 32 32" fill="none">
+      <path d="M24 3 C24 3, 18 5, 14 10 C10 15, 8 21, 8 26 C9 24, 11 19, 14 14 C17 9, 21 5, 24 3 Z" stroke="white" strokeWidth="2" strokeLinejoin="round" fill="none"/>
+      <path d="M24 3 C24 3, 26 7, 24 13 C22 19, 17 24, 12 27 C14 23, 17 18, 20 13 C23 8, 25 5, 24 3 Z" stroke="white" strokeWidth="2" strokeLinejoin="round" fill="none"/>
+      <path d="M8 26 L7 29" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function NavLink({ href, label, icon: Icon, isActive }: NavItem & { isActive: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] no-underline transition-[background,color] duration-100',
+        isActive
+          ? 'font-medium text-text-primary bg-bg-active'
+          : 'font-normal text-text-secondary bg-transparent hover:bg-bg-hover hover:text-text-primary'
+      )}
+    >
+      <Icon size={16} />
+      {label}
+    </Link>
+  )
 }
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
 
   return (
-    <Flex style={{ height: '100vh' }}>
-      <nav
-        style={{
-          width: 240,
-          borderRight: '1px solid var(--gray-4)',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <Text size="5" weight="bold" mb="4" asChild>
-            <h1 style={{ margin: 0 }}>Linguist</h1>
-          </Text>
-          <Flex direction="column" gap="1" mt="4" style={{ flex: 1 }}>
-            {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link key={item.href} href={item.href} style={navLinkStyle(isActive)}>
-                  <item.icon size={18} />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </Flex>
-          <Link href="/settings" style={navLinkStyle(pathname === '/settings')}>
-            <Settings size={18} />
-            Settings
-          </Link>
+    <div className="flex h-screen bg-bg">
+      {/* Sidebar */}
+      <nav className="w-[220px] border-r border-border bg-bg-secondary shrink-0 flex flex-col px-2.5 py-3.5">
+        {/* Logo */}
+        <div className="flex items-center gap-[7px] px-1.5 pt-1 pb-4">
+          <div className="w-6 h-6 bg-accent-brand rounded-[5px] flex items-center justify-center">
+            <LogoSVG />
+          </div>
+          <span className="font-serif text-sm font-normal italic text-text-primary tracking-tight">
+            Linguist
+          </span>
         </div>
+
+        {/* Section label */}
+        <div className="text-[9.5px] uppercase tracking-[.07em] text-text-muted px-1.5 pt-2.5 pb-1 font-medium">
+          Practice
+        </div>
+
+        {/* Nav items */}
+        <div className="flex flex-col gap-0.5 flex-1">
+          {NAV_ITEMS.map((item) => (
+            <NavLink key={item.href} {...item} isActive={pathname === item.href} />
+          ))}
+        </div>
+
+        {/* Settings at bottom */}
+        <NavLink href="/settings" label="Settings" icon={Settings} isActive={pathname === '/settings'} />
       </nav>
 
-      <Flex direction="column" style={{ flex: 1, overflow: 'hidden' }}>
-        <Flex
-          align="center"
-          justify="end"
-          px="6"
-          style={{ height: 48, flexShrink: 0 }}
-        >
+      {/* Main content */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-end px-6 h-12 border-b border-border shrink-0">
           <UserMenu />
-        </Flex>
-        <Box px="6" pb="6" style={{ flex: 1, overflow: 'auto' }}>
+        </div>
+        {/* Content */}
+        <div className="p-6 flex-1 overflow-auto">
           {children}
-        </Box>
-      </Flex>
-    </Flex>
+        </div>
+      </div>
+    </div>
   )
 }

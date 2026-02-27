@@ -1,4 +1,3 @@
-import { Flex, Text, Separator } from '@radix-ui/themes'
 import type { FrontierData } from '@linguist/shared/types'
 import { LevelProgressBar } from './components/level-progress-bar'
 import { MasteryPipeline } from './components/mastery-pipeline'
@@ -12,11 +11,11 @@ export function LevelBarsView({ data }: LevelBarsViewProps) {
   const { bubble, profile, masteryDistribution } = data
 
   return (
-    <Flex direction="column" gap="4">
-      <Flex direction="column" gap="1">
-        <Text size="2" weight="bold" color="gray" mb="1">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <span className="text-[13px] font-bold text-text-muted mb-1">
           Level Coverage
-        </Text>
+        </span>
         {bubble.levelBreakdowns.map((level) => (
           <LevelProgressBar
             key={level.level}
@@ -26,34 +25,34 @@ export function LevelBarsView({ data }: LevelBarsViewProps) {
             isAboveFrontier={isAbove(level.level, bubble.frontierLevel)}
           />
         ))}
-        <Flex gap="3" mt="1">
-          <Text size="1" color="gray">
+        <div className="flex gap-3 mt-1">
+          <span className="text-[11px] text-text-muted">
             Dark = production ready | Light = recognition
-          </Text>
-        </Flex>
-      </Flex>
+          </span>
+        </div>
+      </div>
 
-      <Separator size="4" />
+      <hr className="border-t border-border m-0" />
 
-      <Flex direction="column" gap="2">
-        <Text size="2" weight="bold" color="gray">
+      <div className="flex flex-col gap-2">
+        <span className="text-[13px] font-bold text-text-muted">
           Mastery Distribution
-        </Text>
+        </span>
         <MasteryPipeline distribution={masteryDistribution} />
-      </Flex>
+      </div>
 
-      <Separator size="4" />
+      <hr className="border-t border-border m-0" />
 
-      <Flex direction="column" gap="2">
-        <Text size="2" weight="bold" color="gray">
+      <div className="flex flex-col gap-2">
+        <span className="text-[13px] font-bold text-text-muted">
           Ceiling
-        </Text>
+        </span>
         <CeilingComparison
           comprehensionCeiling={profile.comprehensionCeiling}
           productionCeiling={profile.productionCeiling}
         />
-      </Flex>
-    </Flex>
+      </div>
+    </div>
   )
 }
 

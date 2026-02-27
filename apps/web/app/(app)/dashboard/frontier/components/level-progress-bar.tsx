@@ -1,5 +1,5 @@
-import { Box, Flex, Text } from '@radix-ui/themes'
 import type { LevelBreakdown } from '@linguist/shared/types'
+import { cn } from '@/lib/utils'
 
 interface LevelProgressBarProps {
   level: LevelBreakdown
@@ -21,72 +21,38 @@ export function LevelProgressBar({
       : 0
 
   return (
-    <Flex
-      align="center"
-      gap="3"
-      py="2"
-      px="3"
-      style={{
-        borderRadius: 'var(--radius-2)',
-        opacity: isAboveFrontier ? 0.4 : 1,
-        border: isCurrent
-          ? '1px solid var(--accent-9)'
-          : isFrontier
-            ? '1px dashed var(--accent-7)'
-            : '1px solid transparent',
-        backgroundColor: isCurrent ? 'var(--accent-2)' : undefined,
-      }}
+    <div
+      className={cn(
+        'flex items-center gap-3 px-3 py-2 rounded-md',
+        isCurrent && 'border border-accent-brand bg-[rgba(47,47,47,.04)]',
+        isFrontier && !isCurrent && 'border border-dashed border-border-strong',
+        !isCurrent && !isFrontier && 'border border-transparent'
+      )}
+      style={{ opacity: isAboveFrontier ? 0.4 : 1 }}
     >
-      <Text
-        size="2"
-        weight="bold"
-        style={{ width: 32, flexShrink: 0 }}
-      >
+      <span className="text-[13px] font-bold w-8 shrink-0">
         {level.level}
-      </Text>
+      </span>
 
-      <Box style={{ flex: 1, position: 'relative', height: 20, borderRadius: 'var(--radius-1)' }}>
-        <Box
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: 'var(--gray-3)',
-            borderRadius: 'var(--radius-1)',
-          }}
+      <div className="flex-1 relative h-5 rounded-sm">
+        <div className="absolute inset-0 bg-bg-active rounded-sm" />
+        <div
+          className="absolute top-0 left-0 bottom-0 bg-[rgba(47,47,47,.15)] rounded-sm transition-[width] duration-300 ease-in-out"
+          style={{ width: `${coveragePct}%` }}
         />
-        <Box
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            bottom: 0,
-            width: `${coveragePct}%`,
-            backgroundColor: 'var(--accent-5)',
-            borderRadius: 'var(--radius-1)',
-            transition: 'width 0.3s ease',
-          }}
+        <div
+          className="absolute top-0 left-0 bottom-0 bg-accent-brand rounded-sm transition-[width] duration-300 ease-in-out"
+          style={{ width: `${productionPct}%` }}
         />
-        <Box
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            bottom: 0,
-            width: `${productionPct}%`,
-            backgroundColor: 'var(--accent-9)',
-            borderRadius: 'var(--radius-1)',
-            transition: 'width 0.3s ease',
-          }}
-        />
-      </Box>
+      </div>
 
-      <Text size="1" color="gray" style={{ width: 48, textAlign: 'right', flexShrink: 0 }}>
+      <span className="text-[11px] text-text-muted w-12 text-right shrink-0">
         {coveragePct}%
-      </Text>
+      </span>
 
-      <Text size="1" color="gray" style={{ width: 60, textAlign: 'right', flexShrink: 0 }}>
+      <span className="text-[11px] text-text-muted w-[60px] text-right shrink-0">
         {level.knownItems}/{level.totalReferenceItems}
-      </Text>
-    </Flex>
+      </span>
+    </div>
   )
 }

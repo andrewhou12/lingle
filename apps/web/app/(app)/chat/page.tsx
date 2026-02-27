@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Flex, Text, Button, Popover, IconButton, ScrollArea } from '@radix-ui/themes'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Plus, ChevronDown, Trash2, ArrowUp, Square } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { MessageBubble } from '@/components/message-bubble'
+import { cn } from '@/lib/utils'
 
 function getMessageText(msg: { parts: Array<{ type: string; text?: string }> }): string {
   return msg.parts
@@ -29,7 +31,6 @@ export default function ChatPage() {
   const isLoading = status === 'streaming' || status === 'submitted'
   const activeConversation = conversations.find((c) => c.id === activeId) ?? null
 
-  // Auto-title conversation after first user message
   useEffect(() => {
     if (messages.length === 1 && messages[0].role === 'user') {
       const content = getMessageText(messages[0])
@@ -73,7 +74,6 @@ export default function ChatPage() {
     setDropdownOpen(false)
   }, [setMessages])
 
-  // Auto-recover if active conversation is missing
   useEffect(() => {
     if (!activeConversation) {
       if (conversations.length > 0) {
@@ -122,17 +122,7 @@ export default function ChatPage() {
   const isEmpty = messages.length === 0 && !isLoading
 
   const inputArea = (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'end',
-        gap: 8,
-        border: '1px solid var(--gray-6)',
-        borderRadius: 24,
-        padding: '8px 8px 8px 20px',
-        backgroundColor: 'var(--gray-2)',
-      }}
-    >
+    <div className="flex items-end gap-2 border border-border rounded-3xl py-2 pr-2 pl-5 bg-bg-secondary">
       <textarea
         ref={textareaRef}
         value={input}
@@ -143,146 +133,105 @@ export default function ChatPage() {
         onKeyDown={handleKeyDown}
         placeholder="Ask anything"
         rows={1}
-        style={{
-          flex: 1,
-          resize: 'none',
-          border: 'none',
-          background: 'transparent',
-          color: 'var(--gray-12)',
-          fontSize: 15,
-          lineHeight: 1.5,
-          fontFamily: 'inherit',
-          outline: 'none',
-          padding: '4px 0',
-          maxHeight: 200,
-        }}
+        style={{ maxHeight: 200 }}
+        className="flex-1 resize-none border-none bg-transparent text-text-primary text-[15px] leading-normal font-[inherit] outline-none py-1"
       />
       {isLoading ? (
-        <IconButton
+        <button
           type="button"
-          size="2"
-          variant="soft"
-          color="red"
           onClick={() => stop()}
-          style={{ borderRadius: '50%', flexShrink: 0 }}
+          className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 bg-[rgba(200,87,42,.08)] text-accent-warm border-none cursor-pointer"
         >
           <Square size={14} />
-        </IconButton>
+        </button>
       ) : (
-        <IconButton
+        <button
           type="button"
-          size="2"
-          variant="solid"
           disabled={!input.trim()}
           onClick={handleSend}
-          style={{ borderRadius: '50%', flexShrink: 0 }}
+          className={cn(
+            'flex items-center justify-center w-8 h-8 rounded-full shrink-0 bg-accent-brand text-white border-none cursor-pointer transition-opacity',
+            !input.trim() && 'opacity-40'
+          )}
         >
           <ArrowUp size={16} />
-        </IconButton>
+        </button>
       )}
     </div>
   )
 
   return (
-    <Flex direction="column" style={{ height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <Flex
-        align="center"
-        justify="between"
-        px="3"
-        py="2"
-        style={{ borderBottom: '1px solid var(--gray-5)', flexShrink: 0 }}
-      >
-        <Popover.Root open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <Popover.Trigger>
-            <Button variant="ghost" size="2">
-              <Text size="2" weight="medium">
-                {activeConversation && messages.length > 0
-                  ? activeConversation.title
-                  : 'Chat'}
-              </Text>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+        <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <PopoverTrigger asChild>
+            <button className="inline-flex items-center gap-1 bg-transparent border-none cursor-pointer text-[13px] font-medium text-text-primary px-2 py-1.5 rounded-md transition-colors hover:bg-bg-hover">
+              {activeConversation && messages.length > 0
+                ? activeConversation.title
+                : 'Chat'}
               <ChevronDown size={14} />
-            </Button>
-          </Popover.Trigger>
-          <Popover.Content style={{ maxHeight: 300, width: 280, padding: 8 }}>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="max-h-[300px] w-[280px] p-2">
             <ScrollArea>
-              <Flex direction="column" gap="1">
+              <div className="flex flex-col gap-1">
                 {pastConversations.length === 0 ? (
-                  <Text size="2" color="gray" style={{ padding: '8px 4px' }}>
+                  <span className="text-[13px] text-text-muted px-1 py-2">
                     No conversations yet
-                  </Text>
+                  </span>
                 ) : (
                   pastConversations.map((c) => (
-                    <Flex
+                    <div
                       key={c.id}
-                      align="center"
-                      justify="between"
-                      px="2"
-                      py="1"
-                      style={{
-                        borderRadius: 'var(--radius-2)',
-                        cursor: 'pointer',
-                        backgroundColor: c.id === activeId ? 'var(--accent-3)' : 'transparent',
-                      }}
+                      className={cn(
+                        'flex items-center justify-between px-2 py-1 rounded-md cursor-pointer',
+                        c.id === activeId ? 'bg-bg-hover' : 'bg-transparent'
+                      )}
                       onClick={() => switchConversation(c.id)}
                     >
-                      <Text size="2" truncate style={{ flex: 1, marginRight: 8 }}>
+                      <span className="text-[13px] flex-1 mr-2 overflow-hidden text-ellipsis whitespace-nowrap">
                         {c.title}
-                      </Text>
-                      <IconButton
-                        size="1"
-                        variant="ghost"
-                        color="gray"
+                      </span>
+                      <button
+                        className="flex items-center justify-center w-6 h-6 rounded-sm bg-transparent border-none cursor-pointer text-text-muted transition-colors hover:bg-bg-active"
                         onClick={(e) => {
                           e.stopPropagation()
                           deleteConversation(c.id)
                         }}
                       >
                         <Trash2 size={12} />
-                      </IconButton>
-                    </Flex>
+                      </button>
+                    </div>
                   ))
                 )}
-              </Flex>
+              </div>
             </ScrollArea>
-          </Popover.Content>
-        </Popover.Root>
+          </PopoverContent>
+        </Popover>
 
-        <Button variant="soft" size="2" onClick={createConversation}>
+        <button
+          className="inline-flex items-center gap-1.5 bg-bg-secondary border-none cursor-pointer text-[13px] font-medium text-text-secondary px-3 py-1.5 rounded-md transition-colors hover:bg-bg-hover"
+          onClick={createConversation}
+        >
           <Plus size={14} />
           New Chat
-        </Button>
-      </Flex>
+        </button>
+      </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className="flex-1 overflow-hidden">
         {isEmpty ? (
-          <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 24,
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 28,
-                fontWeight: 400,
-                color: 'var(--gray-11)',
-                margin: '0 0 32px',
-              }}
-            >
+          <div className="h-full flex flex-col items-center justify-center p-6">
+            <h2 className="text-[28px] font-normal text-text-secondary mb-8">
               What can I help with?
             </h2>
-            <div style={{ width: '100%', maxWidth: 640 }}>{inputArea}</div>
+            <div className="w-full max-w-[640px]">{inputArea}</div>
           </div>
         ) : (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              <div style={{ maxWidth: 768, margin: '0 auto', padding: '16px 24px' }}>
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-auto">
+              <div className="max-w-3xl mx-auto px-6 py-4">
                 {messages.map((msg) => (
                   <MessageBubble
                     key={msg.id}
@@ -293,12 +242,12 @@ export default function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
             </div>
-            <div style={{ padding: '12px 24px 24px' }}>
-              <div style={{ maxWidth: 768, margin: '0 auto' }}>{inputArea}</div>
+            <div className="px-6 pt-3 pb-6">
+              <div className="max-w-3xl mx-auto">{inputArea}</div>
             </div>
           </div>
         )}
       </div>
-    </Flex>
+    </div>
   )
 }

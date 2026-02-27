@@ -6,7 +6,10 @@ import type { ConversationMessage, ExpandedSessionPlan, PragmaticState, FsrsStat
 import type { Prisma } from '@prisma/client'
 import { buildAnalysisPrompt, parseAnalysis } from '@linguist/core/conversation/analyzer'
 import { buildPragmaticAnalysisPrompt, parsePragmaticAnalysis, updatePragmaticState } from '@linguist/core/pragmatics/analyzer'
-import { createInitialFsrsState } from '@linguist/core/fsrs/scheduler'
+import { createInitialFsrsState, scheduleReview } from '@linguist/core/fsrs/scheduler'
+import { computeNextMasteryState } from '@linguist/core/mastery/state-machine'
+import { MasteryState } from '@linguist/shared/types'
+import type { ReviewGrade } from '@linguist/shared/types'
 import { recalculateProfile } from '@linguist/core/profile/calculator'
 
 const anthropic = new Anthropic()
@@ -52,6 +55,15 @@ export const POST = withAuth(async (request, { userId }) => {
 
   // Log context entries and update items
   for (const ctxLog of analysis.contextLogs) {
+    // Validate the referenced item exists before creating context log
+    if (ctxLog.itemType === 'lexical') {
+      const exists = await prisma.lexicalItem.findUnique({ where: { id: ctxLog.itemId }, select: { id: true } })
+      if (!exists) continue
+    } else if (ctxLog.itemType === 'grammar') {
+      const exists = await prisma.grammarItem.findUnique({ where: { id: ctxLog.itemId }, select: { id: true } })
+      if (!exists) continue
+    }
+
     await prisma.itemContextLog.create({
       data: {
         userId, contextType: 'conversation', modality: ctxLog.modality,
@@ -100,6 +112,118 @@ export const POST = withAuth(async (request, { userId }) => {
           },
         })
       }
+    }
+  }
+
+  // FSRS + mastery transitions for items with production/error evidence
+  for (const ctxLog of analysis.contextLogs) {
+    if (!ctxLog.wasProduction) continue
+
+    const grade: ReviewGrade = ctxLog.wasSuccessful ? 'good' : 'again'
+
+    if (ctxLog.itemType === 'lexical') {
+      const item = await prisma.lexicalItem.findUnique({ where: { id: ctxLog.itemId } })
+      if (!item) continue
+      const currentFsrs = item.productionFsrs as unknown as FsrsState
+      const { nextState: nextFsrs } = scheduleReview(currentFsrs, grade)
+      const nextMastery = computeNextMasteryState({
+        currentState: item.masteryState as MasteryState,
+        grade,
+        modality: 'production',
+        hasProductionEvidence: item.productionCount > 0 || ctxLog.wasSuccessful,
+        productionCount: item.productionCount + (ctxLog.wasSuccessful ? 1 : 0),
+        productionWeight: item.productionWeight + (ctxLog.wasSuccessful ? 1.0 : 0),
+        contextCount: item.contextCount,
+        novelContextCount: 0,
+      })
+      await prisma.lexicalItem.update({
+        where: { id: ctxLog.itemId },
+        data: {
+          productionFsrs: nextFsrs as unknown as Prisma.InputJsonValue,
+          lastReviewed: new Date(),
+          masteryState: nextMastery,
+        },
+      })
+      await prisma.reviewEvent.create({
+        data: {
+          userId, itemType: 'lexical', grade, modality: 'production',
+          sessionId, productionWeight: 1.0, contextType: 'conversation',
+          lexicalItemId: ctxLog.itemId,
+        },
+      })
+    } else if (ctxLog.itemType === 'grammar') {
+      const item = await prisma.grammarItem.findUnique({ where: { id: ctxLog.itemId } })
+      if (!item) continue
+      const currentFsrs = item.productionFsrs as unknown as FsrsState
+      const { nextState: nextFsrs } = scheduleReview(currentFsrs, grade)
+      const nextMastery = computeNextMasteryState({
+        currentState: item.masteryState as MasteryState,
+        grade,
+        modality: 'production',
+        hasProductionEvidence: true,
+        productionCount: 0,
+        productionWeight: item.productionWeight + (ctxLog.wasSuccessful ? 1.0 : 0),
+        contextCount: item.contextCount,
+        novelContextCount: item.novelContextCount,
+      })
+      await prisma.grammarItem.update({
+        where: { id: ctxLog.itemId },
+        data: {
+          productionFsrs: nextFsrs as unknown as Prisma.InputJsonValue,
+          lastReviewed: new Date(),
+          masteryState: nextMastery,
+        },
+      })
+      await prisma.reviewEvent.create({
+        data: {
+          userId, itemType: 'grammar', grade, modality: 'production',
+          sessionId, productionWeight: 1.0, contextType: 'conversation',
+          grammarItemId: ctxLog.itemId,
+        },
+      })
+    }
+  }
+
+  // FSRS updates for errors logged by analysis
+  for (const err of analysis.errorsLogged) {
+    const lexItem = await prisma.lexicalItem.findUnique({ where: { id: err.itemId } })
+    if (lexItem) {
+      const currentFsrs = lexItem.productionFsrs as unknown as FsrsState
+      const { nextState: nextFsrs } = scheduleReview(currentFsrs, 'again')
+      await prisma.lexicalItem.update({
+        where: { id: err.itemId },
+        data: {
+          productionFsrs: nextFsrs as unknown as Prisma.InputJsonValue,
+          lastReviewed: new Date(),
+        },
+      })
+      await prisma.reviewEvent.create({
+        data: {
+          userId, itemType: 'lexical', grade: 'again', modality: 'production',
+          sessionId, productionWeight: 1.0, contextType: 'conversation',
+          lexicalItemId: err.itemId,
+        },
+      })
+      continue
+    }
+    const gramItem = await prisma.grammarItem.findUnique({ where: { id: err.itemId } })
+    if (gramItem) {
+      const currentFsrs = gramItem.productionFsrs as unknown as FsrsState
+      const { nextState: nextFsrs } = scheduleReview(currentFsrs, 'again')
+      await prisma.grammarItem.update({
+        where: { id: err.itemId },
+        data: {
+          productionFsrs: nextFsrs as unknown as Prisma.InputJsonValue,
+          lastReviewed: new Date(),
+        },
+      })
+      await prisma.reviewEvent.create({
+        data: {
+          userId, itemType: 'grammar', grade: 'again', modality: 'production',
+          sessionId, productionWeight: 1.0, contextType: 'conversation',
+          grammarItemId: err.itemId,
+        },
+      })
     }
   }
 

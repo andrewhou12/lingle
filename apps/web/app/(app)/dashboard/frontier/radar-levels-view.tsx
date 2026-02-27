@@ -1,4 +1,3 @@
-import { Flex, Text, Box } from '@radix-ui/themes'
 import type { FrontierData } from '@linguist/shared/types'
 import { RadarChart } from './components/radar-chart'
 import { LevelProgressBar } from './components/level-progress-bar'
@@ -9,32 +8,32 @@ export function RadarLevelsView({ data }: { data: FrontierData }) {
   const { bubble, profile } = data
 
   return (
-    <Flex direction="column" gap="4">
-      <Flex gap="5" wrap="wrap" align="start">
-        <Flex direction="column" align="center" gap="2" style={{ flex: '1 1 200px' }}>
-          <Text size="2" weight="bold" color="gray">
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-5 flex-wrap items-start">
+        <div className="flex flex-col items-center gap-2 flex-[1_1_200px]">
+          <span className="text-[13px] font-bold text-text-muted">
             Skill Balance
-          </Text>
-          <Box style={{ width: '100%', maxWidth: 220 }}>
+          </span>
+          <div className="w-full max-w-[220px]">
             <RadarChart
               reading={profile.readingLevel}
               writing={profile.writingLevel}
               listening={profile.listeningLevel}
               speaking={profile.speakingLevel}
             />
-          </Box>
-          <Flex gap="3" wrap="wrap" justify="center">
-            <Text size="1" color="gray">Reading: {Math.round(profile.readingLevel * 100)}%</Text>
-            <Text size="1" color="gray">Writing: {Math.round(profile.writingLevel * 100)}%</Text>
-            <Text size="1" color="gray">Listening: {Math.round(profile.listeningLevel * 100)}%</Text>
-            <Text size="1" color="gray">Speaking: {Math.round(profile.speakingLevel * 100)}%</Text>
-          </Flex>
-        </Flex>
+          </div>
+          <div className="flex gap-3 flex-wrap justify-center">
+            <span className="text-[11px] text-text-muted">Reading: {Math.round(profile.readingLevel * 100)}%</span>
+            <span className="text-[11px] text-text-muted">Writing: {Math.round(profile.writingLevel * 100)}%</span>
+            <span className="text-[11px] text-text-muted">Listening: {Math.round(profile.listeningLevel * 100)}%</span>
+            <span className="text-[11px] text-text-muted">Speaking: {Math.round(profile.speakingLevel * 100)}%</span>
+          </div>
+        </div>
 
-        <Flex direction="column" gap="1" style={{ flex: '1 1 250px' }}>
-          <Text size="2" weight="bold" color="gray" mb="1">
+        <div className="flex flex-col gap-1 flex-[1_1_250px]">
+          <span className="text-[13px] font-bold text-text-muted mb-1">
             Level Coverage
-          </Text>
+          </span>
           {bubble.levelBreakdowns.map((level) => (
             <LevelProgressBar
               key={level.level}
@@ -44,9 +43,9 @@ export function RadarLevelsView({ data }: { data: FrontierData }) {
               isAboveFrontier={isAbove(level.level, bubble.frontierLevel)}
             />
           ))}
-        </Flex>
-      </Flex>
-    </Flex>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { Box, Heading, Text, Card, Flex, Button, Separator } from '@radix-ui/themes'
 import { Check, X, ArrowRight, LayoutDashboard } from 'lucide-react'
 import type { ExpandedSessionPlan, PostSessionAnalysis } from '@linguist/shared/types'
 
@@ -26,92 +25,96 @@ export function SessionSummary({
   const targetsHit = new Set(analysis?.targetsHit ?? [])
 
   return (
-    <Box style={{ maxWidth: 640, margin: '0 auto' }}>
-      <Heading size="7" mb="2">
+    <div className="max-w-[640px] mx-auto">
+      <h1 className="text-[28px] font-bold mb-2">
         Session Complete
-      </Heading>
-      <Text size="3" color="gray" mb="5" style={{ display: 'block' }}>
+      </h1>
+      <p className="text-sm text-text-muted mb-6">
         Duration: {minutes} minute{minutes !== 1 ? 's' : ''}
-      </Text>
+      </p>
 
       {allPlanned.length > 0 && (
-        <Card mb="4">
-          <Flex direction="column" gap="2">
-            <Text size="2" weight="medium" color="gray">
+        <div className="rounded-xl border border-border bg-bg p-4 mb-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-text-muted">
               Targets
-            </Text>
-            <Separator size="4" />
+            </span>
+            <hr className="border-t border-border m-0" />
             {allPlanned.map((id) => (
-              <Flex key={id} align="center" gap="2" py="1">
+              <div key={id} className="flex items-center gap-2 py-1">
                 {targetsHit.has(id) ? (
-                  <Check size={16} style={{ color: 'var(--green-9)' }} />
+                  <Check size={16} className="text-[#16a34a]" />
                 ) : (
-                  <X size={16} style={{ color: 'var(--red-9)' }} />
+                  <X size={16} className="text-accent-warm" />
                 )}
-                <Text size="2">
+                <span className="text-[13px]">
                   Item #{id} {targetsHit.has(id) ? '— produced in context' : '— not encountered'}
-                </Text>
-              </Flex>
+                </span>
+              </div>
             ))}
-          </Flex>
-        </Card>
+          </div>
+        </div>
       )}
 
       {analysis?.errorsLogged && analysis.errorsLogged.length > 0 && (
-        <Card mb="4">
-          <Flex direction="column" gap="2">
-            <Text size="2" weight="medium" color="gray">
+        <div className="rounded-xl border border-border bg-bg p-4 mb-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-text-muted">
               Errors
-            </Text>
-            <Separator size="4" />
+            </span>
+            <hr className="border-t border-border m-0" />
             {analysis.errorsLogged.map((err, i) => (
-              <Text key={i} size="2" color="red">
+              <span key={i} className="text-[13px] text-accent-warm">
                 {err.contextQuote || `Error on item #${err.itemId}: ${err.errorType}`}
-              </Text>
+              </span>
             ))}
-          </Flex>
-        </Card>
+          </div>
+        </div>
       )}
 
       {analysis?.newItemsEncountered && analysis.newItemsEncountered.length > 0 && (
-        <Card mb="4">
-          <Flex direction="column" gap="2">
-            <Text size="2" weight="medium" color="gray">
+        <div className="rounded-xl border border-border bg-bg p-4 mb-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-text-muted">
               New Items Encountered
-            </Text>
-            <Separator size="4" />
+            </span>
+            <hr className="border-t border-border m-0" />
             {analysis.newItemsEncountered.map((item, i) => (
-              <Text key={i} size="2">
+              <span key={i} className="text-[13px]">
                 {item.surfaceForm}
                 {item.contextQuote && (
-                  <Text color="gray"> — {item.contextQuote}</Text>
+                  <span className="text-text-muted"> — {item.contextQuote}</span>
                 )}
-              </Text>
+              </span>
             ))}
-          </Flex>
-        </Card>
+          </div>
+        </div>
       )}
 
       {analysis?.overallAssessment && (
-        <Card mb="5">
-          <Text size="2" color="gray">
+        <div className="rounded-xl border border-border bg-bg p-4 mb-6">
+          <span className="text-[13px] text-text-muted">
             {analysis.overallAssessment}
-          </Text>
-        </Card>
+          </span>
+        </div>
       )}
 
-      <Flex gap="3" justify="end">
-        <Button variant="soft" color="gray" asChild>
-          <Link href="/dashboard">
-            <LayoutDashboard size={14} />
-            Dashboard
-          </Link>
-        </Button>
-        <Button onClick={onNewSession}>
+      <div className="flex gap-3 justify-end">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 py-2 px-4 rounded-md bg-bg-secondary text-text-secondary text-[13px] font-medium no-underline transition-colors duration-150 hover:bg-bg-hover"
+        >
+          <LayoutDashboard size={14} />
+          Dashboard
+        </Link>
+        <button
+          onClick={onNewSession}
+          className="inline-flex items-center gap-1.5 py-2 px-4 rounded-md bg-accent-brand text-white text-[13px] font-medium border-none cursor-pointer"
+        >
           Start New Session
           <ArrowRight size={14} />
-        </Button>
-      </Flex>
-    </Box>
+        </button>
+      </div>
+    </div>
   )
 }

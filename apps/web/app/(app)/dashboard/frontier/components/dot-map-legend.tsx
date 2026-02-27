@@ -1,16 +1,14 @@
-import { Box, Flex, Text } from '@radix-ui/themes'
-
 export function DotMapLegend() {
   return (
-    <Flex gap="4" align="center">
-      <Flex align="center" gap="1">
-        <Box style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-9)' }} />
-        <Text size="1" color="gray">Vocabulary</Text>
-      </Flex>
-      <Flex align="center" gap="1">
-        <Box style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--purple-9)' }} />
-        <Text size="1" color="gray">Grammar</Text>
-      </Flex>
-    </Flex>
+    <div className="flex gap-4 items-center">
+      <div className="flex items-center gap-1">
+        <div className="w-2 h-2 rounded-full bg-accent-brand" />
+        <span className="text-[11px] text-text-muted">Vocabulary</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
+        <span className="text-[11px] text-text-muted">Grammar</span>
+      </div>
+    </div>
   )
 }

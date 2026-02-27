@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Box, Heading, Text, Card, Flex, Button, Badge } from '@radix-ui/themes'
 import { X, RefreshCw, ArrowRight } from 'lucide-react'
 import type { KnowledgeBubble, CurriculumRecommendation } from '@linguist/shared/types'
 import { Spinner } from '@/components/spinner'
+import { cn } from '@/lib/utils'
 
 interface SessionPreviewProps {
   bubble: KnowledgeBubble | null
@@ -35,120 +35,140 @@ export function SessionPreview({
   const grammarRecs = visibleRecs.filter((r) => r.itemType === 'grammar')
 
   return (
-    <Box style={{ maxWidth: 640, margin: '0 auto' }}>
-      <Heading size="7" mb="5">
+    <div className="max-w-[640px] mx-auto">
+      <h1 className="text-[28px] font-bold mb-6">
         Learn
-      </Heading>
+      </h1>
 
       {bubble && (
-        <Card mb="5">
-          <Flex direction="column" gap="2">
-            <Text size="2" weight="medium" color="gray">
+        <div className="rounded-xl border border-border bg-bg p-4 mb-6">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-text-muted">
               Knowledge Frontier
-            </Text>
-            <Flex direction="column" gap="1">
+            </span>
+            <div className="flex flex-col gap-1">
               {bubble.levelBreakdowns
                 .filter((lb) => lb.totalReferenceItems > 0)
                 .map((lb) => (
-                  <Flex key={lb.level} align="center" gap="3" py="1" px="2">
-                    <Text size="2" weight="bold" style={{ width: 32 }}>{lb.level}</Text>
-                    <Box style={{ flex: 1, height: 16, borderRadius: 4, backgroundColor: 'var(--gray-3)', position: 'relative', overflow: 'hidden' }}>
-                      <Box style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${Math.round(lb.coverage * 100)}%`, backgroundColor: 'var(--accent-5)', borderRadius: 4 }} />
-                      <Box style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${lb.totalReferenceItems > 0 ? Math.round((lb.productionReady / lb.totalReferenceItems) * 100) : 0}%`, backgroundColor: 'var(--accent-9)', borderRadius: 4 }} />
-                    </Box>
-                    <Text size="1" color="gray" style={{ width: 40, textAlign: 'right' }}>{Math.round(lb.coverage * 100)}%</Text>
-                  </Flex>
+                  <div key={lb.level} className="flex items-center gap-3 py-1 px-2">
+                    <span className="text-[13px] font-bold w-8">{lb.level}</span>
+                    <div className="flex-1 h-4 rounded bg-bg-active relative overflow-hidden">
+                      <div className="absolute top-0 left-0 bottom-0 rounded bg-accent-brand/15" style={{ width: `${Math.round(lb.coverage * 100)}%` }} />
+                      <div className="absolute top-0 left-0 bottom-0 rounded bg-accent-brand" style={{ width: `${lb.totalReferenceItems > 0 ? Math.round((lb.productionReady / lb.totalReferenceItems) * 100) : 0}%` }} />
+                    </div>
+                    <span className="text-[11px] text-text-muted w-10 text-right">{Math.round(lb.coverage * 100)}%</span>
+                  </div>
                 ))}
-            </Flex>
-            <Flex gap="3" align="center">
-              <Flex gap="2" align="center">
-                <Box style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: 'var(--accent-9)' }} />
-                <Text size="1" color="gray">production</Text>
-              </Flex>
-              <Flex gap="2" align="center">
-                <Box style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: 'var(--accent-5)' }} />
-                <Text size="1" color="gray">recognition</Text>
-              </Flex>
-            </Flex>
+            </div>
+            <div className="flex gap-3 items-center">
+              <div className="flex gap-2 items-center">
+                <div className="w-2.5 h-2.5 rounded-sm bg-accent-brand" />
+                <span className="text-[11px] text-text-muted">production</span>
+              </div>
+              <div className="flex gap-2 items-center">
+                <div className="w-2.5 h-2.5 rounded-sm bg-accent-brand/15" />
+                <span className="text-[11px] text-text-muted">recognition</span>
+              </div>
+            </div>
             {bubble.gapsInCurrentLevel.length > 0 && (
-              <Text size="2" color="gray">
+              <span className="text-[13px] text-text-muted">
                 Gaps: {bubble.gapsInCurrentLevel.length} items in {bubble.currentLevel} remaining
-              </Text>
+              </span>
             )}
-          </Flex>
-        </Card>
+          </div>
+        </div>
       )}
 
-      <Heading size="4" mb="3">
+      <h2 className="text-lg font-bold mb-3">
         Today&apos;s Targets
-      </Heading>
+      </h2>
 
       {isLoading ? (
-        <Flex align="center" gap="3" mb="5">
+        <div className="flex items-center gap-3 mb-6">
           <Spinner size={16} />
-          <Text color="gray" size="2">Loading recommendations...</Text>
-        </Flex>
+          <span className="text-text-muted text-[13px]">Loading recommendations...</span>
+        </div>
       ) : visibleRecs.length === 0 ? (
-        <Text color="gray" size="2">No recommendations available. Try refreshing.</Text>
+        <span className="text-text-muted text-[13px]">No recommendations available. Try refreshing.</span>
       ) : (
-        <Flex direction="column" gap="3" mb="5">
+        <div className="flex flex-col gap-3 mb-6">
           {vocabRecs.length > 0 && (
-            <Flex gap="3" wrap="wrap">
+            <div className="flex gap-3 flex-wrap">
               {vocabRecs.map((rec) => (
-                <Card key={rec.id} style={{ minWidth: 180, flex: '1 1 180px', maxWidth: 280 }}>
-                  <Flex direction="column" gap="2">
-                    <Flex justify="between" align="start">
-                      <Text size="4" weight="bold">{rec.surfaceForm}</Text>
-                      <Button size="1" variant="ghost" color="gray" onClick={() => handleSkip(rec.id!)} style={{ flexShrink: 0 }}>
+                <div key={rec.id} className="min-w-[180px] flex-[1_1_180px] max-w-[280px] rounded-xl border border-border bg-bg p-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-lg font-bold">{rec.surfaceForm}</span>
+                      <button
+                        className="shrink-0 bg-transparent border-none cursor-pointer text-text-muted p-1"
+                        onClick={() => handleSkip(rec.id!)}
+                      >
                         <X size={14} />
-                      </Button>
-                    </Flex>
-                    {rec.reading && <Text size="2" color="gray">{rec.reading}</Text>}
-                    <Text size="2">{rec.meaning}</Text>
-                    <Flex gap="2">
-                      <Badge size="1" variant="soft">Vocab</Badge>
-                      {rec.cefrLevel && <Badge size="1" variant="outline" color="gray">{rec.cefrLevel}</Badge>}
-                    </Flex>
-                  </Flex>
-                </Card>
+                      </button>
+                    </div>
+                    {rec.reading && <span className="text-[13px] text-text-muted">{rec.reading}</span>}
+                    <span className="text-[13px]">{rec.meaning}</span>
+                    <div className="flex gap-2">
+                      <span className="inline-flex py-0.5 px-2 rounded-full bg-bg-secondary text-[11px] font-medium text-text-secondary">Vocab</span>
+                      {rec.cefrLevel && <span className="inline-flex py-0.5 px-2 rounded-full border border-border text-[11px] text-text-muted">{rec.cefrLevel}</span>}
+                    </div>
+                  </div>
+                </div>
               ))}
-            </Flex>
+            </div>
           )}
 
           {grammarRecs.length > 0 && (
-            <Flex gap="3" wrap="wrap">
+            <div className="flex gap-3 flex-wrap">
               {grammarRecs.map((rec) => (
-                <Card key={rec.id} style={{ minWidth: 180, flex: '1 1 180px', maxWidth: 280 }}>
-                  <Flex direction="column" gap="2">
-                    <Flex justify="between" align="start">
-                      <Text size="4" weight="bold">{rec.surfaceForm ?? rec.patternId}</Text>
-                      <Button size="1" variant="ghost" color="gray" onClick={() => handleSkip(rec.id!)} style={{ flexShrink: 0 }}>
+                <div key={rec.id} className="min-w-[180px] flex-[1_1_180px] max-w-[280px] rounded-xl border border-border bg-bg p-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-lg font-bold">{rec.surfaceForm ?? rec.patternId}</span>
+                      <button
+                        className="shrink-0 bg-transparent border-none cursor-pointer text-text-muted p-1"
+                        onClick={() => handleSkip(rec.id!)}
+                      >
                         <X size={14} />
-                      </Button>
-                    </Flex>
-                    {rec.meaning && <Text size="2">{rec.meaning}</Text>}
-                    <Flex gap="2">
-                      <Badge size="1" variant="soft" color="purple">Grammar</Badge>
-                      {rec.cefrLevel && <Badge size="1" variant="outline" color="gray">{rec.cefrLevel}</Badge>}
-                    </Flex>
-                  </Flex>
-                </Card>
+                      </button>
+                    </div>
+                    {rec.meaning && <span className="text-[13px]">{rec.meaning}</span>}
+                    <div className="flex gap-2">
+                      <span className="inline-flex py-0.5 px-2 rounded-full bg-[rgba(139,92,246,.08)] text-[11px] font-medium text-[#8b5cf6]">Grammar</span>
+                      {rec.cefrLevel && <span className="inline-flex py-0.5 px-2 rounded-full border border-border text-[11px] text-text-muted">{rec.cefrLevel}</span>}
+                    </div>
+                  </div>
+                </div>
               ))}
-            </Flex>
+            </div>
           )}
-        </Flex>
+        </div>
       )}
 
-      <Flex gap="3" justify="end">
-        <Button variant="soft" color="gray" onClick={onRefresh} disabled={isLoading}>
+      <div className="flex gap-3 justify-end">
+        <button
+          className={cn(
+            "inline-flex items-center gap-1.5 py-2 px-4 rounded-md bg-bg-secondary text-text-secondary text-[13px] font-medium border-none cursor-pointer transition-colors duration-150 hover:bg-bg-hover",
+            isLoading && "opacity-50"
+          )}
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
           <RefreshCw size={14} />
           Refresh
-        </Button>
-        <Button onClick={onStart} disabled={isLoading || visibleRecs.length === 0}>
+        </button>
+        <button
+          className={cn(
+            "inline-flex items-center gap-1.5 py-2 px-4 rounded-md bg-accent-brand text-white text-[13px] font-medium border-none cursor-pointer",
+            (isLoading || visibleRecs.length === 0) && "opacity-50"
+          )}
+          onClick={onStart}
+          disabled={isLoading || visibleRecs.length === 0}
+        >
           Start Session
           <ArrowRight size={14} />
-        </Button>
-      </Flex>
-    </Box>
+        </button>
+      </div>
+    </div>
   )
 }

@@ -15,12 +15,11 @@ export function Skeleton({
 }: SkeletonProps) {
   return (
     <div
-      className="skeleton"
+      className="skeleton shrink-0"
       style={{
         width,
         height,
         borderRadius,
-        flexShrink: 0,
         ...style,
       }}
     />

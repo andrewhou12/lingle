@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Flex, Text, Button, Card, Callout } from '@radix-ui/themes'
+import { cn } from '@/lib/utils'
 
 function GoogleLogo() {
   return (
@@ -53,55 +53,44 @@ export default function SignInPage() {
   }
 
   return (
-    <Flex
-      direction="column"
-      align="center"
-      justify="center"
-      style={{ height: '100vh' }}
-    >
-      <Flex
-        direction="column"
-        align="center"
-        gap="6"
-        style={{ maxWidth: 400, width: '100%', padding: 24 }}
-      >
-        <Flex direction="column" align="center" gap="2">
-          <Text size="8" weight="bold" style={{ letterSpacing: '-0.02em' }}>
+    <div className="flex flex-col items-center justify-center h-screen bg-bg">
+      <div className="flex flex-col items-center gap-8 max-w-[400px] w-full p-6">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[32px] font-bold tracking-tight font-serif italic">
             Linguist
-          </Text>
-          <Text size="3" color="gray" align="center">
+          </span>
+          <span className="text-[15px] text-text-muted text-center">
             Your AI-powered language learning companion
-          </Text>
-        </Flex>
+          </span>
+        </div>
 
-        <Card size="4" style={{ width: '100%' }}>
-          <Flex direction="column" gap="4" align="center" p="2">
-            <Text size="4" weight="medium">
-              Welcome
-            </Text>
-            <Text size="2" color="gray" align="center">
+        <div className="w-full rounded-xl border border-border bg-bg p-8">
+          <div className="flex flex-col gap-5 items-center">
+            <span className="text-lg font-medium">Welcome</span>
+            <span className="text-[13px] text-text-muted text-center">
               Sign in to access your personalized learning experience
-            </Text>
+            </span>
 
             {error && (
-              <Callout.Root color="red" size="1" style={{ width: '100%' }}>
-                <Callout.Text>{error}</Callout.Text>
-              </Callout.Root>
+              <div className="w-full p-3 rounded-md bg-[rgba(200,87,42,.06)] text-accent-warm text-[13px]">
+                {error}
+              </div>
             )}
 
-            <Button
-              size="3"
-              variant="outline"
-              style={{ width: '100%', cursor: signingIn ? 'wait' : 'pointer' }}
+            <button
+              className={cn(
+                "flex items-center justify-center gap-2 w-full py-3 px-4 rounded-md border border-border bg-bg text-sm font-medium text-text-primary transition-colors duration-150 hover:bg-bg-secondary",
+                signingIn ? "cursor-wait opacity-60" : "cursor-pointer"
+              )}
               onClick={handleGoogleSignIn}
               disabled={signingIn}
             >
               <GoogleLogo />
               {signingIn ? 'Signing in...' : 'Continue with Google'}
-            </Button>
-          </Flex>
-        </Card>
-      </Flex>
-    </Flex>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -419,13 +419,18 @@ const webY = desktopY;
 const webClientLines = [
   "React 19  +  Radix UI  +  Tailwind CSS  +  Turbopack  +  App Router",
   "",
-  "Pages:   Dashboard | Review | Learn | Knowledge | Chat | Settings | SignIn | Onboarding | Insights",
+  "MVP Surfaces:  Conversation (primary) | Knowledge Base (3 tabs) | History (annotated transcripts)",
+  "Other Pages:   Settings | SignIn | Onboarding   (Dashboard/Review/Learn/Chat/Insights hidden from nav)",
   "",
-  "Hooks:   useReview | useConversation | useFrontier | useWordbank",
+  "Hooks:   useReview | useConversation | useFrontier | useWordbank | useGrammar | useChunks",
   "         All call lib/api.ts fetch wrapper (never direct DB access)",
   "",
+  "Components:  VocabCard | GrammarCard | CorrectionCard | ReviewPromptCard",
+  "             ChallengeCard | SessionSummaryCard | AnnotatedMessage | SessionAnalysisPanel",
+  "             MessageBubble | MasteryBadge | Skeleton | Spinner",
+  "",
   "State:   Supabase SSR auth (cookie-based via @supabase/ssr)",
-  "Routing: middleware.ts -> route protection (redirect unauth to sign-in)",
+  "Routing: middleware.ts -> / and /dashboard redirect to /conversation",
 ];
 const webClientH = autoH(webClientLines.length);
 {
@@ -450,10 +455,11 @@ elements.push(...arrow({
 
 // Auth middleware
 const webMiddlewareLines = [
-  "middleware.ts            Route protection, cookie refresh",
+  "middleware.ts            Route protection, cookie refresh, default route redirect",
   "lib/supabase/client.ts   Browser-side Supabase client",
   "lib/supabase/server.ts   Server-side Supabase client (cookie-based)",
-  "lib/api.ts               166-line typed fetch wrapper for all API routes",
+  "lib/api.ts               Typed fetch wrapper + SSE streaming consumer for all API routes",
+  "lib/message-parser.ts    Regex parser for [VOCAB_CARD] [GRAMMAR_CARD] [CORRECTION] etc.",
 ];
 const webMiddlewareH = autoH(webMiddlewareLines.length);
 const webMiddlewareY = webBridgeY + ARROW_LEN + ARROW_GAP;
@@ -479,22 +485,25 @@ elements.push(...arrow({
 
 // API Routes
 const webApiLines = [
-  "/api/review/     queue, submit, summary       /api/tom/         analyze, brief, inferences",
-  "/api/wordbank/   GET/POST, [id], search       /api/curriculum/  bubble, recommendations, ...",
-  "/api/conversation/ plan, send, end, list       /api/narrative/   draft, polish",
-  "/api/chat/       POST (streaming via ai SDK)   /api/profile/     GET/PUT, recalculate",
-  "/api/pragmatic/  GET/PUT                       /api/context-log/ POST",
-  "/api/dashboard/  frontier, weekly-stats        /api/onboarding/  status, assessment, complete",
-  "/api/user/       me",
+  "/api/review/       queue, submit, summary       /api/tom/          analyze, brief, inferences",
+  "/api/wordbank/     GET/POST, [id], search       /api/curriculum/   bubble, recommendations, ...",
+  "/api/wordbank/[id]/promote  POST               /api/grammar/[id]/promote  POST",
+  "/api/conversation/ plan, send(SSE), end, list   /api/narrative/    draft, polish",
+  "/api/conversation/[id]  GET (full session)      /api/profile/      GET/PUT, recalculate",
+  "/api/grammar/      GET (list + search)          /api/context-log/  POST",
+  "/api/chunks/       GET (list + search)          /api/onboarding/   status, assessment, complete",
+  "/api/chat/         POST (streaming)             /api/dashboard/    frontier, weekly-stats",
+  "/api/pragmatic/    GET/PUT                      /api/user/         me",
   "",
   "Every route: getSupabaseUser() -> @linguist/core functions -> @linguist/db Prisma writes",
+  "conversation/send: SSE streaming via anthropic.messages.stream() -> ReadableStream",
 ];
 const webApiH = autoH(webApiLines.length);
 const webApiY = webApiArrowY + ARROW_LEN + ARROW_GAP;
 {
   const { elements: els } = titledBox({
     x: webX, y: webApiY, w: Z1_HALF_W, h: webApiH,
-    title: "API ROUTES  (apps/web/app/api/)  — 30+ routes",
+    title: "API ROUTES  (apps/web/app/api/)  — 35+ routes",
     titleBg: COLORS.teal, titleBorder: COLORS.tealBorder,
     bodyBg: "#f0fdf8", bodyBorder: COLORS.tealBorder,
     bodyLines: webApiLines,
@@ -598,12 +607,14 @@ const WR_X = Z2_X + Z2_W + 60;
 const WR_Y = Z2_Y;
 
 elements.push(sectionLabel({ x: WR_X, y: WR_Y, content: "Zone 2b: Web API Routes", size: 24 }));
-elements.push(text({ x: WR_X, y: WR_Y + 32, content: "apps/web/app/api/ — 30+ routes. 1:1 parity with desktop IPC. Same @linguist/core calls.", size: 13, family: 3, color: "#868e96" }));
+elements.push(text({ x: WR_X, y: WR_Y + 32, content: "apps/web/app/api/ — 35+ routes. 1:1 parity with desktop IPC + MVP additions. Same @linguist/core calls.", size: 13, family: 3, color: "#868e96" }));
 
 const apiRouteGroups = [
   { route: "/api/review/", methods: "queue  submit  summary", maps: "reviews.ts" },
-  { route: "/api/wordbank/", methods: "GET/POST  [id]  search", maps: "wordbank.ts" },
-  { route: "/api/conversation/", methods: "plan  send  end  list", maps: "conversation.ts" },
+  { route: "/api/wordbank/", methods: "GET/POST  [id]  search  [id]/promote", maps: "wordbank.ts" },
+  { route: "/api/grammar/", methods: "GET (list + search)  [id]/promote", maps: "grammar.ts" },
+  { route: "/api/chunks/", methods: "GET (list + search by kind)", maps: "chunks.ts" },
+  { route: "/api/conversation/", methods: "plan  send(SSE)  end  list  [id]", maps: "conversation.ts" },
   { route: "/api/chat/", methods: "POST (Vercel AI SDK streaming)", maps: "chat.ts" },
   { route: "/api/tom/", methods: "analyze  brief  inferences", maps: "tom.ts" },
   { route: "/api/curriculum/", methods: "bubble  recommendations  introduce  skip  regenerate", maps: "curriculum.ts" },
@@ -612,7 +623,7 @@ const apiRouteGroups = [
   { route: "/api/pragmatic/", methods: "GET/PUT", maps: "pragmatics.ts" },
   { route: "/api/context-log/", methods: "POST", maps: "context-log.ts" },
   { route: "/api/dashboard/", methods: "frontier  weekly-stats", maps: "dashboard.ts" },
-  { route: "/api/onboarding/", methods: "status  assessment  complete", maps: "onboarding.ts" },
+  { route: "/api/onboarding/", methods: "status  assessment  complete (+ chunk seeding)", maps: "onboarding.ts" },
   { route: "/api/user/", methods: "me", maps: "auth.ts" },
 ];
 
@@ -678,8 +689,13 @@ const coreModules = [
     bg: COLORS.orange, border: COLORS.orangeBorder,
     lines: [
       "buildPlanningPrompt(summary, brief) -> prompt",
-      "parseSessionPlan(response) -> ExpandedSessionPlan",
+      "parseSessionPlan(response) -> ExpandedSessionPlan (incl. cardBudget)",
       "buildConversationSystemPrompt(plan) -> system prompt",
+      "  Includes structured card instructions:",
+      "  [VOCAB_CARD] [GRAMMAR_CARD] [CORRECTION] [REVIEW_PROMPT]",
+      "  [TARGETS_HIT: item1, item2] metadata per response",
+      "  Card budget: <20 items->5, 20-80->3, 80+->1",
+      "  Turn 20 wind-down (no new items after)",
       "buildAnalysisPrompt(transcript, plan) -> prompt",
       "parseAnalysis(response) -> PostSessionAnalysis",
       "",
@@ -1161,33 +1177,38 @@ const flowBX = flowAX + 740 + 50;
 const flowBY = flowAY;
 const flowBLines = [
   "PLAN PHASE -- Claude API Call #1",
-  "  1. User clicks 'Start Learning' -> conversationPlan()",
+  "  1. User clicks 'Start Session' -> conversationPlan()",
   "  2. Build learner summary (active items, stable count, pragmatics)",
   "  3. Build ToM brief (avoidance, confusion, modality gaps)",
   "  4. -> Claude API: 'You are a session planner...'",
-  "  5. Parse JSON: targetVocab, targetGrammar, register, focus",
+  "  5. Parse JSON: targetVocab, targetGrammar, register, focus, cardBudget",
   "  6. CREATE ConversationSession in DB",
-  "  7. Return ExpandedSessionPlan to client",
+  "  7. Return ExpandedSessionPlan + ChallengeCard targets to client",
   "",
-  "CONVERSATION PHASE -- Claude API Call #2 (per turn)",
-  "  8. User types message -> conversationSend(sessionId, text)",
-  "  9. Retrieve session state",
-  " 10. -> Claude API: system prompt + last 30 turns of history",
-  " 11. Claude responds in target language (recasting errors)",
-  " 12. UPDATE ConversationSession.transcript in DB",
-  " 13. Return ConversationMessage to client",
+  "CONVERSATION PHASE -- Claude API (SSE streaming per turn)",
+  "  8. User types message -> conversationSendStream(sessionId, text)",
+  "  9. Retrieve session state, build system prompt w/ card instructions",
+  " 10. -> Claude API (streaming): system prompt + last 30 turns",
+  " 11. SSE stream: delta events -> client renders incrementally",
+  " 12. Client parses [VOCAB_CARD] [GRAMMAR_CARD] etc. -> renders cards inline",
+  " 13. Client parses [TARGETS_HIT] -> updates ChallengeCard checklist",
+  " 14. Server accumulates full response -> UPDATE transcript in DB",
   "",
-  "END PHASE -- Claude API Calls #3 + #4",
-  " 14. User clicks 'End' -> conversationEnd(sessionId)",
-  " 15. -> Claude API #3: 'Analyze this transcript...'",
-  " 16. Parse: targets hit, errors, avoidance, new items",
-  " 17. CREATE ItemContextLog per item interaction",
-  " 18. UPDATE items: productionCount, contextTypes, modalities",
-  " 19. INSERT new items as 'introduced' mastery state",
-  " 20. -> Claude API #4: pragmatic analysis (register accuracy)",
-  " 21. UPDATE PragmaticProfile in DB",
-  " 22. TRIGGER async profile recalculation",
-  " 23. Return PostSessionAnalysis -> client shows summary",
+  "END PHASE -- Claude API Calls #3 + #4 + FSRS + Mastery",
+  " 15. User clicks 'End Session' -> conversationEnd(sessionId)",
+  " 16. -> Claude API #3: 'Analyze this transcript...'",
+  " 17. Parse: targets hit, errors, avoidance, new items",
+  " 18. CREATE ItemContextLog per item (with existence validation)",
+  " 19. UPDATE items: productionCount, contextTypes, modalities",
+  " 20. INSERT new items as 'introduced' mastery state",
+  " 21. FSRS LOOP: for each production event:",
+  "     -> scheduleReview(fsrs, grade) -> UPDATE item FSRS state",
+  "     -> computeNextMasteryState() -> UPDATE mastery if changed",
+  "     -> CREATE ReviewEvent (contextType: 'conversation')",
+  " 22. -> Claude API #4: pragmatic analysis (register accuracy)",
+  " 23. UPDATE PragmaticProfile in DB",
+  " 24. TRIGGER async profile recalculation",
+  " 25. Return PostSessionAnalysis -> client shows SessionSummaryCard",
 ];
 const flowBH = autoH(flowBLines.length);
 {
@@ -1541,21 +1562,25 @@ const nextLines = [
   "  [x] Authoritative corpus (JMDict + JLPT)",
   "  [x] Multi-word units (collocation/chunk/pragmatic)",
   "  [x] Three-tier onboarding seeding",
+  "  [x] MVP v0: Conversation (streaming + cards)",
+  "  [x] MVP v0: Knowledge Base (3 tabs)",
+  "  [x] MVP v0: Session History (annotated)",
+  "  [x] FSRS + mastery transitions at session end",
+  "  [x] Structured card protocol ([TAG]...[/TAG])",
   "",
   "Next priorities:",
-  "  [ ] @linguist/ui shared component pkg",
-  "  [ ] Word bank detail view + editing",
+  "  [ ] End-to-end testing (conversation loop)",
   "  [ ] Error handling UX (toasts, boundaries)",
-  "  [ ] Session summary enrichment",
-  "  [ ] Chat integration w/ knowledge model",
-  "  [ ] Insights page (ToM display)",
-  "  [ ] Testing (core/ + API routes)",
+  "  [ ] Card rendering reliability (fallbacks)",
+  "  [ ] Desktop parity (port MVP surfaces)",
+  "  [ ] Session quality metrics tracking",
+  "  [ ] Voice layer V2 (STT -> LLM -> TTS)",
 ];
 const nextH = autoH(nextLines.length);
 {
   const { elements: els } = titledBox({
     x: NUX, y: NUY, w: 360, h: nextH,
-    title: "Next Up (Post-Curriculum)",
+    title: "Progress (Post-MVP v0)",
     titleBg: "#f8f9fa", titleBorder: "#adb5bd",
     bodyBg: "#f8f9fa", bodyBorder: "#adb5bd",
     bodyLines: nextLines,

@@ -1,4 +1,4 @@
-import { Box, Flex, Text, Tooltip } from '@radix-ui/themes'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { MASTERY_ORDER, MASTERY_LABELS, MASTERY_HEX } from '@/constants/mastery'
 
 interface MasteryPipelineProps {
@@ -8,19 +8,12 @@ interface MasteryPipelineProps {
 export function MasteryPipeline({ distribution }: MasteryPipelineProps) {
   const total = Object.values(distribution).reduce((sum, n) => sum + n, 0)
   if (total === 0) {
-    return <Text size="2" color="gray">No items yet</Text>
+    return <span className="text-[13px] text-text-muted">No items yet</span>
   }
 
   return (
-    <Flex direction="column" gap="2">
-      <Flex
-        style={{
-          height: 28,
-          borderRadius: 'var(--radius-2)',
-          overflow: 'hidden',
-          width: '100%',
-        }}
-      >
+    <div className="flex flex-col gap-2">
+      <div className="flex h-7 rounded-md overflow-hidden w-full">
         {MASTERY_ORDER.map((state) => {
           const count = distribution[state] ?? 0
           if (count === 0) return null
@@ -28,50 +21,44 @@ export function MasteryPipeline({ distribution }: MasteryPipelineProps) {
           const showLabel = widthPct > 8
 
           return (
-            <Tooltip key={state} content={`${MASTERY_LABELS[state]}: ${count}`}>
-              <Box
-                style={{
-                  width: `${widthPct}%`,
-                  backgroundColor: MASTERY_HEX[state],
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: count > 0 ? 4 : 0,
-                  cursor: 'default',
-                  transition: 'width 0.3s ease',
-                }}
-              >
-                {showLabel && (
-                  <Text size="1" style={{ color: 'white', fontWeight: 600 }}>
-                    {count}
-                  </Text>
-                )}
-              </Box>
+            <Tooltip key={state}>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center justify-center cursor-default transition-[width] duration-300 ease-in-out"
+                  style={{
+                    width: `${widthPct}%`,
+                    backgroundColor: MASTERY_HEX[state],
+                    minWidth: count > 0 ? 4 : 0,
+                  }}
+                >
+                  {showLabel && (
+                    <span className="text-[11px] text-white font-semibold">
+                      {count}
+                    </span>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{`${MASTERY_LABELS[state]}: ${count}`}</TooltipContent>
             </Tooltip>
           )
         })}
-      </Flex>
+      </div>
 
-      <Flex gap="3" wrap="wrap">
+      <div className="flex gap-3 flex-wrap">
         {MASTERY_ORDER.map((state) => {
           const count = distribution[state] ?? 0
           if (count === 0) return null
           return (
-            <Flex key={state} align="center" gap="1">
-              <Box
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 2,
-                  backgroundColor: MASTERY_HEX[state],
-                  flexShrink: 0,
-                }}
+            <div key={state} className="flex items-center gap-1">
+              <div
+                className="w-2 h-2 rounded-[2px] shrink-0"
+                style={{ backgroundColor: MASTERY_HEX[state] }}
               />
-              <Text size="1" color="gray">{MASTERY_LABELS[state]}</Text>
-            </Flex>
+              <span className="text-[11px] text-text-muted">{MASTERY_LABELS[state]}</span>
+            </div>
           )
         })}
-      </Flex>
-    </Flex>
+      </div>
+    </div>
   )
 }

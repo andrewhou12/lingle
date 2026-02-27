@@ -1,4 +1,3 @@
-import { Flex, Text } from '@radix-ui/themes'
 import type { FrontierData } from '@linguist/shared/types'
 import { DotMapGrid } from './components/dot-map-grid'
 import { DotMapLegend } from './components/dot-map-legend'
@@ -8,24 +7,24 @@ export function DotMapView({ data }: { data: FrontierData }) {
 
   if (items.length === 0) {
     return (
-      <Text size="2" color="gray">
+      <span className="text-[13px] text-text-muted">
         No items in your knowledge base yet. Complete onboarding or add items to see the map.
-      </Text>
+      </span>
     )
   }
 
   return (
-    <Flex direction="column" gap="3">
-      <Flex justify="between" align="center">
-        <Text size="2" weight="bold" color="gray">
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-between items-center">
+        <span className="text-[13px] font-bold text-text-muted">
           Knowledge Map
-        </Text>
+        </span>
         <DotMapLegend />
-      </Flex>
+      </div>
       <DotMapGrid items={items} />
-      <Text size="1" color="gray">
+      <span className="text-[11px] text-text-muted">
         Each dot is one item. Columns = CEFR level. Rows = mastery state.
-      </Text>
-    </Flex>
+      </span>
+    </div>
   )
 }

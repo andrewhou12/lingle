@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Box, Card, Flex, Heading, Text } from '@radix-ui/themes'
 import { Skeleton } from '@/components/skeleton'
 import { useFrontier } from '@/hooks/use-frontier'
 import { ViewToggle, type FrontierView } from './view-toggle'
@@ -15,42 +14,42 @@ export function FrontierContainer() {
 
   if (isLoading) {
     return (
-      <Card mt="5">
-        <Flex direction="column" gap="3">
+      <div className="mt-5 rounded-xl border border-border bg-bg p-4">
+        <div className="flex flex-col gap-3">
           <Skeleton width={160} height={18} />
           {Array.from({ length: 4 }).map((_, i) => (
-            <Flex key={i} gap="3" align="center">
+            <div key={i} className="flex gap-3 items-center">
               <Skeleton width={32} height={14} />
               <Skeleton width="100%" height={20} borderRadius={4} />
-            </Flex>
+            </div>
           ))}
-        </Flex>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   if (!data) {
     return (
-      <Card mt="5">
-        <Text size="2" color="gray">
+      <div className="mt-5 rounded-xl border border-border bg-bg p-4">
+        <span className="text-[13px] text-text-muted">
           Complete onboarding to see your learning frontier.
-        </Text>
-      </Card>
+        </span>
+      </div>
     )
   }
 
   return (
-    <Card mt="5">
-      <Flex justify="between" align="center" mb="4">
-        <Heading size="4">Learning Frontier</Heading>
+    <div className="mt-5 rounded-xl border border-border bg-bg p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold">Learning Frontier</h3>
         <ViewToggle value={view} onChange={setView} />
-      </Flex>
+      </div>
 
-      <Box>
+      <div>
         {view === 'levels' && <LevelBarsView data={data} />}
         {view === 'map' && <DotMapView data={data} />}
         {view === 'skills' && <RadarLevelsView data={data} />}
-      </Box>
-    </Card>
+      </div>
+    </div>
   )
 }

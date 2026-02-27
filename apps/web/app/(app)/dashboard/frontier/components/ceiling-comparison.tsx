@@ -1,4 +1,4 @@
-import { Flex, Text, Box } from '@radix-ui/themes'
+import { cn } from '@/lib/utils'
 
 interface CeilingComparisonProps {
   comprehensionCeiling: string
@@ -15,10 +15,10 @@ export function CeilingComparison({ comprehensionCeiling, productionCeiling }: C
   const maxValue = 6
 
   return (
-    <Flex gap="5" align="end">
+    <div className="flex gap-5 items-end">
       <CeilingBar label="Comprehension" level={comprehensionCeiling} value={compValue} max={maxValue} />
       <CeilingBar label="Production" level={productionCeiling} value={prodValue} max={maxValue} />
-    </Flex>
+    </div>
   )
 }
 
@@ -26,33 +26,18 @@ function CeilingBar({ label, level, value, max }: { label: string; level: string
   const heightPct = max > 0 ? (value / max) * 100 : 0
 
   return (
-    <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
-      <Text size="1" weight="bold">{level}</Text>
-      <Box
-        style={{
-          width: '100%',
-          maxWidth: 60,
-          height: 80,
-          borderRadius: 'var(--radius-2)',
-          backgroundColor: 'var(--gray-3)',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <Box
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: `${heightPct}%`,
-            backgroundColor: label === 'Comprehension' ? 'var(--accent-9)' : 'var(--purple-9)',
-            borderRadius: 'var(--radius-2)',
-            transition: 'height 0.3s ease',
-          }}
+    <div className="flex flex-col items-center gap-1 flex-1">
+      <span className="text-[11px] font-bold">{level}</span>
+      <div className="w-full max-w-[60px] h-20 rounded-md bg-bg-active relative overflow-hidden">
+        <div
+          className={cn(
+            'absolute bottom-0 left-0 right-0 rounded-md transition-[height] duration-300 ease-in-out',
+            label === 'Comprehension' ? 'bg-accent-brand' : 'bg-[#8b5cf6]'
+          )}
+          style={{ height: `${heightPct}%` }}
         />
-      </Box>
-      <Text size="1" color="gray">{label}</Text>
-    </Flex>
+      </div>
+      <span className="text-[11px] text-text-muted">{label}</span>
+    </div>
   )
 }

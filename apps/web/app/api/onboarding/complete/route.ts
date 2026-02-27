@@ -13,6 +13,9 @@ import {
 import {
   getItemsBelowLevel,
   getItemsForLevel,
+  getCollocationsByLevel,
+  getChunksByLevel,
+  getPragmaticFormulasByLevel,
 } from '@linguist/core/curriculum/reference-data'
 
 export const POST = withAuth(async (request, { userId }) => {
@@ -178,6 +181,90 @@ export const POST = withAuth(async (request, { userId }) => {
 
   // Items ABOVE the learner's level are NOT seeded — the curriculum generator
   // introduces these when the learner is ready (level-up seeding)
+
+  // ── Seed chunk items (collocations, chunks, pragmatic formulas) ──
+  await prisma.chunkItem.deleteMany({ where: { userId, source: 'onboarding' } })
+
+  const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1']
+  const levelIdx = CEFR_ORDER.indexOf(cefrLevel)
+  const levelsToSeed = levelIdx >= 0 ? CEFR_ORDER.slice(0, levelIdx + 1) : ['A1']
+
+  for (const level of levelsToSeed) {
+    const isBelowLevel = level !== cefrLevel
+
+    const collocations = getCollocationsByLevel(level)
+    for (const coll of collocations) {
+      await prisma.chunkItem.create({
+        data: {
+          userId,
+          itemKind: 'collocation',
+          referenceId: coll.id,
+          phrase: coll.phrase,
+          reading: coll.reading,
+          meaning: coll.meaning,
+          componentItemIds: [],
+          grammarDependencies: [],
+          cefrLevel: coll.cefrLevel,
+          frequencyRank: coll.frequencyRank,
+          masteryState: isBelowLevel ? 'introduced' : 'unseen',
+          recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          tags: coll.tags ?? [],
+          domain: coll.domain,
+          source: 'onboarding',
+        },
+      })
+    }
+
+    const chunks = getChunksByLevel(level)
+    for (const chunk of chunks) {
+      await prisma.chunkItem.create({
+        data: {
+          userId,
+          itemKind: 'chunk',
+          referenceId: chunk.id,
+          phrase: chunk.phrase,
+          reading: chunk.reading,
+          meaning: chunk.meaning,
+          componentItemIds: [],
+          grammarDependencies: chunk.grammarDependencies ?? [],
+          cefrLevel: chunk.cefrLevel,
+          frequencyRank: chunk.frequencyRank,
+          masteryState: isBelowLevel ? 'introduced' : 'unseen',
+          recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          tags: chunk.tags ?? [],
+          domain: chunk.domain,
+          source: 'onboarding',
+        },
+      })
+    }
+
+    const formulas = getPragmaticFormulasByLevel(level)
+    for (const formula of formulas) {
+      await prisma.chunkItem.create({
+        data: {
+          userId,
+          itemKind: 'pragmatic_formula',
+          referenceId: formula.id,
+          phrase: formula.phrase,
+          reading: formula.reading,
+          meaning: formula.meaning,
+          componentItemIds: [],
+          grammarDependencies: [],
+          register: formula.register,
+          cefrLevel: formula.cefrLevel,
+          frequencyRank: formula.frequencyRank,
+          masteryState: isBelowLevel ? 'introduced' : 'unseen',
+          recognitionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          productionFsrs: initialFsrs as unknown as Prisma.InputJsonValue,
+          tags: formula.tags ?? [],
+          domain: formula.domain,
+          source: 'onboarding',
+        },
+      })
+    }
+  }
 
   // Wipe stale curriculum so it regenerates from the new knowledge state
   await prisma.curriculumItem.deleteMany({ where: { userId } })

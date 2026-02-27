@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Flex, Text, Popover, Separator, Box } from '@radix-ui/themes'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Separator } from '@/components/ui/separator'
 import { LogOut, CircleUser } from 'lucide-react'
 import type { ExpandedLearnerProfile } from '@linguist/shared/types'
 import { createClient } from '@/lib/supabase/client'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export function UserMenu() {
   const router = useRouter()
@@ -30,135 +32,67 @@ export function UserMenu() {
   }
 
   return (
-    <Popover.Root>
-      <Popover.Trigger>
-        <button
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            padding: 0,
-            color: 'var(--gray-11)',
-          }}
-        >
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="size-8 rounded-full bg-transparent border-none cursor-pointer flex items-center justify-center p-0 text-text-secondary transition-colors duration-100 hover:text-text-primary">
           <CircleUser size={20} />
         </button>
-      </Popover.Trigger>
-      <Popover.Content
+      </PopoverTrigger>
+      <PopoverContent
         side="bottom"
         align="end"
-        style={{ width: 280, padding: 0 }}
+        className="w-[280px] p-0"
       >
         {/* User header */}
-        <Flex align="center" gap="3" p="4">
-          <div
-            style={{
-              width: 40,
-              minWidth: 40,
-              height: 40,
-              minHeight: 40,
-              borderRadius: '50%',
-              backgroundColor: user?.avatarUrl ? 'transparent' : 'var(--accent-9)',
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+        <div className="flex items-center gap-3 p-4">
+          <div className={cn(
+            'size-10 min-w-10 min-h-10 rounded-full overflow-hidden flex items-center justify-center',
+            user?.avatarUrl ? 'bg-transparent' : 'bg-accent-brand'
+          )}>
             {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={displayName}
-                width={40}
-                height={40}
-                style={{ borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-              />
+              <img src={user.avatarUrl} alt={displayName} width={40} height={40} className="rounded-full object-cover block" />
             ) : (
-              <Text size="4" weight="bold" style={{ color: 'white', lineHeight: 1 }}>
-                {initials}
-              </Text>
+              <span className="text-lg font-bold text-white leading-none">{initials}</span>
             )}
           </div>
-          <Flex direction="column" style={{ minWidth: 0 }}>
-            <Text size="2" weight="bold" truncate>
-              {displayName}
-            </Text>
-            <Text size="1" color="gray" truncate>
-              {profile
-                ? `${profile.targetLanguage} (${profile.computedLevel})`
-                : user?.email || 'Loading...'}
-            </Text>
-          </Flex>
-        </Flex>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[13px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">{displayName}</span>
+            <span className="text-[11px] text-text-muted overflow-hidden text-ellipsis whitespace-nowrap">
+              {profile ? `${profile.targetLanguage} (${profile.computedLevel})` : user?.email || 'Loading...'}
+            </span>
+          </div>
+        </div>
 
-        <Separator size="4" />
+        <Separator />
 
         {/* Stats */}
-        <Flex direction="column" gap="2" p="4">
-          <Flex justify="between" align="center">
-            <Text size="2">Current level</Text>
-            <Text size="2" weight="medium">
-              {profile?.computedLevel ?? '—'}
-            </Text>
-          </Flex>
-          <Flex justify="between" align="center">
-            <Text size="2">Streak</Text>
-            <Text size="2" weight="medium">
-              {profile?.currentStreak ?? 0} day{(profile?.currentStreak ?? 0) !== 1 ? 's' : ''}
-            </Text>
-          </Flex>
-          <Flex justify="between" align="center">
-            <Text size="2">Total reviews</Text>
-            <Text size="2" weight="medium">
-              {profile?.totalReviewEvents ?? 0}
-            </Text>
-          </Flex>
-          <Flex justify="between" align="center">
-            <Text size="2">Sessions</Text>
-            <Text size="2" weight="medium">
-              {profile?.totalSessions ?? 0}
-            </Text>
-          </Flex>
-        </Flex>
+        <div className="flex flex-col gap-2 p-4">
+          {[
+            { label: 'Current level', value: profile?.computedLevel ?? '—' },
+            { label: 'Streak', value: `${profile?.currentStreak ?? 0} day${(profile?.currentStreak ?? 0) !== 1 ? 's' : ''}` },
+            { label: 'Total reviews', value: String(profile?.totalReviewEvents ?? 0) },
+            { label: 'Sessions', value: String(profile?.totalSessions ?? 0) },
+          ].map((row) => (
+            <div key={row.label} className="flex justify-between items-center">
+              <span className="text-[13px] text-text-secondary">{row.label}</span>
+              <span className="text-[13px] font-medium">{row.value}</span>
+            </div>
+          ))}
+        </div>
 
-        <Separator size="4" />
+        <Separator />
 
         {/* Sign out */}
-        <Box p="2">
+        <div className="p-2">
           <button
             onClick={handleSignOut}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-2)',
-              cursor: 'pointer',
-              width: '100%',
-              background: 'none',
-              border: 'none',
-              color: 'var(--gray-11)',
-              fontSize: 'var(--font-size-2)',
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = 'var(--gray-3)')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = 'transparent')
-            }
+            className="flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer w-full bg-transparent border-none text-text-secondary text-[13px] transition-colors duration-100 hover:bg-bg-hover hover:text-text-primary"
           >
             <LogOut size={16} />
             Sign out
           </button>
-        </Box>
-      </Popover.Content>
-    </Popover.Root>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -72,15 +72,92 @@ class LinguistApiClient {
       method: 'POST',
       body: JSON.stringify({ sessionId, message }),
     })
+  conversationSendStream = async (
+    sessionId: string,
+    message: string,
+    onDelta: (text: string) => void,
+    onDone: (message: ConversationMessage) => void,
+    onError?: (error: string) => void
+  ) => {
+    const res = await fetch('/api/conversation/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, message, stream: true }),
+    })
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    const reader = res.body?.getReader()
+    if (!reader) throw new Error('No response body')
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const json = JSON.parse(line.slice(6))
+        if (json.type === 'delta') onDelta(json.text)
+        else if (json.type === 'done') onDone(json.message)
+        else if (json.type === 'error') onError?.(json.error)
+      }
+    }
+  }
   conversationEnd = (sessionId: string) =>
     this.request<PostSessionAnalysis | null>('/conversation/end', {
       method: 'POST',
       body: JSON.stringify({ sessionId }),
     })
   conversationList = () =>
-    this.request<Array<{ id: string; timestamp: string; durationSeconds: number | null; sessionFocus: string }>>(
-      '/conversation/list'
-    )
+    this.request<Array<{
+      id: string; timestamp: string; durationSeconds: number | null; sessionFocus: string
+      targetsPlannedCount: number; targetsHitCount: number; errorsLoggedCount: number
+    }>>('/conversation/list')
+  conversationDetail = (id: string) =>
+    this.request<{
+      id: string; timestamp: string; durationSeconds: number | null
+      transcript: ConversationMessage[]; sessionPlan: ExpandedSessionPlan
+      targetsPlanned: { vocabulary: number[]; grammar: number[] }
+      targetsHit: number[]; errorsLogged: Array<{ itemId: number; errorType: string; contextQuote: string }>
+      avoidanceEvents: Array<{ itemId: number; contextQuote: string }>
+      systemPrompt: string | null; contextLogs: Array<{
+        id: number; contextType: string; modality: string; wasProduction: boolean
+        wasSuccessful: boolean | null; contextQuote: string | null; lexicalItemId: number | null
+        grammarItemId: number | null
+      }>
+    }>(`/conversation/${id}`)
+
+  // Grammar
+  grammarList = (filters?: { masteryState?: string; search?: string }) => {
+    const params = new URLSearchParams()
+    if (filters?.masteryState) params.set('masteryState', filters.masteryState)
+    if (filters?.search) params.set('search', filters.search)
+    const qs = params.toString()
+    return this.request<Array<{
+      id: number; patternId: string; name: string; description: string | null
+      cefrLevel: string | null; masteryState: string; contextCount: number
+      recognitionFsrs: import('@linguist/shared/types').FsrsState
+      productionFsrs: import('@linguist/shared/types').FsrsState
+      firstSeen: string; lastReviewed: string | null; productionWeight: number
+    }>>(`/grammar${qs ? `?${qs}` : ''}`)
+  }
+
+  // Chunks
+  chunksList = (filters?: { masteryState?: string; itemKind?: string; search?: string }) => {
+    const params = new URLSearchParams()
+    if (filters?.masteryState) params.set('masteryState', filters.masteryState)
+    if (filters?.itemKind) params.set('itemKind', filters.itemKind)
+    if (filters?.search) params.set('search', filters.search)
+    const qs = params.toString()
+    return this.request<import('@linguist/shared/types').WordBankChunkEntry[]>(`/chunks${qs ? `?${qs}` : ''}`)
+  }
+
+  // Promote items
+  wordbankPromote = (id: number) =>
+    this.request<{ masteryState: string }>(`/wordbank/${id}/promote`, { method: 'POST' })
+  grammarPromote = (id: number) =>
+    this.request<{ masteryState: string }>(`/grammar/${id}/promote`, { method: 'POST' })
 
   // ToM
   tomRunAnalysis = () => this.request<void>('/tom/analyze', { method: 'POST' })

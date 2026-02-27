@@ -2,10 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Flex, Text, Button, Card, RadioCards, Slider, Badge, Progress, Separator,
-  TextField, TextArea,
-} from '@radix-ui/themes'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Slider } from '@/components/ui/slider'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Check, ChevronRight, ChevronLeft, BookOpen, Languages, Target, Sparkles, Keyboard, FileText, X } from 'lucide-react'
 import type {
   AssessmentItem,
@@ -17,9 +17,14 @@ import type {
   SelfReportedLevel,
 } from '@linguist/shared/types'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 type Step = 'welcome' | 'language' | 'level' | 'assessment' | 'reading_challenge' | 'comprehension' | 'preferences' | 'complete'
 const STEPS: Step[] = ['welcome', 'language', 'level', 'assessment', 'reading_challenge', 'comprehension', 'preferences', 'complete']
+
+const primaryBtnClass = "inline-flex items-center gap-2 py-2.5 px-5 rounded-md bg-accent-brand text-white text-sm font-medium border-none cursor-pointer transition-opacity duration-150"
+const softBtnClass = "inline-flex items-center gap-2 py-2.5 px-5 rounded-md bg-bg-secondary text-text-secondary text-sm font-medium border-none cursor-pointer transition-colors duration-150 hover:bg-bg-hover"
+const cardClass = "w-full rounded-xl border border-border bg-bg p-8"
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -131,18 +136,12 @@ export default function OnboardingPage() {
   const readingCorrect = readingResults.filter((r) => r.correct).length
 
   return (
-    <Flex
-      direction="column"
-      align="center"
-      style={{ height: '100vh', overflow: 'auto' }}
-    >
-      <Flex
-        direction="column"
-        align="center"
-        style={{ maxWidth: 600, width: '100%', padding: '80px 24px 48px' }}
-        gap="5"
-      >
-        <Progress value={progress} size="1" style={{ width: '100%' }} />
+    <div className="flex flex-col items-center h-screen overflow-auto bg-bg">
+      <div className="flex flex-col items-center max-w-[600px] w-full pt-20 px-6 pb-12 gap-6">
+        {/* Progress bar */}
+        <div className="w-full h-1 rounded-sm bg-bg-active overflow-hidden">
+          <div className="h-full rounded-sm bg-accent-brand transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} />
+        </div>
 
         {step === 'welcome' && <WelcomeStep onNext={goNext} />}
         {step === 'language' && (
@@ -202,77 +201,86 @@ export default function OnboardingPage() {
             onBack={goBack}
           />
         )}
-      </Flex>
-    </Flex>
+      </div>
+    </div>
   )
 }
 
-// ── Welcome ──
+// -- Welcome --
 
 function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" align="center" gap="5" p="4">
-        <Flex align="center" justify="center" style={{ width: 64, height: 64, borderRadius: 'var(--radius-4)', background: 'var(--accent-3)' }}>
-          <Languages size={32} color="var(--accent-11)" />
-        </Flex>
-        <Flex direction="column" align="center" gap="2">
-          <Text size="7" weight="bold">Welcome!</Text>
-          <Text size="3" color="gray" align="center" style={{ maxWidth: 400 }}>
+    <div className={cardClass}>
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-16 h-16 rounded-xl bg-bg-secondary flex items-center justify-center">
+          <Languages size={32} className="text-accent-brand" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[28px] font-bold">Welcome!</span>
+          <span className="text-[15px] text-text-muted text-center max-w-[400px]">
             Let&apos;s set up your personalized learning experience. We&apos;ll ask a few
             questions to understand your current level and tailor your study plan.
-          </Text>
-        </Flex>
-        <Text size="2" color="gray" align="center">This takes about 3–4 minutes.</Text>
-        <Button size="3" onClick={onNext} style={{ width: '100%', maxWidth: 300 }}>
+          </span>
+        </div>
+        <span className="text-[13px] text-text-muted text-center">This takes about 3--4 minutes.</span>
+        <button className={cn(primaryBtnClass, "w-full max-w-[300px] justify-center")} onClick={onNext}>
           Get Started <ChevronRight size={16} />
-        </Button>
-      </Flex>
-    </Card>
+        </button>
+      </div>
+    </div>
   )
 }
 
-// ── Language ──
+// -- Language --
 
 function LanguageStep({
   nativeLanguage, onNativeLanguageChange, onNext, onBack,
 }: { nativeLanguage: string; onNativeLanguageChange: (l: string) => void; onNext: () => void; onBack: () => void }) {
   const languages = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Chinese', 'Korean', 'Other']
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Text size="5" weight="bold">What&apos;s your native language?</Text>
-          <Text size="2" color="gray">We&apos;ll use this to tailor explanations and detect L1 interference patterns.</Text>
-        </Flex>
-        <RadioCards.Root value={nativeLanguage} onValueChange={onNativeLanguageChange} columns={{ initial: '2', sm: '2' }}>
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <span className="text-[22px] font-bold">What&apos;s your native language?</span>
+          <span className="text-[13px] text-text-muted">We&apos;ll use this to tailor explanations and detect L1 interference patterns.</span>
+        </div>
+        <RadioGroup value={nativeLanguage} onValueChange={onNativeLanguageChange} className="grid grid-cols-2 gap-2">
           {languages.map((lang) => (
-            <RadioCards.Item key={lang} value={lang}><Text weight="medium">{lang}</Text></RadioCards.Item>
+            <label
+              key={lang}
+              className={cn(
+                "flex items-center gap-3 cursor-pointer rounded-md border py-3 px-4 transition-colors duration-150",
+                nativeLanguage === lang ? "border-accent-brand bg-accent-brand/5" : "border-border bg-bg hover:bg-bg-secondary"
+              )}
+            >
+              <RadioGroupItem value={lang} className="sr-only" />
+              <span className="font-medium">{lang}</span>
+            </label>
           ))}
-        </RadioCards.Root>
-        <Separator size="4" />
-        <Flex direction="column" gap="2">
-          <Text size="5" weight="bold">Target language</Text>
-          <Card variant="surface">
-            <Flex align="center" gap="3" p="1">
-              <Text size="6">🇯🇵</Text>
-              <Flex direction="column">
-                <Text weight="medium">Japanese</Text>
-                <Text size="1" color="gray">More languages coming in future versions</Text>
-              </Flex>
-            </Flex>
-          </Card>
-        </Flex>
-        <Flex gap="3" justify="between">
-          <Button variant="soft" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
-          <Button onClick={onNext}>Continue <ChevronRight size={16} /></Button>
-        </Flex>
-      </Flex>
-    </Card>
+        </RadioGroup>
+        <hr className="border-t border-border m-0" />
+        <div className="flex flex-col gap-2">
+          <span className="text-[22px] font-bold">Target language</span>
+          <div className="rounded-lg border border-border bg-bg-secondary p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🇯🇵</span>
+              <div className="flex flex-col">
+                <span className="font-medium">Japanese</span>
+                <span className="text-[11px] text-text-muted">More languages coming in future versions</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-between">
+          <button className={softBtnClass} onClick={onBack}><ChevronLeft size={16} /> Back</button>
+          <button className={primaryBtnClass} onClick={onNext}>Continue <ChevronRight size={16} /></button>
+        </div>
+      </div>
+    </div>
   )
 }
 
-// ── Level ──
+// -- Level --
 
 function LevelStep({ onSelect, onBack }: { onSelect: (l: SelfReportedLevel) => void; onBack: () => void }) {
   const levels: Array<{ value: SelfReportedLevel; label: string; description: string }> = [
@@ -284,16 +292,16 @@ function LevelStep({ onSelect, onBack }: { onSelect: (l: SelfReportedLevel) => v
     { value: 'N1', label: 'JLPT N1', description: 'Near-native comprehension, ~2000 kanji' },
   ]
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Flex align="center" gap="2">
-            <Target size={20} color="var(--accent-11)" />
-            <Text size="5" weight="bold">What&apos;s your current level?</Text>
-          </Flex>
-          <Text size="2" color="gray">Don&apos;t worry about being exact — we&apos;ll fine-tune this with a few challenges next.</Text>
-        </Flex>
-        <Flex direction="column" gap="2">
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Target size={20} className="text-accent-brand" />
+            <span className="text-[22px] font-bold">What&apos;s your current level?</span>
+          </div>
+          <span className="text-[13px] text-text-muted">Don&apos;t worry about being exact — we&apos;ll fine-tune this with a few challenges next.</span>
+        </div>
+        <div className="flex flex-col gap-2">
           {levels.map((level) => (
             <div
               key={level.value}
@@ -301,29 +309,27 @@ function LevelStep({ onSelect, onBack }: { onSelect: (l: SelfReportedLevel) => v
               role="button"
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(level.value) } }}
-              style={{ cursor: 'pointer', padding: '12px 16px', borderRadius: 'var(--radius-2)', border: '1px solid var(--gray-6)', background: 'var(--color-surface)', transition: 'border-color 0.15s ease, background 0.15s ease' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-8)'; e.currentTarget.style.background = 'var(--accent-2)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--gray-6)'; e.currentTarget.style.background = 'var(--color-surface)' }}
+              className="cursor-pointer py-3 px-4 rounded-md border border-border bg-bg transition-colors duration-150 hover:border-border-strong hover:bg-bg-secondary"
             >
-              <Flex align="center" justify="between" gap="3">
-                <Flex direction="column" gap="1">
-                  <Text weight="medium">{level.label}</Text>
-                  <Text size="1" color="gray">{level.description}</Text>
-                </Flex>
-                <ChevronRight size={16} color="var(--gray-8)" />
-              </Flex>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{level.label}</span>
+                  <span className="text-[11px] text-text-muted">{level.description}</span>
+                </div>
+                <ChevronRight size={16} className="text-text-muted" />
+              </div>
             </div>
           ))}
-        </Flex>
-        <Button variant="soft" onClick={onBack} style={{ alignSelf: 'flex-start' }}>
+        </div>
+        <button className={cn(softBtnClass, "self-start")} onClick={onBack}>
           <ChevronLeft size={16} /> Back
-        </Button>
-      </Flex>
-    </Card>
+        </button>
+      </div>
+    </div>
   )
 }
 
-// ── Vocabulary Assessment ──
+// -- Vocabulary Assessment --
 
 function AssessmentStep({
   items, knownItems, loading, onToggle, onNext, onBack,
@@ -331,70 +337,90 @@ function AssessmentStep({
   const vocabItems = items.filter((i) => i.type === 'vocabulary')
   const grammarItems = items.filter((i) => i.type === 'grammar')
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Flex align="center" gap="2">
-            <BookOpen size={20} color="var(--accent-11)" />
-            <Text size="5" weight="bold">Quick Vocabulary Check</Text>
-          </Flex>
-          <Text size="2" color="gray">Tap the items you already know. This helps us build your initial knowledge map.</Text>
-        </Flex>
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <BookOpen size={20} className="text-accent-brand" />
+            <span className="text-[22px] font-bold">Quick Vocabulary Check</span>
+          </div>
+          <span className="text-[13px] text-text-muted">Tap the items you already know. This helps us build your initial knowledge map.</span>
+        </div>
         {loading ? (
-          <Flex align="center" justify="center" py="6"><Text color="gray">Loading assessment...</Text></Flex>
+          <div className="flex items-center justify-center py-6">
+            <span className="text-text-muted">Loading assessment...</span>
+          </div>
         ) : (
           <>
             {vocabItems.length > 0 && (
-              <Flex direction="column" gap="3">
-                <Text size="3" weight="medium" color="gray">Vocabulary</Text>
-                <Flex gap="2" wrap="wrap">
+              <div className="flex flex-col gap-3">
+                <span className="text-sm font-medium text-text-muted">Vocabulary</span>
+                <div className="flex gap-2 flex-wrap">
                   {vocabItems.map((item) => {
                     const isKnown = knownItems.has(item.index)
                     return (
-                      <Button key={item.index} variant={isKnown ? 'solid' : 'outline'} size="2" onClick={() => onToggle(item.index)} style={{ cursor: 'pointer', transition: 'all 0.15s ease', padding: '12px 16px', height: 'auto' }}>
+                      <button
+                        key={item.index}
+                        onClick={() => onToggle(item.index)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 py-3 px-4 rounded-md border cursor-pointer transition-all duration-150",
+                          isKnown
+                            ? "border-accent-brand bg-accent-brand text-white"
+                            : "border-border bg-bg text-text-primary"
+                        )}
+                      >
                         {isKnown && <Check size={14} />}
-                        <Flex direction="column" align="start" gap="1">
-                          <Text size="2" weight="medium">{item.surfaceForm}</Text>
-                          <Text size="1" style={{ opacity: 0.7 }}>{item.meaning}</Text>
-                        </Flex>
-                      </Button>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="text-[13px] font-medium">{item.surfaceForm}</span>
+                          <span className="text-[11px] opacity-70">{item.meaning}</span>
+                        </div>
+                      </button>
                     )
                   })}
-                </Flex>
-              </Flex>
+                </div>
+              </div>
             )}
             {grammarItems.length > 0 && (
-              <Flex direction="column" gap="3">
-                <Text size="3" weight="medium" color="gray">Grammar Patterns</Text>
-                <Flex gap="2" wrap="wrap">
+              <div className="flex flex-col gap-3">
+                <span className="text-sm font-medium text-text-muted">Grammar Patterns</span>
+                <div className="flex gap-2 flex-wrap">
                   {grammarItems.map((item) => {
                     const isKnown = knownItems.has(item.index)
                     return (
-                      <Button key={item.index} variant={isKnown ? 'solid' : 'outline'} size="2" onClick={() => onToggle(item.index)} style={{ cursor: 'pointer', transition: 'all 0.15s ease', padding: '12px 16px', height: 'auto' }}>
+                      <button
+                        key={item.index}
+                        onClick={() => onToggle(item.index)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 py-3 px-4 rounded-md border cursor-pointer transition-all duration-150",
+                          isKnown
+                            ? "border-accent-brand bg-accent-brand text-white"
+                            : "border-border bg-bg text-text-primary"
+                        )}
+                      >
                         {isKnown && <Check size={14} />}
-                        <Flex direction="column" align="start" gap="1">
-                          <Text size="2" weight="medium">{item.surfaceForm}</Text>
-                          <Text size="1" style={{ opacity: 0.7 }}>{item.meaning}</Text>
-                        </Flex>
-                      </Button>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="text-[13px] font-medium">{item.surfaceForm}</span>
+                          <span className="text-[11px] opacity-70">{item.meaning}</span>
+                        </div>
+                      </button>
                     )
                   })}
-                </Flex>
-              </Flex>
+                </div>
+              </div>
             )}
-            <Text size="1" color="gray" align="center">{knownItems.size} of {items.length} items marked as known</Text>
+            <span className="text-[11px] text-text-muted text-center">{knownItems.size} of {items.length} items marked as known</span>
           </>
         )}
-        <Flex gap="3" justify="between">
-          <Button variant="soft" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
-          <Button onClick={onNext}>Continue <ChevronRight size={16} /></Button>
-        </Flex>
-      </Flex>
-    </Card>
+        <div className="flex gap-3 justify-between">
+          <button className={softBtnClass} onClick={onBack}><ChevronLeft size={16} /> Back</button>
+          <button className={primaryBtnClass} onClick={onNext}>Continue <ChevronRight size={16} /></button>
+        </div>
+      </div>
+    </div>
   )
 }
 
-// ── Reading Challenge (kanji → hiragana) ──
+// -- Reading Challenge (kanji -> hiragana) --
 
 function ReadingChallengeStep({
   items, loading, onComplete, onBack,
@@ -413,9 +439,11 @@ function ReadingChallengeStep({
 
   if (loading || items.length === 0) {
     return (
-      <Card size="4" style={{ width: '100%' }}>
-        <Flex align="center" justify="center" py="6"><Text color="gray">Loading reading challenge...</Text></Flex>
-      </Card>
+      <div className={cardClass}>
+        <div className="flex items-center justify-center py-6">
+          <span className="text-text-muted">Loading reading challenge...</span>
+        </div>
+      </div>
     )
   }
 
@@ -439,30 +467,29 @@ function ReadingChallengeStep({
   const lastResult = results.length > 0 ? results[results.length - 1] : null
 
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Flex align="center" gap="2">
-            <Keyboard size={20} color="var(--accent-11)" />
-            <Text size="5" weight="bold">Reading Challenge</Text>
-          </Flex>
-          <Text size="2" color="gray">Type the hiragana reading for each word. Use a Japanese keyboard input.</Text>
-          <Text
-            size="1" color="gray"
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Keyboard size={20} className="text-accent-brand" />
+            <span className="text-[22px] font-bold">Reading Challenge</span>
+          </div>
+          <span className="text-[13px] text-text-muted">Type the hiragana reading for each word. Use a Japanese keyboard input.</span>
+          <span
+            className="text-[11px] text-text-muted cursor-pointer underline underline-offset-2"
             onClick={() => onComplete([])}
-            style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
           >
             No Japanese keyboard? Skip this step
-          </Text>
-        </Flex>
+          </span>
+        </div>
 
-        <Text size="1" color="gray" align="center">{currentIdx + 1} of {items.length}</Text>
+        <span className="text-[11px] text-text-muted text-center">{currentIdx + 1} of {items.length}</span>
 
-        <Flex direction="column" align="center" gap="4" py="2">
-          <Text size="8" weight="bold" style={{ letterSpacing: '0.05em' }}>{current.surfaceForm}</Text>
-          <Text size="2" color="gray">{current.meaning}</Text>
+        <div className="flex flex-col items-center gap-4 py-2">
+          <span className="text-4xl font-bold tracking-wide">{current.surfaceForm}</span>
+          <span className="text-[13px] text-text-muted">{current.meaning}</span>
 
-          <TextField.Root
+          <Input
             ref={inputRef}
             placeholder="ひらがなで入力..."
             value={userInput}
@@ -474,34 +501,37 @@ function ReadingChallengeStep({
               }
             }}
             readOnly={checked}
-            size="3"
-            style={{ width: '100%', maxWidth: 300, textAlign: 'center', fontSize: '1.1rem', opacity: checked ? 0.6 : 1 }}
+            className={cn("w-full max-w-[300px] text-center text-lg", checked && "opacity-60")}
           />
 
           {checked && correctReading && (
-            <Flex align="center" gap="2">
+            <div className="flex items-center gap-2">
               {lastResult?.correct ? (
-                <Badge size="2" color="green"><Check size={14} /> Correct!</Badge>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full bg-[rgba(22,163,106,.08)] text-[13px] font-medium text-[#16a34a]">
+                  <Check size={14} /> Correct!
+                </span>
               ) : (
-                <Flex direction="column" align="center" gap="1">
-                  <Badge size="2" color="red"><X size={14} /> Incorrect</Badge>
-                  <Text size="2" color="gray">Correct reading: <Text weight="bold">{correctReading}</Text></Text>
-                </Flex>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full bg-[rgba(200,87,42,.07)] text-[13px] font-medium text-accent-warm">
+                    <X size={14} /> Incorrect
+                  </span>
+                  <span className="text-[13px] text-text-muted">Correct reading: <strong>{correctReading}</strong></span>
+                </div>
               )}
-            </Flex>
+            </div>
           )}
-        </Flex>
+        </div>
 
-        <Flex gap="3" justify="between">
-          <Button variant="soft" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
+        <div className="flex gap-3 justify-between">
+          <button className={softBtnClass} onClick={onBack}><ChevronLeft size={16} /> Back</button>
           {!checked ? (
-            <Button onClick={handleCheck} disabled={!userInput.trim()}>Check</Button>
+            <button className={cn(primaryBtnClass, !userInput.trim() && "opacity-50")} onClick={handleCheck} disabled={!userInput.trim()}>Check</button>
           ) : (
-            <Button onClick={handleNext}>{isLast ? 'Continue' : 'Next'} <ChevronRight size={16} /></Button>
+            <button className={primaryBtnClass} onClick={handleNext}>{isLast ? 'Continue' : 'Next'} <ChevronRight size={16} /></button>
           )}
-        </Flex>
-      </Flex>
-    </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -529,7 +559,7 @@ function getCorrectReading(surfaceForm: string): string {
   return fullList.find((i) => i.surfaceForm === surfaceForm)?.reading ?? ''
 }
 
-// ── Comprehension Challenge (sentence → translation) ──
+// -- Comprehension Challenge (sentence -> translation) --
 
 const COMPREHENSION_KEYWORDS: Record<string, string[]> = {
   '私は毎日学校に行きます。': ['school', 'go', 'every'],
@@ -587,9 +617,11 @@ function ComprehensionStep({
 
   if (loading || items.length === 0) {
     return (
-      <Card size="4" style={{ width: '100%' }}>
-        <Flex align="center" justify="center" py="6"><Text color="gray">Loading comprehension challenge...</Text></Flex>
-      </Card>
+      <div className={cardClass}>
+        <div className="flex items-center justify-center py-6">
+          <span className="text-text-muted">Loading comprehension challenge...</span>
+        </div>
+      </div>
     )
   }
 
@@ -611,29 +643,27 @@ function ComprehensionStep({
   const correctCount = results.filter((r) => r.keywordMatchRate >= 0.5).length
 
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Flex align="center" gap="2">
-            <FileText size={20} color="var(--accent-11)" />
-            <Text size="5" weight="bold">Comprehension Challenge</Text>
-          </Flex>
-          <Text size="2" color="gray">Translate each Japanese sentence into your native language. We check for key concepts in your answer.</Text>
-        </Flex>
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <FileText size={20} className="text-accent-brand" />
+            <span className="text-[22px] font-bold">Comprehension Challenge</span>
+          </div>
+          <span className="text-[13px] text-text-muted">Translate each Japanese sentence into your native language. We check for key concepts in your answer.</span>
+        </div>
 
-        <Flex justify="between" align="center">
-          <Text size="1" color="gray">{currentIdx + 1} of {items.length}</Text>
-          {results.length > 0 && <Text size="1" color="gray">{correctCount} of {results.length} correct so far</Text>}
-        </Flex>
+        <div className="flex justify-between items-center">
+          <span className="text-[11px] text-text-muted">{currentIdx + 1} of {items.length}</span>
+          {results.length > 0 && <span className="text-[11px] text-text-muted">{correctCount} of {results.length} correct so far</span>}
+        </div>
 
-        <Flex direction="column" align="center" gap="4" py="2">
-          <Card variant="surface" style={{ width: '100%' }}>
-            <Flex align="center" justify="center" p="4">
-              <Text size="5" weight="medium" align="center" style={{ lineHeight: 1.6 }}>{current.sentence}</Text>
-            </Flex>
-          </Card>
+        <div className="flex flex-col items-center gap-4 py-2">
+          <div className="w-full rounded-lg border border-border bg-bg-secondary p-5">
+            <span className="text-xl font-medium text-center leading-relaxed block">{current.sentence}</span>
+          </div>
 
-          <TextArea
+          <Textarea
             ref={textAreaRef}
             placeholder="Type your translation..."
             value={userInput}
@@ -646,80 +676,87 @@ function ComprehensionStep({
               }
             }}
             readOnly={checked}
-            size="3"
-            style={{ width: '100%', minHeight: 80, opacity: checked ? 0.6 : 1 }}
+            className={cn("w-full min-h-[80px]", checked && "opacity-60")}
           />
 
           {checked && (
-            <Flex direction="column" align="center" gap="2" style={{ width: '100%' }}>
+            <div className="flex flex-col items-center gap-2 w-full">
               {lastMatchRate >= 0.5 ? (
-                <Badge size="2" color="green"><Check size={14} /> Good — you got the key ideas!</Badge>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full bg-[rgba(22,163,106,.08)] text-[13px] font-medium text-[#16a34a]">
+                  <Check size={14} /> Good — you got the key ideas!
+                </span>
               ) : lastMatchRate > 0 ? (
-                <Badge size="2" color="yellow">Partial — you got some key concepts</Badge>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full bg-[rgba(245,158,11,.08)] text-[13px] font-medium text-[#f59e0b]">
+                  Partial — you got some key concepts
+                </span>
               ) : (
-                <Badge size="2" color="red"><X size={14} /> Needs work</Badge>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full bg-[rgba(200,87,42,.07)] text-[13px] font-medium text-accent-warm">
+                  <X size={14} /> Needs work
+                </span>
               )}
-              <Text size="1" color="gray">Reference translation:</Text>
-              <Text size="2" weight="medium" align="center" style={{ fontStyle: 'italic' }}>{refTranslation}</Text>
-            </Flex>
+              <span className="text-[11px] text-text-muted">Reference translation:</span>
+              <span className="text-[13px] font-medium text-center italic">{refTranslation}</span>
+            </div>
           )}
-        </Flex>
+        </div>
 
-        <Flex gap="3" justify="between">
-          <Button variant="soft" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
+        <div className="flex gap-3 justify-between">
+          <button className={softBtnClass} onClick={onBack}><ChevronLeft size={16} /> Back</button>
           {!checked ? (
-            <Button onClick={handleCheck} disabled={!userInput.trim()}>Check</Button>
+            <button className={cn(primaryBtnClass, !userInput.trim() && "opacity-50")} onClick={handleCheck} disabled={!userInput.trim()}>Check</button>
           ) : (
-            <Button onClick={handleNext}>{isLast ? 'Continue' : 'Next'} <ChevronRight size={16} /></Button>
+            <button className={primaryBtnClass} onClick={handleNext}>{isLast ? 'Continue' : 'Next'} <ChevronRight size={16} /></button>
           )}
-        </Flex>
-      </Flex>
-    </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 
-// ── Preferences ──
+// -- Preferences --
 
 function PreferencesStep({
   dailyNewItemLimit, onDailyLimitChange, onNext, onBack,
 }: { dailyNewItemLimit: number; onDailyLimitChange: (l: number) => void; onNext: () => void; onBack: () => void }) {
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" gap="5" p="4">
-        <Flex direction="column" gap="2">
-          <Text size="5" weight="bold">Study Preferences</Text>
-          <Text size="2" color="gray">You can always change these later in Settings.</Text>
-        </Flex>
-        <Flex direction="column" gap="3">
-          <Flex justify="between" align="center">
-            <Text size="3" weight="medium">New items per day</Text>
-            <Badge size="2" variant="soft">{dailyNewItemLimit}</Badge>
-          </Flex>
+    <div className={cardClass}>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <span className="text-[22px] font-bold">Study Preferences</span>
+          <span className="text-[13px] text-text-muted">You can always change these later in Settings.</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">New items per day</span>
+            <span className="inline-flex items-center py-0.5 px-2.5 rounded-full bg-bg-secondary text-[13px] font-medium text-text-secondary">
+              {dailyNewItemLimit}
+            </span>
+          </div>
           <Slider value={[dailyNewItemLimit]} onValueChange={([v]) => onDailyLimitChange(v)} min={3} max={30} step={1} />
-          <Flex justify="between">
-            <Text size="1" color="gray">Light (3)</Text>
-            <Text size="1" color="gray">Heavy (30)</Text>
-          </Flex>
-        </Flex>
-        <Card variant="surface">
-          <Flex direction="column" gap="2" p="2">
-            <Text size="2" weight="medium">What this means</Text>
-            <Text size="1" color="gray">
+          <div className="flex justify-between">
+            <span className="text-[11px] text-text-muted">Light (3)</span>
+            <span className="text-[11px] text-text-muted">Heavy (30)</span>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-bg-secondary p-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium">What this means</span>
+            <span className="text-[11px] text-text-muted">
               Each day, up to {dailyNewItemLimit} new vocabulary and grammar items will be introduced
               alongside your review queue.
-            </Text>
-          </Flex>
-        </Card>
-        <Flex gap="3" justify="between">
-          <Button variant="soft" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
-          <Button onClick={onNext}>Continue <ChevronRight size={16} /></Button>
-        </Flex>
-      </Flex>
-    </Card>
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-between">
+          <button className={softBtnClass} onClick={onBack}><ChevronLeft size={16} /> Back</button>
+          <button className={primaryBtnClass} onClick={onNext}>Continue <ChevronRight size={16} /></button>
+        </div>
+      </div>
+    </div>
   )
 }
 
-// ── Complete ──
+// -- Complete --
 
 function CompleteStep({
   knownCount, totalCount, readingCorrect, readingTotal, comprehensionCount,
@@ -736,73 +773,89 @@ function CompleteStep({
   const levelChanged = ready && computedLevel !== getLevelCefrLabel(selfReportedLevel)
 
   return (
-    <Card size="4" style={{ width: '100%' }}>
-      <Flex direction="column" align="center" gap="5" p="4">
-        <Flex align="center" justify="center" style={{ width: 64, height: 64, borderRadius: 'var(--radius-4)', background: 'var(--green-3)' }}>
-          <Sparkles size={32} color="var(--green-11)" />
-        </Flex>
-        <Flex direction="column" align="center" gap="2">
-          <Text size="6" weight="bold">{ready ? "You're all set!" : 'Setting up your profile...'}</Text>
-          <Text size="3" color="gray" align="center" style={{ maxWidth: 400 }}>
+    <div className={cardClass}>
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-16 h-16 rounded-xl bg-[rgba(22,163,106,.08)] flex items-center justify-center">
+          <Sparkles size={32} className="text-[#16a34a]" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-2xl font-bold">{ready ? "You're all set!" : 'Setting up your profile...'}</span>
+          <span className="text-sm text-text-muted text-center max-w-[400px]">
             {ready
               ? "Your personalized learning profile has been created. Here's a summary:"
               : 'Analyzing your results and building your knowledge map...'}
-          </Text>
-        </Flex>
-        <Card variant="surface" style={{ width: '100%' }}>
-          <Flex direction="column" gap="3" p="3">
-            <Flex justify="between">
-              <Text size="2" color="gray">Self-reported level</Text>
-              <Text size="2" weight="medium">{levelLabels[selfReportedLevel]}</Text>
-            </Flex>
-            <Separator size="4" />
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray">Computed level</Text>
+          </span>
+        </div>
+        <div className="w-full rounded-lg border border-border bg-bg-secondary p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between">
+              <span className="text-[13px] text-text-muted">Self-reported level</span>
+              <span className="text-[13px] font-medium">{levelLabels[selfReportedLevel]}</span>
+            </div>
+            <hr className="border-t border-border m-0" />
+            <div className="flex justify-between items-center">
+              <span className="text-[13px] text-text-muted">Computed level</span>
               {ready ? (
-                <Flex align="center" gap="2">
-                  <Badge size="2" color={levelChanged ? 'green' : 'blue'}>{computedLevel}</Badge>
-                  {levelChanged && <Text size="1" color="green">Adjusted from challenges</Text>}
-                </Flex>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "inline-flex items-center py-0.5 px-2.5 rounded-full text-[13px] font-medium",
+                    levelChanged ? "bg-[rgba(22,163,106,.08)] text-[#16a34a]" : "bg-bg-active text-text-secondary"
+                  )}>
+                    {computedLevel}
+                  </span>
+                  {levelChanged && <span className="text-[11px] text-[#16a34a]">Adjusted from challenges</span>}
+                </div>
               ) : (
-                <Text size="2" color="gray">Computing...</Text>
+                <span className="text-[13px] text-text-muted">Computing...</span>
               )}
-            </Flex>
-            <Separator size="4" />
-            <Flex justify="between">
-              <Text size="2" color="gray">Known items</Text>
-              <Text size="2" weight="medium">{knownCount} of {totalCount} assessed</Text>
-            </Flex>
+            </div>
+            <hr className="border-t border-border m-0" />
+            <div className="flex justify-between">
+              <span className="text-[13px] text-text-muted">Known items</span>
+              <span className="text-[13px] font-medium">{knownCount} of {totalCount} assessed</span>
+            </div>
             {readingTotal > 0 && (
               <>
-                <Separator size="4" />
-                <Flex justify="between">
-                  <Text size="2" color="gray">Reading challenge</Text>
-                  <Text size="2" weight="medium">{readingCorrect} of {readingTotal} correct</Text>
-                </Flex>
+                <hr className="border-t border-border m-0" />
+                <div className="flex justify-between">
+                  <span className="text-[13px] text-text-muted">Reading challenge</span>
+                  <span className="text-[13px] font-medium">{readingCorrect} of {readingTotal} correct</span>
+                </div>
               </>
             )}
-            <Separator size="4" />
-            <Flex justify="between">
-              <Text size="2" color="gray">Comprehension</Text>
-              <Text size="2" weight="medium">{comprehensionCount} sentence{comprehensionCount !== 1 ? 's' : ''} translated</Text>
-            </Flex>
-            <Separator size="4" />
-            <Flex justify="between">
-              <Text size="2" color="gray">Target language</Text>
-              <Text size="2" weight="medium">Japanese 🇯🇵</Text>
-            </Flex>
-          </Flex>
-        </Card>
-        <Flex gap="3" style={{ width: '100%' }} direction="column">
-          <Button size="3" onClick={onComplete} disabled={!ready} style={{ width: '100%', cursor: !ready ? 'wait' : 'pointer' }}>
+            <hr className="border-t border-border m-0" />
+            <div className="flex justify-between">
+              <span className="text-[13px] text-text-muted">Comprehension</span>
+              <span className="text-[13px] font-medium">{comprehensionCount} sentence{comprehensionCount !== 1 ? 's' : ''} translated</span>
+            </div>
+            <hr className="border-t border-border m-0" />
+            <div className="flex justify-between">
+              <span className="text-[13px] text-text-muted">Target language</span>
+              <span className="text-[13px] font-medium">Japanese 🇯🇵</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3 w-full flex-col">
+          <button
+            className={cn(
+              primaryBtnClass, "w-full justify-center",
+              !ready && "opacity-50 cursor-wait"
+            )}
+            onClick={onComplete}
+            disabled={!ready}
+          >
             {ready ? 'Start Learning' : 'Setting up...'}
-          </Button>
-          <Button variant="soft" onClick={onBack} style={{ width: '100%' }} disabled={submitting}>
+          </button>
+          <button
+            className={cn(softBtnClass, "w-full justify-center", submitting && "opacity-50")}
+            onClick={onBack}
+            disabled={submitting}
+          >
             <ChevronLeft size={16} /> Go Back
-          </Button>
-        </Flex>
-      </Flex>
-    </Card>
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

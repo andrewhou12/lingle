@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Box, Card, Flex, Text, Button, Badge, Kbd, TextField } from '@radix-ui/themes'
+import { Input } from '@/components/ui/input'
 import type { ReviewQueueItem, ReviewGrade } from '@linguist/shared/types'
-import { MASTERY_COLORS, formatMasteryLabel } from '@/constants/mastery'
+import { formatMasteryLabel } from '@/constants/mastery'
 
 interface ReviewCardProps {
   item: ReviewQueueItem
@@ -11,13 +11,26 @@ interface ReviewCardProps {
 }
 
 const GRADE_CONFIG: Array<{
-  grade: ReviewGrade; label: string; color: 'red' | 'orange' | 'green' | 'blue'; key: string
+  grade: ReviewGrade; label: string; color: string; bg: string; key: string
 }> = [
-  { grade: 'again', label: 'Again', color: 'red', key: '1' },
-  { grade: 'hard', label: 'Hard', color: 'orange', key: '2' },
-  { grade: 'good', label: 'Good', color: 'green', key: '3' },
-  { grade: 'easy', label: 'Easy', color: 'blue', key: '4' },
+  { grade: 'again', label: 'Again', color: 'var(--accent-warm)', bg: 'rgba(200,87,42,.06)', key: '1' },
+  { grade: 'hard', label: 'Hard', color: '#f59e0b', bg: 'rgba(245,158,11,.06)', key: '2' },
+  { grade: 'good', label: 'Good', color: '#16a34a', bg: 'rgba(22,163,106,.06)', key: '3' },
+  { grade: 'easy', label: 'Easy', color: '#3b82f6', bg: 'rgba(59,130,246,.06)', key: '4' },
 ]
+
+const MASTERY_STYLES: Record<string, { bg: string; color: string }> = {
+  unseen: { bg: 'var(--bg-secondary)', color: 'var(--text-muted)' },
+  introduced: { bg: 'var(--bg-secondary)', color: 'var(--text-muted)' },
+  apprentice_1: { bg: 'rgba(245,158,11,.08)', color: '#f59e0b' },
+  apprentice_2: { bg: 'rgba(245,158,11,.08)', color: '#f59e0b' },
+  apprentice_3: { bg: 'rgba(245,158,11,.08)', color: '#f59e0b' },
+  apprentice_4: { bg: 'rgba(245,158,11,.08)', color: '#f59e0b' },
+  journeyman: { bg: 'rgba(59,130,246,.08)', color: '#3b82f6' },
+  expert: { bg: 'rgba(22,163,106,.08)', color: '#16a34a' },
+  master: { bg: 'rgba(139,92,246,.08)', color: '#8b5cf6' },
+  burned: { bg: 'rgba(245,158,11,.08)', color: '#f59e0b' },
+}
 
 export function ReviewCard({ item, onGrade }: ReviewCardProps) {
   const [side, setSide] = useState<'front' | 'back'>('front')
@@ -52,70 +65,86 @@ export function ReviewCard({ item, onGrade }: ReviewCardProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [side, isProduction, showAnswer, handleGrade])
 
+  const masteryStyle = MASTERY_STYLES[item.masteryState] ?? { bg: 'var(--bg-secondary)', color: 'var(--text-muted)' }
+
   return (
-    <Card style={{ maxWidth: 500, margin: '0 auto', padding: 32, minHeight: 300 }}>
+    <div className="max-w-[500px] mx-auto rounded-xl border border-border bg-bg p-8 min-h-[300px]">
       {side === 'front' ? (
-        <Flex direction="column" align="center" justify="center" gap="4" style={{ minHeight: 220 }}>
+        <div className="flex flex-col items-center justify-center gap-4 min-h-[220px]">
           {isProduction ? (
             <>
-              <Text size="2" color="gray">Produce the word for:</Text>
-              <Text size="7" weight="bold" align="center">{item.meaning}</Text>
-              {item.reading && <Text size="3" color="gray">Reading: {item.reading}</Text>}
-              <Box style={{ width: '100%', maxWidth: 300, marginTop: 8 }}>
-                <TextField.Root
-                  size="3"
+              <span className="text-[13px] text-text-muted">Produce the word for:</span>
+              <span className="text-[28px] font-bold text-center">{item.meaning}</span>
+              {item.reading && <span className="text-[15px] text-text-muted">Reading: {item.reading}</span>}
+              <div className="w-full max-w-[300px] mt-2">
+                <Input
                   placeholder="Type your answer..."
                   value={typedAnswer}
                   onChange={(e) => setTypedAnswer(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); showAnswer() } }}
                   autoFocus
+                  className="text-base"
                 />
-              </Box>
-              <Button size="3" variant="soft" onClick={showAnswer} mt="2">
-                Submit <Kbd>Enter</Kbd>
-              </Button>
+              </div>
+              <button
+                className="mt-2 inline-flex items-center gap-2 rounded-md bg-bg-secondary px-5 py-2.5 text-[15px] font-medium text-text-secondary border-none cursor-pointer transition-colors hover:bg-bg-hover"
+                onClick={showAnswer}
+              >
+                Submit <kbd className="ml-1 rounded border border-border bg-bg-active px-1.5 py-0.5 text-[11px] font-mono">Enter</kbd>
+              </button>
             </>
           ) : (
             <>
-              <Text size="2" color="gray">What does this mean?</Text>
-              <Text size="9" weight="bold" align="center" style={{ lineHeight: 1.3 }}>{item.surfaceForm}</Text>
-              {item.reading && <Text size="4" color="gray">{item.reading}</Text>}
-              <Button size="3" variant="soft" onClick={showAnswer} mt="4">
-                Show Answer <Kbd>Space</Kbd>
-              </Button>
+              <span className="text-[13px] text-text-muted">What does this mean?</span>
+              <span className="text-[44px] font-bold text-center leading-tight">{item.surfaceForm}</span>
+              {item.reading && <span className="text-lg text-text-muted">{item.reading}</span>}
+              <button
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-bg-secondary px-5 py-2.5 text-[15px] font-medium text-text-secondary border-none cursor-pointer transition-colors hover:bg-bg-hover"
+                onClick={showAnswer}
+              >
+                Show Answer <kbd className="ml-1 rounded border border-border bg-bg-active px-1.5 py-0.5 text-[11px] font-mono">Space</kbd>
+              </button>
             </>
           )}
-        </Flex>
+        </div>
       ) : (
-        <Flex direction="column" align="center" gap="4" style={{ minHeight: 220 }}>
-          <Flex direction="column" align="center" gap="2">
-            <Text size="7" weight="bold">{item.surfaceForm}</Text>
-            {item.reading && <Text size="4" color="gray">{item.reading}</Text>}
-          </Flex>
-          <Text size="5" align="center">{item.meaning}</Text>
-          <Badge color={MASTERY_COLORS[item.masteryState] ?? 'gray'}>
+        <div className="flex flex-col items-center gap-4 min-h-[220px]">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[28px] font-bold">{item.surfaceForm}</span>
+            {item.reading && <span className="text-lg text-text-muted">{item.reading}</span>}
+          </div>
+          <span className="text-xl text-center">{item.meaning}</span>
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+            style={{ background: masteryStyle.bg, color: masteryStyle.color }}
+          >
             {formatMasteryLabel(item.masteryState)}
-          </Badge>
+          </span>
           {isProduction && typedAnswer && (
-            <Box
+            <div
+              className="w-full max-w-[300px] px-4 py-2 rounded-md text-center"
               style={{
-                padding: '8px 16px', borderRadius: 'var(--radius-2)',
-                backgroundColor: typedAnswer.trim() === item.surfaceForm ? 'var(--green-3)' : 'var(--red-3)',
-                width: '100%', maxWidth: 300, textAlign: 'center',
+                background: typedAnswer.trim() === item.surfaceForm ? 'rgba(22,163,106,.06)' : 'rgba(200,87,42,.06)',
               }}
             >
-              <Text size="3">Your answer: <strong>{typedAnswer}</strong></Text>
-            </Box>
+              <span className="text-[15px]">Your answer: <strong>{typedAnswer}</strong></span>
+            </div>
           )}
-          <Flex gap="2" mt="4" wrap="wrap" justify="center">
-            {GRADE_CONFIG.map(({ grade, label, color, key }) => (
-              <Button key={grade} size="3" variant="soft" color={color} onClick={() => handleGrade(grade)} style={{ minWidth: 90 }}>
-                {label} <Kbd>{key}</Kbd>
-              </Button>
+          <div className="flex gap-2 mt-4 flex-wrap justify-center">
+            {GRADE_CONFIG.map(({ grade, label, color, bg, key }) => (
+              <button
+                key={grade}
+                className="min-w-[90px] inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-[15px] font-medium border-none cursor-pointer transition-opacity hover:opacity-80"
+                style={{ color, background: bg }}
+                onClick={() => handleGrade(grade)}
+              >
+                {label}
+                <kbd className="ml-1 rounded border border-border bg-white/50 px-1.5 py-0.5 text-[11px] font-mono">{key}</kbd>
+              </button>
             ))}
-          </Flex>
-        </Flex>
+          </div>
+        </div>
       )}
-    </Card>
+    </div>
   )
 }

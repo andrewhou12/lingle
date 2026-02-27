@@ -1,20 +1,27 @@
 import type { Metadata } from 'next'
-import { Inter, Shippori_Mincho } from 'next/font/google'
-import { Theme } from '@radix-ui/themes'
-import '@radix-ui/themes/styles.css'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
+import { Fraunces, Noto_Serif_JP } from 'next/font/google'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const shipporiMincho = Shippori_Mincho({
-  weight: ['400', '600', '700'],
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
+  variable: '--font-fraunces',
+  display: 'swap',
+})
+
+const notoSerifJP = Noto_Serif_JP({
+  weight: ['300', '400', '500', '600', '700'],
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-shippori',
+  variable: '--font-noto-serif-jp',
 })
 
 export const metadata: Metadata = {
-  title: 'Linguist',
-  description: 'Language learning with adaptive knowledge modeling',
+  title: 'Linguist — Modern Language Learning',
+  description: 'The first Japanese learning system with a live model of exactly what you know.',
 }
 
 export default function RootLayout({
@@ -25,13 +32,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${shipporiMincho.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable} ${notoSerifJP.variable}`}
       suppressHydrationWarning
     >
       <body>
-        <Theme appearance="light" accentColor="blue" radius="large">
+        <TooltipProvider>
           {children}
-        </Theme>
+        </TooltipProvider>
       </body>
     </html>
   )

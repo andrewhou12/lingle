@@ -1,6 +1,5 @@
 'use client'
 
-import { Box, Heading, Text, Flex, Progress } from '@radix-ui/themes'
 import { useReview } from '@/hooks/use-review'
 import { ReviewCard } from './review-card'
 import { SessionSummary } from './session-summary'
@@ -14,22 +13,22 @@ export default function ReviewPage() {
 
   if (isLoading) {
     return (
-      <Box>
-        <Heading size="7" mb="4">Review</Heading>
-        <Flex align="center" gap="3" mt="6">
+      <div>
+        <h1 className="text-[28px] font-bold mb-4">Review</h1>
+        <div className="flex items-center gap-3 mt-6">
           <Spinner size={18} />
-          <Text size="2" color="gray">Loading review queue...</Text>
-        </Flex>
-      </Box>
+          <span className="text-[13px] text-text-muted">Loading review queue...</span>
+        </div>
+      </div>
     )
   }
 
   if (queue.length === 0) {
     return (
-      <Box>
-        <Heading size="7" mb="4">Review</Heading>
-        <Text>No items due for review. Check back later!</Text>
-      </Box>
+      <div>
+        <h1 className="text-[28px] font-bold mb-4">Review</h1>
+        <p>No items due for review. Check back later!</p>
+      </div>
     )
   }
 
@@ -50,13 +49,18 @@ export default function ReviewPage() {
   }
 
   return (
-    <Box>
-      <Flex justify="between" align="center" mb="2">
-        <Heading size="5">Review</Heading>
-        <Text size="2" color="gray">{currentIndex + 1} / {queue.length}</Text>
-      </Flex>
-      <Progress value={progress} size="1" mb="6" />
+    <div>
+      <div className="flex justify-between items-center mb-2">
+        <h2 className="text-xl font-bold">Review</h2>
+        <span className="text-[13px] text-text-muted">{currentIndex + 1} / {queue.length}</span>
+      </div>
+      <div className="h-1 rounded-sm bg-bg-active overflow-hidden mb-6">
+        <div
+          className="h-full rounded-sm bg-accent-brand transition-[width] duration-300 ease-in-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
       {currentItem && <ReviewCard item={currentItem} onGrade={handleGrade} />}
-    </Box>
+    </div>
   )
 }

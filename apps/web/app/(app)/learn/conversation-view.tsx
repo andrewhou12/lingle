@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Flex, Text, Badge, Button, IconButton } from '@radix-ui/themes'
 import { ArrowUp, Square } from 'lucide-react'
 import type { ConversationMessage, ExpandedSessionPlan } from '@linguist/shared/types'
 import { Spinner } from '@/components/spinner'
 import { MessageBubble } from '@/components/message-bubble'
+import { cn } from '@/lib/utils'
 
 interface ConversationViewProps {
   plan: ExpandedSessionPlan
@@ -57,64 +57,51 @@ export function ConversationView({
   )
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="h-full flex flex-col">
       {/* Session info bar */}
-      <Flex
-        align="center"
-        justify="between"
-        px="4"
-        py="2"
-        style={{ borderBottom: '1px solid var(--gray-5)', flexShrink: 0 }}
-      >
-        <Flex align="center" gap="3">
-          <Text size="2" weight="medium">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] font-medium">
             {plan.sessionFocus}
-          </Text>
-          <Badge size="1" variant="soft">
+          </span>
+          <span className="inline-flex items-center py-0.5 px-2 rounded-full bg-bg-secondary text-[11px] font-medium text-text-secondary">
             {plan.difficultyLevel}
-          </Badge>
-          <Badge size="1" variant="outline" color="gray">
+          </span>
+          <span className="inline-flex items-center py-0.5 px-2 rounded-full border border-border text-[11px] text-text-muted">
             {plan.register}
-          </Badge>
-        </Flex>
-        <Button variant="soft" color="red" size="2" onClick={onEnd}>
+          </span>
+        </div>
+        <button
+          className="inline-flex items-center gap-1.5 rounded-md bg-[rgba(200,87,42,.06)] py-1.5 px-3 text-[13px] font-medium text-accent-warm border-none cursor-pointer transition-colors duration-150 hover:bg-[rgba(200,87,42,.12)]"
+          onClick={onEnd}
+        >
           <Square size={12} />
           End Session
-        </Button>
-      </Flex>
+        </button>
+      </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ maxWidth: 768, margin: '0 auto', padding: '16px 24px' }}>
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-3xl mx-auto px-6 py-4">
           {messages.map((msg, i) => (
             <MessageBubble key={i} message={msg} />
           ))}
           {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-            <Flex align="center" gap="2" py="3">
+            <div className="flex items-center gap-2 py-3">
               <Spinner size={16} />
-              <Text size="2" color="gray">
+              <span className="text-[13px] text-text-muted">
                 Thinking...
-              </Text>
-            </Flex>
+              </span>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
       {/* Input area */}
-      <div style={{ padding: '12px 24px 24px' }}>
-        <div style={{ maxWidth: 768, margin: '0 auto' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'end',
-              gap: 8,
-              border: '1px solid var(--gray-6)',
-              borderRadius: 24,
-              padding: '8px 8px 8px 20px',
-              backgroundColor: 'var(--gray-2)',
-            }}
-          >
+      <div className="px-6 pt-3 pb-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-end gap-2 border border-border rounded-3xl py-2 pr-2 pl-5 bg-bg-secondary">
             <textarea
               ref={textareaRef}
               value={input}
@@ -125,29 +112,18 @@ export function ConversationView({
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
               rows={1}
-              style={{
-                flex: 1,
-                resize: 'none',
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--gray-12)',
-                fontSize: 15,
-                lineHeight: 1.5,
-                fontFamily: 'inherit',
-                outline: 'none',
-                padding: '4px 0',
-                maxHeight: 200,
-              }}
+              className="flex-1 resize-none border-none bg-transparent text-text-primary text-[15px] leading-normal font-[inherit] outline-none py-1 max-h-[200px]"
             />
-            <IconButton
-              size="2"
-              variant="solid"
+            <button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              style={{ borderRadius: '50%', flexShrink: 0 }}
+              className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-full shrink-0 bg-accent-brand text-white border-none cursor-pointer transition-opacity duration-150",
+                (!input.trim() || isLoading) && "opacity-40"
+              )}
             >
               <ArrowUp size={16} />
-            </IconButton>
+            </button>
           </div>
         </div>
       </div>

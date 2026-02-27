@@ -358,6 +358,7 @@ export interface ExpandedSessionPlan extends SessionPlan {
     patternId: string
     novelContext: string
   }>
+  cardBudget?: number
 }
 
 // ── Dashboard Weekly Stats ──
