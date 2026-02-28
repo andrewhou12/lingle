@@ -3,8 +3,6 @@ import { withAuth } from '@/lib/api-helpers'
 import OpenAI from 'openai'
 import { parseMessage } from '@/lib/message-parser'
 
-const openai = new OpenAI()
-
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 
 export const POST = withAuth(async (request) => {
@@ -26,6 +24,7 @@ export const POST = withAuth(async (request) => {
     return NextResponse.json({ error: 'no speakable text' }, { status: 400 })
   }
 
+  const openai = new OpenAI()
   const response = await openai.audio.speech.create({
     model: 'tts-1',
     voice: 'shimmer',
