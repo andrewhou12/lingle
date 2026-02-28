@@ -152,9 +152,6 @@ export function SessionSummaryModal({ isOpen, onClose, analysis, plan, durationS
           >
             Close
           </button>
-          <button className="py-2.5 px-4 rounded-xl bg-bg-secondary text-text-secondary text-[14px] font-medium border border-border cursor-pointer transition-colors hover:bg-bg-hover">
-            See Full Report
-          </button>
         </div>
       </div>
     </div>

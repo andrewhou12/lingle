@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Square } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport, type UIMessage } from 'ai'
 import type {
   ExpandedSessionPlan,
-  ConversationMessage,
   PostSessionAnalysis,
 } from '@linguist/shared/types'
 import { api } from '@/lib/api'
-import { parseMessage, extractTargetsHit, type MessageSegment } from '@/lib/message-parser'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import { useRomaji, useAnnotatedTexts } from '@/hooks/use-romaji'
 import { useTTS } from '@/hooks/use-tts'
@@ -37,28 +37,82 @@ export default function ConversationPage() {
   const [phase, setPhase] = useState<Phase>('planning')
   const [sessionPlan, setSessionPlan] = useState<ExpandedSessionPlan | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [analysis, setAnalysis] = useState<PostSessionAnalysis | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSending, setIsSending] = useState(false)
-  const [streamingContent, setStreamingContent] = useState('')
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [targetsHit, setTargetsHit] = useState<Set<string>>(new Set())
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const sessionStartTime = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  sessionIdRef.current = sessionId
   const { showRomaji, toggle: toggleRomaji } = useRomaji()
+  const tts = useTTS()
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/conversation/send',
+        body: () => (sessionIdRef.current ? { sessionId: sessionIdRef.current } : {}),
+      }),
+    []
+  )
+
+  const {
+    messages,
+    sendMessage,
+    status,
+    setMessages,
+  } = useChat({ transport })
+
+  const isSending = status === 'streaming' || status === 'submitted'
+
+  // Extract text from assistant messages for romaji annotation
   const assistantTexts = useMemo(
-    () => messages.filter((m) => m.role === 'assistant').map((m) => m.content),
+    () =>
+      messages
+        .filter((m) => m.role === 'assistant')
+        .map((m) => {
+          const textParts = m.parts.filter((p) => p.type === 'text')
+          return textParts.map((p) => (p as { type: 'text'; text: string }).text).join('')
+        }),
     [messages]
   )
   const { getAnnotated } = useAnnotatedTexts(assistantTexts, showRomaji)
-  const tts = useTTS()
+
+  // Extract targets hit from markTargetsHit tool calls
+  useEffect(() => {
+    const newHits = new Set<string>()
+    for (const msg of messages) {
+      if (msg.role !== 'assistant') continue
+      for (const part of msg.parts) {
+        if (
+          'type' in part &&
+          typeof part.type === 'string' &&
+          part.type === 'tool-markTargetsHit' &&
+          'state' in part &&
+          part.state === 'output-available' &&
+          'output' in part
+        ) {
+          const output = part.output as { vocab_ids?: string[]; grammar_ids?: string[] }
+          for (const id of output.vocab_ids ?? []) newHits.add(id)
+          for (const id of output.grammar_ids ?? []) newHits.add(id)
+        }
+      }
+    }
+    if (newHits.size > 0) {
+      setTargetsHit((prev) => {
+        const next = new Set(prev)
+        for (const h of newHits) next.add(h)
+        return next
+      })
+    }
+  }, [messages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }, [messages])
 
   const handleStartSession = useCallback(async () => {
     setIsLoading(true)
@@ -76,50 +130,14 @@ export default function ConversationPage() {
       setError(err instanceof Error ? err.message : 'Failed to start session. Please try again.')
     }
     setIsLoading(false)
-  }, [])
+  }, [setMessages])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isSending) return
     const text = input.trim()
     setInput('')
-
-    const userMsg: ConversationMessage = {
-      role: 'user',
-      content: text,
-      timestamp: new Date().toISOString(),
-    }
-    setMessages((prev) => [...prev, userMsg])
-    setIsSending(true)
-    setStreamingContent('')
-
-    try {
-      await api.conversationSendStream(
-        sessionId,
-        text,
-        (delta) => {
-          setStreamingContent((prev) => prev + delta)
-        },
-        (message) => {
-          setMessages((prev) => [...prev, message])
-          setStreamingContent('')
-          const hits = extractTargetsHit(message.content)
-          if (hits.length > 0) {
-            setTargetsHit((prev) => {
-              const next = new Set(prev)
-              for (const h of hits) next.add(h)
-              return next
-            })
-          }
-        },
-        (error) => {
-          console.error('Stream error:', error)
-        }
-      )
-    } catch (err) {
-      console.error('Failed to send message:', err)
-    }
-    setIsSending(false)
-  }, [input, sessionId, isSending])
+    await sendMessage({ text })
+  }, [input, sessionId, isSending, sendMessage])
 
   const handleSuggestionSelect = useCallback((text: string) => {
     setInput(text)
@@ -150,9 +168,8 @@ export default function ConversationPage() {
     setMessages([])
     setAnalysis(null)
     setTargetsHit(new Set())
-    setStreamingContent('')
     setShowSummaryModal(false)
-  }, [])
+  }, [setMessages])
 
   // Planning Phase
   if (phase === 'planning') {
@@ -299,25 +316,31 @@ export default function ConversationPage() {
       {/* Messages */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-6 py-4">
-          {messages.map((msg, i) => (
-            <MessageSegmentRenderer
-              key={i}
+          {messages.map((msg) => (
+            <UIMessageRenderer
+              key={msg.id}
               message={msg}
               showRomaji={showRomaji}
               getAnnotated={getAnnotated}
-              onPlay={msg.role === 'assistant' ? () => tts.play(msg.timestamp, msg.content) : undefined}
-              onStop={msg.role === 'assistant' ? tts.stop : undefined}
-              isPlayingAudio={tts.playingId === msg.timestamp}
+              onPlay={
+                msg.role === 'assistant' && msg.parts.some((p) => p.type === 'text' && (p as { type: 'text'; text: string }).text.trim())
+                  ? () => {
+                      const textContent = msg.parts
+                        .filter((p) => p.type === 'text')
+                        .map((p) => (p as { type: 'text'; text: string }).text)
+                        .join('')
+                      tts.play(msg.id, textContent)
+                    }
+                  : undefined
+              }
+              onStop={msg.role === 'assistant' && msg.parts.some((p) => p.type === 'text' && (p as { type: 'text'; text: string }).text.trim()) ? tts.stop : undefined}
+              isPlayingAudio={tts.playingId === msg.id}
+              isStreaming={isSending && msg === messages[messages.length - 1] && msg.role === 'assistant'}
             />
           ))}
 
-          {/* Streaming content */}
-          {streamingContent && (
-            <MessageBlock role="assistant" content={streamingContent} isStreaming showRomaji={showRomaji} />
-          )}
-
           {/* Loading indicator */}
-          {isSending && !streamingContent && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+          {isSending && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
             <div className="flex items-center gap-2.5 py-3 pl-10">
               <Spinner size={14} />
               <span className="text-[13px] text-text-muted">Thinking...</span>
@@ -360,75 +383,112 @@ export default function ConversationPage() {
   )
 }
 
-// Message rendering with structured cards
+// Parts-based message rendering
 
-function MessageSegmentRenderer({ message, showRomaji, getAnnotated, onPlay, onStop, isPlayingAudio }: {
-  message: ConversationMessage
+function UIMessageRenderer({
+  message,
+  showRomaji,
+  getAnnotated,
+  onPlay,
+  onStop,
+  isPlayingAudio,
+  isStreaming,
+}: {
+  message: UIMessage
   showRomaji: boolean
   getAnnotated: (text: string) => string
   onPlay?: () => void
   onStop?: () => void
   isPlayingAudio?: boolean
+  isStreaming?: boolean
 }) {
   if (message.role === 'user') {
+    const textContent = message.parts
+      .filter((p) => p.type === 'text')
+      .map((p) => (p as { type: 'text'; text: string }).text)
+      .join('')
     return (
       <MessageBlock
         role="user"
-        content={message.content}
-        timestamp={message.timestamp}
+        content={textContent}
       />
     )
   }
 
-  const annotatedContent = showRomaji ? getAnnotated(message.content) : message.content
-  const segments = parseMessage(annotatedContent)
-
+  // Assistant message — render parts
   return (
     <MessageBlock
       role="assistant"
       content=""
-      timestamp={message.timestamp}
       showRomaji={showRomaji}
       onPlay={onPlay}
       onStop={onStop}
       isPlayingAudio={isPlayingAudio}
+      isStreaming={isStreaming}
     >
-      {segments.map((segment, i) => (
-        <SegmentComponent key={i} segment={segment} showRomaji={showRomaji} />
+      {message.parts.map((part, i) => (
+        <PartRenderer key={i} part={part} showRomaji={showRomaji} getAnnotated={getAnnotated} />
       ))}
     </MessageBlock>
   )
 }
 
-function SegmentComponent({ segment, showRomaji }: { segment: MessageSegment; showRomaji: boolean }) {
-  switch (segment.type) {
-    case 'vocab_card':
-      return <VocabCard segment={segment} />
-    case 'grammar_card':
-      return <GrammarCard segment={segment} />
-    case 'correction':
-      return <CorrectionCard segment={segment} />
-    case 'review_prompt':
-      return <ReviewPromptCard segment={segment} />
-    case 'targets_hit':
-      return null
-    case 'text':
-    default:
-      if (!segment.content.trim()) return null
-      if (showRomaji) {
-        return (
-          <RomajiText
-            text={segment.content}
-            className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]"
-          />
-        )
-      }
+function PartRenderer({
+  part,
+  showRomaji,
+  getAnnotated,
+}: {
+  part: UIMessage['parts'][number]
+  showRomaji: boolean
+  getAnnotated: (text: string) => string
+}) {
+  // Type narrowing via the type field
+  if (part.type === 'text') {
+    const text = (part as { type: 'text'; text: string }).text
+    if (!text.trim()) return null
+    const displayText = showRomaji ? getAnnotated(text) : text
+    if (showRomaji) {
       return (
-        <div className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]">
-          <Markdown remarkPlugins={[remarkGfm]}>
-            {stripRubyAnnotations(segment.content)}
-          </Markdown>
-        </div>
+        <RomajiText
+          text={displayText}
+          className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]"
+        />
       )
+    }
+    return (
+      <div className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]">
+        <Markdown remarkPlugins={[remarkGfm]}>
+          {stripRubyAnnotations(displayText)}
+        </Markdown>
+      </div>
+    )
   }
+
+  // Tool invocations — match by type prefix 'tool-*'
+  const partType = part.type as string
+  const toolPart = part as { type: string; state: string; input?: unknown; output?: unknown }
+
+  if (partType === 'tool-displayVocabCard' && toolPart.state === 'output-available' && toolPart.output) {
+    return <VocabCard data={toolPart.output as { surface: string; reading?: string; meaning: string; example?: string; example_translation?: string }} />
+  }
+
+  if (partType === 'tool-displayGrammarCard' && toolPart.state === 'output-available' && toolPart.output) {
+    return <GrammarCard data={toolPart.output as { pattern: string; meaning: string; formation?: string; example?: string; example_translation?: string }} />
+  }
+
+  if (partType === 'tool-displayCorrection' && toolPart.state === 'output-available' && toolPart.output) {
+    return <CorrectionCard data={toolPart.output as { incorrect: string; correct: string; error_type?: string; explanation?: string }} />
+  }
+
+  if (partType === 'tool-displayReviewPrompt' && toolPart.state === 'output-available' && toolPart.output) {
+    return <ReviewPromptCard data={toolPart.output as { prompt: string; answer: string; item_type?: string; item_id?: string }} />
+  }
+
+  // markTargetsHit and other tool types — hidden
+  if (partType.startsWith('tool-')) {
+    return null
+  }
+
+  // step-start, reasoning, etc. — ignore
+  return null
 }
