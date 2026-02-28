@@ -67,41 +67,41 @@ class LinguistApiClient {
   // Conversation
   conversationPlan = () =>
     this.request<ExpandedSessionPlan & { _sessionId: string }>('/conversation/plan', { method: 'POST' })
-  conversationSend = (sessionId: string, message: string) =>
-    this.request<ConversationMessage>('/conversation/send', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId, message }),
-    })
-  conversationSendStream = async (
-    sessionId: string,
-    message: string,
-    onDelta: (text: string) => void,
-    onDone: (message: ConversationMessage) => void,
-    onError?: (error: string) => void
-  ) => {
+  // Simple non-streaming send for pages that don't use useChat (e.g. learn page)
+  conversationSend = async (sessionId: string, message: string): Promise<ConversationMessage> => {
+    const userMsg = {
+      id: crypto.randomUUID(),
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: message }],
+    }
     const res = await fetch('/api/conversation/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, message, stream: true }),
+      body: JSON.stringify({ sessionId, messages: [userMsg] }),
     })
     if (!res.ok) throw new Error(`API error: ${res.status}`)
+    // Read the UI message stream to extract text
     const reader = res.body?.getReader()
     if (!reader) throw new Error('No response body')
     const decoder = new TextDecoder()
-    let buffer = ''
+    let fullText = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n\n')
-      buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const json = JSON.parse(line.slice(6))
-        if (json.type === 'delta') onDelta(json.text)
-        else if (json.type === 'done') onDone(json.message)
-        else if (json.type === 'error') onError?.(json.error)
+      const chunk = decoder.decode(value, { stream: true })
+      // Extract text parts from the stream (format: 0:text\n)
+      for (const line of chunk.split('\n')) {
+        if (line.startsWith('0:')) {
+          try {
+            fullText += JSON.parse(line.slice(2))
+          } catch { /* skip non-text chunks */ }
+        }
       }
+    }
+    return {
+      role: 'assistant',
+      content: fullText,
+      timestamp: new Date().toISOString(),
     }
   }
   conversationEnd = (sessionId: string) =>

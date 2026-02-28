@@ -4,12 +4,50 @@ import { useState } from 'react'
 import { BookOpen, Languages, HelpCircle } from 'lucide-react'
 import type { MessageSegment } from '@/lib/message-parser'
 
-interface CardProps {
-  segment: MessageSegment
+// Tool output types matching the Zod schemas in conversation-tools.ts
+export interface VocabCardData {
+  surface: string
+  reading?: string
+  meaning: string
+  example?: string
+  example_translation?: string
 }
 
-export function VocabCard({ segment }: CardProps) {
-  const d = segment.data ?? {}
+export interface GrammarCardData {
+  pattern: string
+  meaning: string
+  formation?: string
+  example?: string
+  example_translation?: string
+}
+
+export interface CorrectionCardData {
+  incorrect: string
+  correct: string
+  error_type?: string
+  explanation?: string
+}
+
+export interface ReviewPromptCardData {
+  prompt: string
+  answer: string
+  item_type?: string
+  item_id?: string
+}
+
+// Union prop types: accept either tool output data or legacy MessageSegment
+type VocabCardProps = { data: VocabCardData } | { segment: MessageSegment }
+type GrammarCardProps = { data: GrammarCardData } | { segment: MessageSegment }
+type CorrectionCardProps = { data: CorrectionCardData } | { segment: MessageSegment }
+type ReviewPromptCardProps = { data: ReviewPromptCardData } | { segment: MessageSegment }
+
+function resolveData<T>(props: { data: T } | { segment: MessageSegment }): Record<string, string | undefined> {
+  if ('data' in props) return props.data as unknown as Record<string, string | undefined>
+  return (props.segment.data ?? {}) as Record<string, string | undefined>
+}
+
+export function VocabCard(props: VocabCardProps) {
+  const d = resolveData(props)
   return (
     <div className="my-2 max-w-[480px] rounded-xl border border-border bg-bg p-4 border-l-[3px] border-l-blue-500">
       <div className="flex flex-col gap-2">
@@ -37,8 +75,8 @@ export function VocabCard({ segment }: CardProps) {
   )
 }
 
-export function GrammarCard({ segment }: CardProps) {
-  const d = segment.data ?? {}
+export function GrammarCard(props: GrammarCardProps) {
+  const d = resolveData(props)
   return (
     <div className="my-2 max-w-[480px] rounded-xl border border-border bg-bg p-4 border-l-[3px] border-l-violet-500">
       <div className="flex flex-col gap-2">
@@ -66,9 +104,9 @@ export function GrammarCard({ segment }: CardProps) {
   )
 }
 
-export function CorrectionCard({ segment }: CardProps) {
-  const d = segment.data ?? {}
-  const badgeType = d.error_type || d.badge || 'Grammar'
+export function CorrectionCard(props: CorrectionCardProps) {
+  const d = resolveData(props)
+  const badgeType = d.error_type || 'Grammar'
 
   const badgeColors: Record<string, string> = {
     'Style tip': 'bg-blue-soft text-blue',
@@ -102,9 +140,9 @@ export function CorrectionCard({ segment }: CardProps) {
   )
 }
 
-export function ReviewPromptCard({ segment }: CardProps) {
+export function ReviewPromptCard(props: ReviewPromptCardProps) {
   const [showAnswer, setShowAnswer] = useState(false)
-  const d = segment.data ?? {}
+  const d = resolveData(props)
   return (
     <div className="my-2 max-w-[480px] rounded-xl border border-border bg-bg p-4 border-l-[3px] border-l-[var(--accent-brand)]">
       <div className="flex flex-col gap-2">
@@ -115,13 +153,17 @@ export function ReviewPromptCard({ segment }: CardProps) {
           </span>
         </div>
         <span className="text-[15px] font-medium">{d.prompt ?? ''}</span>
-        {!showAnswer && (
+        {!showAnswer ? (
           <button
             className="self-start rounded-md bg-bg-secondary border border-border px-3 py-1 text-xs font-medium text-text-secondary cursor-pointer transition-colors duration-100 hover:bg-bg-hover"
             onClick={() => setShowAnswer(true)}
           >
             Show Answer
           </button>
+        ) : (
+          <div className="mt-1 p-2 bg-bg-secondary rounded-md border border-border-subtle">
+            <span className="text-[14px] font-jp">{d.answer ?? ''}</span>
+          </div>
         )}
       </div>
     </div>

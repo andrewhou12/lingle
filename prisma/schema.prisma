@@ -85,6 +85,7 @@ model LexicalItem {
   contextLogs         ItemContextLog[]
 
   @@index([userId])
+  @@index([userId, surfaceForm])
 }
 
 model GrammarItem {

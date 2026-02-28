@@ -11,7 +11,8 @@
     "typecheck": "turbo typecheck",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "build:dict": "tsx packages/core/src/ime/build-dictionary-index.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
