@@ -118,7 +118,7 @@ function VocabularyTab() {
     }
   }, [reload])
 
-  if (isLoading) return <LoadingSkeleton />
+  if (isLoading && items.length === 0) return <LoadingSkeleton />
 
   return (
     <>
@@ -277,7 +277,7 @@ function GrammarTab() {
     }
   }, [reload])
 
-  if (isLoading) return <LoadingSkeleton />
+  if (isLoading && items.length === 0) return <LoadingSkeleton />
 
   return (
     <>
@@ -379,7 +379,7 @@ function PhrasesTab() {
     setFilters(Object.keys(f).length > 0 ? f : undefined)
   }
 
-  if (isLoading) return <LoadingSkeleton />
+  if (isLoading && items.length === 0) return <LoadingSkeleton />
 
   const kindLabels: Record<string, string> = {
     collocation: 'Collocation',

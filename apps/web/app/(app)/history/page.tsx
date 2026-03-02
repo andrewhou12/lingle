@@ -27,7 +27,7 @@ export default function HistoryPage() {
     <div>
       <h1 className="text-[28px] font-bold mb-4">Session History</h1>
 
-      {isLoading ? (
+      {isLoading && sessions.length === 0 ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex gap-4 items-center">

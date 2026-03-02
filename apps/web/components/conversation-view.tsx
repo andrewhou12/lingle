@@ -349,7 +349,7 @@ export function ConversationView() {
 
     return (
       <div className="h-full flex flex-col items-center justify-center px-6">
-        <div className="max-w-[520px] w-full flex flex-col items-center text-center">
+        <div className="max-w-[640px] w-full flex flex-col items-center text-center">
           {/* Logo */}
           <h1 className="logo-shimmer text-[42px] italic font-serif font-semibold mb-6 select-none">
             Lingle

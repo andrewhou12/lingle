@@ -120,7 +120,7 @@ export function ChatInput({ value, onChange, onSend, disabled, placeholder, show
             {/* Composition highlight layer — rendered behind textarea */}
             {isComposing && (
               <div
-                className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words py-1.5 overflow-hidden"
+                className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words py-1.5 overflow-hidden text-left"
                 style={{ font: 'inherit', fontSize: '14.5px', lineHeight: 'normal' }}
                 aria-hidden="true"
               >
@@ -135,6 +135,22 @@ export function ChatInput({ value, onChange, onSend, disabled, placeholder, show
                   {highlightText}
                 </span>
                 <span style={{ color: 'transparent' }}>{postText}</span>
+              </div>
+            )}
+
+            {/* Suggestion overlay — kanji shown above kana (no overflow-hidden so chip floats above) */}
+            {isComposing && ime.suggestion && (
+              <div
+                className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words py-1.5 text-left"
+                style={{ font: 'inherit', fontSize: '14.5px', lineHeight: 'normal' }}
+                aria-hidden="true"
+              >
+                <span style={{ visibility: 'hidden' }}>{preText}</span>
+                <span className="relative inline-block">
+                  <span className="absolute bottom-full left-0 mb-1 whitespace-nowrap bg-bg-secondary border border-border rounded-md px-2 py-0.5 text-[14px] font-jp text-text-primary shadow-sm z-20">
+                    {ime.suggestion}
+                  </span>
+                </span>
               </div>
             )}
 

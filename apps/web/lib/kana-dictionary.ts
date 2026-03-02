@@ -64,13 +64,19 @@ const HIRAGANA_PREFERRED = new Set([
   'そして', 'しかし', 'でも', 'だから', 'それから', 'ところで',
   'ところが', 'すなわち', 'したがって', 'ただし', 'および',
   'あるいは', 'それでも', 'それでは', 'それなのに',
+  // Compound grammatical patterns (copula + particle, auxiliary chains)
+  'なので', 'なのだ', 'なのです', 'なのか',
+  'のだ', 'のです', 'のか',
+  'ため', 'ために', 'ながら',
+  'について', 'にとって', 'によって', 'によると',
+  'として', 'ところ',
   // Question words typically in kana
   'いつ', 'なぜ',
   // Auxiliary that stays kana
   'ください',
   // Common auxiliary / copula
   'です', 'ます', 'ません', 'ました', 'でした', 'ではない',
-  'だった', 'ている', 'てる', 'ておく', 'てある',
+  'だった', 'ている', 'てる', 'ておく', 'てある', 'ない',
   // Te-forms of hiragana-preferred verbs
   'して', 'きて', 'いて', 'あって', 'なって', 'できて',
   'いって', 'みて', 'おいて', 'くれて', 'もらって', 'あげて',
@@ -99,6 +105,36 @@ function hasHiraganaPreferredContinuation(prefix: string): boolean {
     if (word.length > prefix.length && word.startsWith(prefix)) return true
   }
   return false
+}
+
+/**
+ * Check if kana is composed entirely of grammatical/hiragana-preferred words.
+ * Prevents false kanji conversions on multi-particle combos like なので, ですか, ますよ.
+ *
+ * Guards:
+ * - Minimum length 3 to avoid false positives on short kanji words (もの=物, はな=花)
+ * - Requires at least one multi-char (≥2) segment in the decomposition
+ */
+function isGrammaticalCombination(kana: string): boolean {
+  if (kana.length < 3) return false
+  if (HIRAGANA_PREFERRED.has(kana)) return true
+
+  let pos = 0
+  let hasMultiCharSegment = false
+  while (pos < kana.length) {
+    let matched = false
+    for (let len = Math.min(kana.length - pos, 12); len >= 1; len--) {
+      const candidate = kana.slice(pos, pos + len)
+      if (HIRAGANA_PREFERRED.has(candidate)) {
+        if (len >= 2) hasMultiCharSegment = true
+        pos += len
+        matched = true
+        break
+      }
+    }
+    if (!matched) return false
+  }
+  return hasMultiCharSegment
 }
 
 // ─── BASIC LOOKUPS ───────────────────────────────────────────────────
@@ -547,6 +583,8 @@ function bestConversion(kana: string): string | null {
   if (kana.length < 2) return null
   // Hiragana-preferred words stay as kana
   if (HIRAGANA_PREFERRED.has(kana)) return null
+  // Combinations of grammatical words stay as kana (e.g. なので, ですか)
+  if (isGrammaticalCombination(kana)) return null
 
   // Try exact dictionary match
   const exact = lookup(kana)
@@ -572,6 +610,20 @@ function checkWord(candidate: string): { match: boolean; surface: string | null 
     return { match: true, surface: null } // stays as kana
   }
 
+  // Check if candidate is a combination of grammatical words (e.g. なので = な + ので).
+  // This prevents false deconjugation matches like なので → 名乗で (te-form of 名乗る).
+  if (isGrammaticalCombination(candidate)) {
+    return { match: true, surface: null }
+  }
+
+  // Check conjugation to hiragana-preferred base BEFORE exact lookup.
+  // This prevents e.g. いない→以内 when it's the negative of いる (hiragana-preferred).
+  // Without this, exact lookup returns 以内 first and the conjugation check never runs.
+  const deconjs = deconjugate(candidate)
+  if (deconjs.some(d => HIRAGANA_PREFERRED.has(d.baseReading))) {
+    return { match: true, surface: null }
+  }
+
   const exact = lookup(candidate)
   if (exact.length > 0 && exact[0].surface !== candidate) {
     return { match: true, surface: exact[0].surface }
@@ -579,12 +631,6 @@ function checkWord(candidate: string): { match: boolean; surface: string | null 
 
   const conj = conjugatedLookup(candidate)
   if (conj.length > 0 && conj[0].surface !== candidate) {
-    // If the base (dictionary) form is hiragana-preferred, keep as kana.
-    // E.g., います → base いる is hiragana-preferred → stays as います, not 居ます.
-    const deconjs = deconjugate(candidate)
-    if (deconjs.some(d => HIRAGANA_PREFERRED.has(d.baseReading))) {
-      return { match: true, surface: null }
-    }
     return { match: true, surface: conj[0].surface }
   }
 
