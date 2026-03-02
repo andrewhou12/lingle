@@ -11,7 +11,7 @@ export default function ReviewPage() {
     queue, isLoading, currentItem, currentIndex, isComplete, sessionStats, submitReview,
   } = useReview()
 
-  if (isLoading) {
+  if (isLoading && queue.length === 0) {
     return (
       <div>
         <h1 className="text-[28px] font-bold mb-4">Review</h1>

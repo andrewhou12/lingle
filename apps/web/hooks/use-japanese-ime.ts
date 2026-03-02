@@ -43,6 +43,7 @@ export interface UseJapaneseIMEReturn {
   showCandidates: boolean
   katakanaMode: boolean
   toggleKatakana: () => void
+  suggestion: string
   handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => boolean
   insertText: (textarea: HTMLTextAreaElement, text: string) => void
   reset: () => void
@@ -82,6 +83,7 @@ export function useJapaneseIME(
   const [katakanaMode, setKatakanaMode] = useState(false)
   const [composedText, setComposedText] = useState('')
   const [compositionStart, setCompositionStart] = useState(-1)
+  const [suggestion, setSuggestion] = useState('')
 
   const preRef = useRef('')
   const postRef = useRef('')
@@ -117,16 +119,27 @@ export function useJapaneseIME(
     [onChange]
   )
 
-  /** Commit the current composed text — advance preRef past it */
-  const commitCurrent = useCallback(() => {
-    preRef.current += composedText
+  /** Commit the current composed text — replace kana with suggestion (kanji) in textarea */
+  const commitCurrent = useCallback((textarea?: HTMLTextAreaElement) => {
+    const textToCommit = suggestion || composedText
+    preRef.current += textToCommit
+    const newValue = preRef.current + postRef.current
+    onChange(newValue)
+    if (textarea) {
+      const pos = preRef.current.length
+      requestAnimationFrame(() => {
+        textarea.selectionStart = pos
+        textarea.selectionEnd = pos
+      })
+    }
+    setSuggestion('')
     setComposedText('')
     setCompositionStart(-1)
     setCompositionBuffer('')
     setCandidates([])
     setSelectedIndex(0)
     setMode('direct')
-  }, [composedText])
+  }, [suggestion, composedText, onChange])
 
   const reset = useCallback(() => {
     setMode('direct')
@@ -134,6 +147,7 @@ export function useJapaneseIME(
     setCandidates([])
     setSelectedIndex(0)
     setComposedText('')
+    setSuggestion('')
     setCompositionStart(-1)
     preRef.current = ''
     postRef.current = ''
@@ -144,8 +158,11 @@ export function useJapaneseIME(
       const next = !prev
       localStorage.setItem(IME_STORAGE_KEY, String(next))
       if (!next && compositionBuffer) {
-        // Turning off mid-composition — commit current text
-        preRef.current += composedText
+        // Turning off mid-composition — commit suggestion (kanji) or kana
+        const textToCommit = suggestion || composedText
+        preRef.current += textToCommit
+        onChange(preRef.current + postRef.current)
+        setSuggestion('')
         setComposedText('')
         setCompositionStart(-1)
         setCompositionBuffer('')
@@ -154,7 +171,7 @@ export function useJapaneseIME(
       }
       return next
     })
-  }, [compositionBuffer, composedText])
+  }, [compositionBuffer, composedText, suggestion, onChange])
 
   const toggleKatakana = useCallback(() => {
     setKatakanaMode((prev) => !prev)
@@ -220,7 +237,7 @@ export function useJapaneseIME(
         // Enter → commit selected candidate (consume Enter — don't send)
         if (e.key === 'Enter') {
           e.preventDefault()
-          commitCurrent()
+          commitCurrent(textarea)
           return true
         }
 
@@ -229,7 +246,7 @@ export function useJapaneseIME(
           e.preventDefault()
           const nextIdx = Math.min(selectedIndex + 1, candidates.length - 1)
           setSelectedIndex(nextIdx)
-          updateValue(candidates[nextIdx].surface, textarea)
+          setSuggestion(candidates[nextIdx].surface)
           return true
         }
 
@@ -238,7 +255,7 @@ export function useJapaneseIME(
           e.preventDefault()
           const prevIdx = Math.max(selectedIndex - 1, 0)
           setSelectedIndex(prevIdx)
-          updateValue(candidates[prevIdx].surface, textarea)
+          setSuggestion(candidates[prevIdx].surface)
           return true
         }
 
@@ -247,9 +264,16 @@ export function useJapaneseIME(
           const idx = parseInt(e.key) - 1
           if (idx < candidates.length) {
             e.preventDefault()
-            updateValue(candidates[idx].surface, textarea)
-            // Need to commit with the selected text
+            // Commit candidate — replace kana with candidate in value
             preRef.current += candidates[idx].surface
+            const newValue = preRef.current + postRef.current
+            onChange(newValue)
+            const pos = preRef.current.length
+            requestAnimationFrame(() => {
+              textarea.selectionStart = pos
+              textarea.selectionEnd = pos
+            })
+            setSuggestion('')
             setComposedText('')
             setCompositionStart(-1)
             setCompositionBuffer('')
@@ -260,22 +284,23 @@ export function useJapaneseIME(
           }
         }
 
-        // Escape → close popup, revert to kana, back to composing
+        // Escape → close popup, back to composing (kana already in textarea)
         if (e.key === 'Escape') {
           e.preventDefault()
           setCandidates([])
           setSelectedIndex(0)
-          updateValue(compositionDisplay, textarea)
+          // Restore auto-conversion suggestion
+          setSuggestion(autoConvert(compositionDisplay) || '')
           setMode('composing')
           return true
         }
 
-        // Backspace → close popup, revert to kana, back to composing
+        // Backspace → close popup, back to composing (kana already in textarea)
         if (e.key === 'Backspace') {
           e.preventDefault()
           setCandidates([])
           setSelectedIndex(0)
-          updateValue(compositionDisplay, textarea)
+          setSuggestion(autoConvert(compositionDisplay) || '')
           setMode('composing')
           return true
         }
@@ -283,13 +308,13 @@ export function useJapaneseIME(
         // Typing a letter → commit current selection, start new composition
         if (e.key.length === 1 && /^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault()
-          // Commit current
-          preRef.current += composedText
-          postRef.current = postRef.current
+          // Commit suggestion (kanji) or kana
+          const textToCommit = suggestion || composedText
+          preRef.current += textToCommit
           setCandidates([])
           setSelectedIndex(0)
 
-          // Start new composition
+          // Start new composition — kana in textarea, kanji in suggestion
           const char = e.key.toLowerCase()
           const useKata = katakanaMode || e.shiftKey
           const newBuffer = char
@@ -300,7 +325,8 @@ export function useJapaneseIME(
             ? toKatakana(newBuffer, { IMEMode: true })
             : toKana(newBuffer, { IMEMode: true })
           const converted = autoConvert(display)
-          updateValue(converted || display, textarea)
+          updateValue(display, textarea)
+          setSuggestion(converted || '')
           setMode('composing')
           return true
         }
@@ -313,7 +339,7 @@ export function useJapaneseIME(
         // Enter → commit composed text (consume Enter so message doesn't send)
         if (e.key === 'Enter') {
           e.preventDefault()
-          commitCurrent()
+          commitCurrent(textarea)
           return true
         }
 
@@ -332,7 +358,7 @@ export function useJapaneseIME(
           setCandidates(list)
 
           // If auto-converted, highlight matching candidate; otherwise first
-          const currentDisplay = lastSegment ? lastSegment.converted : composedText
+          const currentDisplay = lastSegment ? lastSegment.converted : (suggestion || composedText)
           const currentIdx = list.findIndex((c) => c.surface === currentDisplay)
           const startIdx = currentIdx >= 0 ? currentIdx : 0
           setSelectedIndex(startIdx)
@@ -343,21 +369,22 @@ export function useJapaneseIME(
             preRef.current += committedPart
             setCompositionStart(preRef.current.length)
             setCompositionBuffer(lastSegment.kana) // approximate — just the kana of last segment
-            updateValue(list[startIdx].surface, textarea)
+            updateValue(lastSegment.kana, textarea)   // kana in textarea
+            setSuggestion(list[startIdx].surface)      // candidate floats above
           } else {
-            updateValue(list[startIdx].surface, textarea)
+            updateValue(kana, textarea)                // clean kana in textarea
+            setSuggestion(list[startIdx].surface)      // candidate floats above
           }
           setMode('selecting')
           return true
         }
 
-        // Escape → revert to kana (if auto-converted) or cancel composition
+        // Escape → clear suggestion (if present) or cancel composition
         if (e.key === 'Escape') {
           e.preventDefault()
-          const isAutoConverted = composedText !== compositionDisplay
-          if (isAutoConverted) {
-            // Revert to kana
-            updateValue(compositionDisplay, textarea)
+          if (suggestion) {
+            // Clear suggestion — kana stays in textarea
+            setSuggestion('')
           } else {
             // Cancel composition entirely
             const newValue = preRef.current + postRef.current
@@ -383,7 +410,8 @@ export function useJapaneseIME(
               ? toKatakana(newBuffer, { IMEMode: true })
               : toKana(newBuffer, { IMEMode: true })
             const converted = autoConvert(display)
-            updateValue(converted || display, textarea)
+            updateValue(display, textarea)         // kana in textarea
+            setSuggestion(converted || '')          // kanji suggestion
           } else {
             // Buffer empty → cancel composition
             const newValue = preRef.current + postRef.current
@@ -411,7 +439,7 @@ export function useJapaneseIME(
           const list = buildCandidateList(lookupKana)
           if (list.length > 0) {
             setCandidates(list)
-            const currentDisplay = lastSegment ? lastSegment.converted : composedText
+            const currentDisplay = lastSegment ? lastSegment.converted : (suggestion || composedText)
             const currentIdx = list.findIndex((c) => c.surface === currentDisplay)
             const startIdx = currentIdx >= 0 ? currentIdx : 0
             setSelectedIndex(startIdx)
@@ -421,9 +449,11 @@ export function useJapaneseIME(
               preRef.current += committedPart
               setCompositionStart(preRef.current.length)
               setCompositionBuffer(lastSegment.kana)
-              updateValue(list[startIdx].surface, textarea)
+              updateValue(lastSegment.kana, textarea)   // kana in textarea
+              setSuggestion(list[startIdx].surface)      // candidate floats above
             } else {
-              updateValue(list[startIdx].surface, textarea)
+              updateValue(kana, textarea)                // clean kana in textarea
+              setSuggestion(list[startIdx].surface)      // candidate floats above
             }
             setMode('selecting')
           }
@@ -453,22 +483,38 @@ export function useJapaneseIME(
           : toKana(newBuffer, { IMEMode: true })
 
         const converted = autoConvert(display)
-        updateValue(converted || display, textarea)
+        updateValue(display, textarea)          // kana in textarea
+        setSuggestion(converted || '')           // kanji suggestion floats above
         setMode('composing')
         return true
       }
 
-      // Non-romaji character while composing → commit and let it through
+      // Non-romaji character while composing → commit and insert character
       if (mode === 'composing' && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-        commitCurrent()
-        return false
+        e.preventDefault()
+        const textToCommit = suggestion || composedText
+        preRef.current += textToCommit + e.key
+        onChange(preRef.current + postRef.current)
+        const pos = preRef.current.length
+        requestAnimationFrame(() => {
+          textarea.selectionStart = pos
+          textarea.selectionEnd = pos
+        })
+        setSuggestion('')
+        setComposedText('')
+        setCompositionStart(-1)
+        setCompositionBuffer('')
+        setCandidates([])
+        setSelectedIndex(0)
+        setMode('direct')
+        return true
       }
 
       return false
     },
     [
       imeActive, mode, compositionBuffer, compositionDisplay, composedText,
-      candidates, selectedIndex, katakanaMode, value, onChange,
+      suggestion, candidates, selectedIndex, katakanaMode, value, onChange,
       updateValue, commitCurrent, reset, toggleIME, buildCandidateList,
     ]
   )
@@ -481,6 +527,7 @@ export function useJapaneseIME(
     compositionDisplay,
     composedText,
     compositionStart,
+    suggestion,
     candidates,
     selectedIndex,
     showCandidates: mode === 'selecting',
