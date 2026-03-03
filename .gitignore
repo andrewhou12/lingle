@@ -37,8 +37,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Kuromoji dictionary (loaded from CDN at runtime)
-apps/web/public/dict/
 
 # Electron
 release/
