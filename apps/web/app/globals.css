@@ -154,15 +154,12 @@
 .chat-markdown a { color: var(--accent-warm); text-decoration: underline; text-underline-offset: 2px; }
 
 .chat-markdown blockquote {
-  border-left: 3px solid var(--accent-warm);
+  border-left: 3px solid var(--border-strong);
   margin: 1em 0;
   padding: 0.5em 0.75em;
-  background: var(--warm-soft);
+  background: var(--bg-secondary);
   border-radius: 0 8px 8px 0;
-  color: var(--text-primary);
-}
-.chat-markdown blockquote strong {
-  color: var(--accent-warm);
+  color: var(--text-secondary);
 }
 
 /* Cultural notes — standalone italic paragraphs */

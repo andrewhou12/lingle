@@ -24,11 +24,11 @@ import { GrammarNote, GrammarNoteSkeleton } from '@/components/chat/grammar-note
 import { Spinner } from '@/components/spinner'
 import { cn } from '@/lib/utils'
 import {
-  type ExperienceScenario,
-  type ScenarioCategory,
-  CATEGORY_LABELS,
-  getScenariosByCategory,
-  getAllCategories,
+  type ScenarioMode,
+  MODE_LABELS,
+  MODE_DESCRIPTIONS,
+  MODE_PLACEHOLDERS,
+  getAllModes,
 } from '@/lib/experience-scenarios'
 
 function getGreeting(): { japanese: string; english: string } {
@@ -59,7 +59,7 @@ export function ConversationView() {
   const [isLoading, setIsLoading] = useState(false)
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<ScenarioCategory>('featured')
+  const [selectedMode, setSelectedMode] = useState<ScenarioMode>('conversation')
   const [chosenChoiceIds, setChosenChoiceIds] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -128,13 +128,13 @@ export function ConversationView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleStartSession = useCallback(async (prompt: string, title?: string) => {
+  const handleStartSession = useCallback(async (prompt: string, mode: ScenarioMode) => {
     setIsLoading(true)
     setError(null)
     try {
-      const plan = await api.conversationPlan(prompt)
+      const plan = await api.conversationPlan(prompt, mode)
       setSessionId(plan._sessionId ?? null)
-      setSessionTitle(title || plan.sessionFocus || 'Conversation')
+      setSessionTitle(plan.sessionFocus || MODE_LABELS[mode])
       setChosenChoiceIds(new Set())
       setMessages([])
       setPhase('conversation')
@@ -153,12 +153,8 @@ export function ConversationView() {
     if (!input.trim()) return
     const text = input.trim()
     setInput('')
-    await handleStartSession(text)
-  }, [input, handleStartSession])
-
-  const handleScenarioSelect = useCallback(async (scenario: ExperienceScenario) => {
-    await handleStartSession(scenario.prompt, scenario.title)
-  }, [handleStartSession])
+    await handleStartSession(text, selectedMode)
+  }, [input, selectedMode, handleStartSession])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isSending) return
@@ -198,8 +194,7 @@ export function ConversationView() {
   // Idle Phase — experience launcher
   if (phase === 'idle') {
     const greeting = getGreeting()
-    const scenarios = getScenariosByCategory(selectedCategory)
-    const categories = getAllCategories()
+    const modes = getAllModes()
 
     return (
       <div className="h-full flex flex-col items-center px-6 pt-12 pb-6 overflow-auto">
@@ -233,53 +228,42 @@ export function ConversationView() {
             </div>
           ) : (
             <>
+              {/* Mode tabs */}
+              <div className="w-full mb-2 grid grid-cols-4 gap-2">
+                {modes.map((mode) => (
+                  <button
+                    key={mode}
+                    className={cn(
+                      'flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-lg text-[13px] font-medium border cursor-pointer transition-all',
+                      selectedMode === mode
+                        ? 'bg-accent-brand text-white border-accent-brand shadow-[var(--shadow-sm)]'
+                        : 'bg-bg-pure text-text-secondary border-border-subtle hover:border-border-strong hover:bg-bg-hover'
+                    )}
+                    onClick={() => setSelectedMode(mode)}
+                  >
+                    <span>{MODE_LABELS[mode]}</span>
+                    <span className={cn(
+                      'text-[11px] font-normal',
+                      selectedMode === mode ? 'text-white/70' : 'text-text-muted'
+                    )}>
+                      {MODE_DESCRIPTIONS[mode]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
               {/* Free prompt input */}
-              <div className="w-full mb-8">
+              <div className="w-full mt-4">
                 <ChatInput
                   value={input}
                   onChange={setInput}
                   onSend={handleFreePromptSubmit}
                   disabled={isLoading}
-                  placeholder="Describe any situation, and I'll take you there..."
+                  placeholder={MODE_PLACEHOLDERS[selectedMode]}
                   showRomaji={showRomaji}
                   onToggleRomaji={toggleRomaji}
                   minRows={2}
                 />
-              </div>
-
-              {/* Category pills */}
-              <div className="w-full mb-4 overflow-x-auto scrollbar-none">
-                <div className="flex gap-2">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap border cursor-pointer transition-all',
-                        selectedCategory === cat
-                          ? 'bg-accent-brand text-white border-accent-brand'
-                          : 'bg-bg-pure text-text-secondary border-border-subtle hover:border-border-strong hover:bg-bg-hover'
-                      )}
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {CATEGORY_LABELS[cat]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scenario cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full">
-                {scenarios.map((scenario) => (
-                  <button
-                    key={scenario.id}
-                    className="flex flex-col items-start gap-1 p-4 rounded-xl bg-bg-pure border border-border-subtle text-left cursor-pointer transition-all hover:border-border-strong hover:shadow-[var(--shadow-sm)] active:scale-[0.98]"
-                    onClick={() => handleScenarioSelect(scenario)}
-                  >
-                    <span className="text-[22px] mb-1">{scenario.emoji}</span>
-                    <span className="text-[14px] font-medium text-text-primary">{scenario.title}</span>
-                    <span className="text-[12px] text-text-muted leading-snug">{scenario.subtitle}</span>
-                  </button>
-                ))}
               </div>
             </>
           )}

@@ -57,10 +57,10 @@ class LingleApiClient {
   userGetMe = () => this.request<{ id: string; email: string | null; name: string | null; avatarUrl: string | null }>('/user/me')
 
   // Conversation
-  conversationPlan = (prompt?: string) =>
+  conversationPlan = (prompt?: string, mode?: string) =>
     this.request<{ _sessionId: string; sessionFocus: string }>('/conversation/plan', {
       method: 'POST',
-      ...(prompt ? { body: JSON.stringify({ prompt }) } : {}),
+      body: JSON.stringify({ ...(prompt ? { prompt } : {}), ...(mode ? { mode } : {}) }),
     })
   conversationEnd = (sessionId: string) =>
     this.request<null>('/conversation/end', {

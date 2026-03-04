@@ -6,10 +6,14 @@ import type { Prisma } from '@prisma/client'
 
 export const POST = withAuth(async (request, { userId }) => {
   let prompt: string | undefined
+  let mode: string | undefined
   try {
     const body = await request.json()
     if (body.prompt && typeof body.prompt === 'string') {
       prompt = body.prompt
+    }
+    if (body.mode && typeof body.mode === 'string') {
+      mode = body.mode
     }
   } catch {
     // No body or invalid JSON
@@ -21,6 +25,7 @@ export const POST = withAuth(async (request, { userId }) => {
 
   const systemPrompt = buildSystemPrompt({
     userPrompt: sessionFocus,
+    mode: mode || 'conversation',
     difficultyLevel: profile.difficultyLevel,
     nativeLanguage: profile.nativeLanguage,
     targetLanguage: profile.targetLanguage,
