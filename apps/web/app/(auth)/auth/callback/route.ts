@@ -28,6 +28,15 @@ export async function GET(request: Request) {
         },
       })
 
+      // Check if user has a learner profile — new users go to onboarding
+      const profile = await prisma.learnerProfile.findUnique({
+        where: { userId: data.user.id },
+      })
+
+      if (!profile) {
+        return NextResponse.redirect(`${origin}/onboarding`)
+      }
+
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

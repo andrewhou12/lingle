@@ -36,6 +36,7 @@ model LearnerProfile {
   targetLanguage          String
   nativeLanguage          String
   selfReportedLevel       String   @default("beginner")
+  learningGoals           String[] @default([])
   dailyNewItemLimit       Int      @default(10)
   targetRetention         Float    @default(0.90)
   difficultyLevel         Int      @default(2)

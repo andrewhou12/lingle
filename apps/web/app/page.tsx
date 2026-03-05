@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import s from './landing.module.css'
 
 /* ── SVG Logo Mark ── */
@@ -258,6 +259,7 @@ const subtitles: Record<string, string> = {
 
 export default function LandingPage() {
   const revealRef = useReveal()
+  const router = useRouter()
   const [activeMode, setActiveMode] = useState('conversation')
   const [promptValue, setPromptValue] = useState('')
   const [placeholderVisible, setPlaceholderVisible] = useState(true)
@@ -266,6 +268,13 @@ export default function LandingPage() {
   const [heroSub, setHeroSub] = useState(subtitles.conversation)
   const [activeLevel, setActiveLevel] = useState(2)
   const promptRef = useRef<HTMLTextAreaElement>(null)
+
+  const handlePromptSubmit = useCallback(() => {
+    const text = promptValue.trim()
+    if (!text) return
+    localStorage.setItem('lingle_pending_prompt', JSON.stringify({ prompt: text, mode: activeMode }))
+    router.push('/get-started')
+  }, [promptValue, activeMode, router])
 
   const handleModeChange = useCallback((mode: string) => {
     setActiveMode(mode)
@@ -350,6 +359,12 @@ export default function LandingPage() {
                   e.target.style.height = 'auto'
                   e.target.style.height = e.target.scrollHeight + 'px'
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handlePromptSubmit()
+                  }
+                }}
                 onFocus={() => {
                   setPromptFocused(true)
                   if (!promptValue) setPlaceholderVisible(false)
@@ -364,7 +379,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className={s['prompt-footer']}>
-              <button className={s['prompt-send']} title="Start practice">
+              <button className={s['prompt-send']} title="Start practice" onClick={handlePromptSubmit}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M1 8L15 1L8 15L6.5 9.5L1 8Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
                 </svg>

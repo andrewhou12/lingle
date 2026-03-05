@@ -422,6 +422,21 @@ function ConversationViewInner() {
     }
   }, [phase])
 
+  // Pick up pending prompt from landing page / onboarding
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('lingle_pending_prompt')
+      if (stored) {
+        const { prompt, mode } = JSON.parse(stored)
+        localStorage.removeItem('lingle_pending_prompt')
+        if (prompt) {
+          setInput(prompt)
+          if (mode) setSelectedMode(mode as ScenarioMode)
+        }
+      }
+    } catch {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStartSession = useCallback(async (prompt: string, mode: ScenarioMode) => {
     setIsLoading(true)
     setError(null)

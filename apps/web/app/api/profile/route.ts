@@ -23,6 +23,28 @@ export const GET = withAuth(async (_request, { userId }) => {
   return NextResponse.json(serialize(profile))
 })
 
+export const POST = withAuth(async (request, { userId }) => {
+  const body = await request.json()
+
+  // Check if profile already exists
+  const existing = await prisma.learnerProfile.findUnique({ where: { userId } })
+  if (existing) {
+    return NextResponse.json(serialize(existing))
+  }
+
+  const profile = await prisma.learnerProfile.create({
+    data: {
+      userId,
+      targetLanguage: body.targetLanguage || 'Japanese',
+      nativeLanguage: body.nativeLanguage || 'English',
+      selfReportedLevel: body.selfReportedLevel || 'beginner',
+      difficultyLevel: body.difficultyLevel || 2,
+      learningGoals: Array.isArray(body.goals) ? body.goals : [],
+    },
+  })
+  return NextResponse.json(serialize(profile))
+})
+
 export const PATCH = withAuth(async (request, { userId }) => {
   const updates = await request.json()
   const profile = await prisma.learnerProfile.update({
