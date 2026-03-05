@@ -60,7 +60,7 @@ export default function SignInPage() {
             <span className="text-[32px] font-bold tracking-tight font-serif italic">
               Lingle
             </span>
-            <span className="text-[11px] font-semibold tracking-wide uppercase bg-amber-100 text-amber-700 border border-amber-300 rounded px-1.5 py-0.5 leading-none mt-1">Beta</span>
+            <span className="text-[11px] font-semibold tracking-wide uppercase bg-bg-hover text-text-secondary border border-border-strong rounded-sm px-1.5 py-0.5 leading-none mt-1">Beta</span>
           </div>
           <span className="text-[15px] text-text-muted text-center">
             Your AI-powered language learning companion

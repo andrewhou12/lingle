@@ -42,7 +42,7 @@
 }
 .beta-badge {
   font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-  background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; border-radius: 4px;
+  background: var(--bg-hover); color: var(--text-secondary); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   padding: 2px 6px; line-height: 1; white-space: nowrap;
 }
 .nav-links { display: flex; align-items: center; gap: 2px; position: absolute; left: 50%; transform: translateX(-50%); }
