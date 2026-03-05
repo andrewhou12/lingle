@@ -41,6 +41,7 @@ import {
   getAllModes,
 } from '@/lib/experience-scenarios'
 import { getGreetingForLanguage } from '@/lib/languages'
+import { useLanguage } from '@/hooks/use-language'
 
 function getModeDefaultPrompts(language: string): Record<string, string> {
   return {
@@ -237,6 +238,7 @@ export function ConversationView() {
 
 function ConversationViewInner() {
   const router = useRouter()
+  const { targetLanguage } = useLanguage()
   const [phase, setPhase] = useState<Phase>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionTitle, setSessionTitle] = useState<string>('Conversation')
@@ -249,7 +251,6 @@ function ConversationViewInner() {
   const [inputMode, setInputMode] = useState<'chat' | 'voice'>('chat')
   const [voiceSessionConfig, setVoiceSessionConfig] = useState<{ prompt: string; mode: ScenarioMode } | null>(null)
   const [chosenChoiceIds, setChosenChoiceIds] = useState<Set<string>>(new Set())
-  const [targetLanguage, setTargetLanguage] = useState('Japanese')
   const [difficultyLevel, setDifficultyLevel] = useState(3) // default intermediate
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
   const [showAllSuggestions, setShowAllSuggestions] = useState(false)
@@ -411,12 +412,11 @@ function ConversationViewInner() {
     prevIsSendingRef.current = isSending
   }, [isSending, messages, difficultyLevel, difficultyViolations])
 
-  // Fetch profile for language and recent sessions
+  // Fetch recent sessions for idle screen
   useEffect(() => {
     if (phase === 'idle') {
       api.conversationList().then(setRecentSessions).catch(() => {})
       api.profileGet().then((profile) => {
-        if (profile?.targetLanguage) setTargetLanguage(profile.targetLanguage)
         if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
       }).catch(() => {})
     }
@@ -426,10 +426,9 @@ function ConversationViewInner() {
     setIsLoading(true)
     setError(null)
     try {
-      // Fetch profile for difficulty level and language
-      const profile = api.peekCache<{ difficultyLevel?: number; targetLanguage?: string }>('/profile')
+      // Fetch profile for difficulty level
+      const profile = api.peekCache<{ difficultyLevel?: number }>('/profile')
       if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
-      if (profile?.targetLanguage) setTargetLanguage(profile.targetLanguage)
 
       const result = await api.conversationPlan(prompt, mode)
       setSessionId(result._sessionId ?? null)

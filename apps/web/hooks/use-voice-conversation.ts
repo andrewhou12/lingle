@@ -7,6 +7,8 @@ import { api } from '@/lib/api'
 import type { SessionPlan } from '@/lib/session-plan'
 import { useSoniox, type RealtimeUtterance } from './use-soniox'
 import { useVoiceTTS } from './use-voice-tts'
+import { useLanguage } from './use-language'
+import { getSttCode } from '@/lib/languages'
 
 // ── State Machine ──
 
@@ -38,7 +40,7 @@ function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState {
       if (state === 'THINKING') return 'SPEAKING'
       return state
     case 'TTS_ENDED':
-      if (state === 'SPEAKING') return 'IDLE'
+      if (state === 'SPEAKING' || state === 'THINKING') return 'IDLE'
       return state
     case 'INTERRUPTED':
       if (state === 'SPEAKING') return 'INTERRUPTED'
@@ -129,6 +131,8 @@ export function useVoiceConversation(
   options: UseVoiceConversationOptions = {},
 ): UseVoiceConversationReturn {
   const { autoEndpoint = false, onPlanUpdate } = options
+  const { targetLanguage } = useLanguage()
+  const sttLanguageCode = getSttCode(targetLanguage)
 
   const [voiceState, dispatch] = useReducer(voiceReducer, 'IDLE')
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
@@ -265,10 +269,18 @@ export function useVoiceConversation(
             }
             return prev
           })
+        } else {
+          // Tool-calls-only response (no text) — nothing for TTS to play.
+          // Reset to IDLE so the conversation doesn't freeze.
+          console.log('[voice] tool-only response, resetting to IDLE')
+          dispatch({ type: 'TTS_ENDED' })
         }
+      } else {
+        // No assistant message found — reset to IDLE
+        dispatch({ type: 'TTS_ENDED' })
       }
 
-      // Pause Soniox during TTS playback
+      // Pause Soniox during TTS playback (only if TTS has something to play)
       if (!ttsRef.current.isDone) {
         sonioxRef.current.pause()
       }
@@ -305,9 +317,13 @@ export function useVoiceConversation(
     () => ({
       endpointDetection: autoEndpoint,
       maxEndpointDelayMs: 1500,
+      languageCode: sttLanguageCode,
     }),
-    [autoEndpoint],
+    [autoEndpoint, sttLanguageCode],
   )
+
+  // Track whether Soniox has been started (for PTT deferred start)
+  const sonioxStartedRef = useRef(false)
 
   const handleUtterance = useCallback(
     (utterance: RealtimeUtterance) => {
@@ -359,7 +375,7 @@ export function useVoiceConversation(
 
   // ── Push-to-Talk ──
 
-  const startTalking = useCallback(() => {
+  const startTalking = useCallback(async () => {
     if (!isActiveRef.current) return
     // If AI is speaking, interrupt it
     if (voiceStateRef.current === 'SPEAKING') {
@@ -367,7 +383,13 @@ export function useVoiceConversation(
       dispatch({ type: 'INTERRUPTED' })
     }
     setIsTalking(true)
-    sonioxRef.current.resume()
+    // Start Soniox on first PTT press (deferred start)
+    if (!sonioxStartedRef.current) {
+      sonioxStartedRef.current = true
+      await sonioxRef.current.start()
+    } else {
+      sonioxRef.current.resume()
+    }
     dispatch({ type: 'SPEECH_DETECTED' })
   }, [])
 
@@ -396,10 +418,12 @@ export function useVoiceConversation(
         }, 1000)
 
         ttsRef.current.reset()
-        await sonioxRef.current.start()
-        // In PTT mode, pause mic immediately — user holds button to talk
-        if (!autoEndpoint) {
-          sonioxRef.current.pause()
+        sonioxStartedRef.current = false
+        // Only start Soniox immediately in auto-endpoint mode
+        // In PTT mode, Soniox starts on first button press
+        if (autoEndpoint) {
+          await sonioxRef.current.start()
+          sonioxStartedRef.current = true
         }
         sendMessageRef.current({ text: prompt })
         dispatch({ type: 'LLM_STREAMING' })
@@ -408,7 +432,7 @@ export function useVoiceConversation(
         setError(err instanceof Error ? err.message : 'Failed to start session')
       }
     },
-    [setMessages],
+    [setMessages, autoEndpoint],
   )
 
   const startWithExistingPlan = useCallback(
@@ -427,9 +451,10 @@ export function useVoiceConversation(
         }, 1000)
 
         ttsRef.current.reset()
-        await sonioxRef.current.start()
-        if (!autoEndpoint) {
-          sonioxRef.current.pause()
+        sonioxStartedRef.current = false
+        if (autoEndpoint) {
+          await sonioxRef.current.start()
+          sonioxStartedRef.current = true
         }
 
         // Build message with steering context
@@ -445,7 +470,7 @@ export function useVoiceConversation(
         setError(err instanceof Error ? err.message : 'Failed to start session')
       }
     },
-    [setMessages],
+    [setMessages, autoEndpoint],
   )
 
   const startSession = useCallback(async () => {
@@ -456,9 +481,10 @@ export function useVoiceConversation(
       setDuration((d) => d + 1)
     }, 1000)
     ttsRef.current.reset()
-    await sonioxRef.current.start()
-    if (!autoEndpoint) {
-      sonioxRef.current.pause()
+    sonioxStartedRef.current = false
+    if (autoEndpoint) {
+      await sonioxRef.current.start()
+      sonioxStartedRef.current = true
     }
     dispatch({ type: 'RESET' })
   }, [autoEndpoint])
@@ -472,6 +498,7 @@ export function useVoiceConversation(
 
     try { ttsRef.current.interrupt() } catch {}
     try { await sonioxRef.current.stop() } catch {}
+    sonioxStartedRef.current = false
     dispatch({ type: 'RESET' })
 
     if (sessionIdRef.current) {

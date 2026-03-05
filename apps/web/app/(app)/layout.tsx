@@ -22,6 +22,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { SUPPORTED_LANGUAGES } from '@/lib/languages'
+import { LanguageProvider, useLanguage } from '@/hooks/use-language'
 
 /* ── Nav Sections ── */
 
@@ -161,25 +162,19 @@ function UserFooter() {
 /* ── Layout ── */
 
 export default function AppLayout({ children }: { children: ReactNode }) {
+  return (
+    <LanguageProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </LanguageProvider>
+  )
+}
+
+function AppLayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const [targetLanguage, setTargetLanguage] = useState<string>('Japanese')
+  const { targetLanguage, setTargetLanguage } = useLanguage()
 
-  // Prefetch common data on first mount & load current language
-  useEffect(() => {
-    api.prefetch()
-    api.profileGet().then((profile) => {
-      if (profile?.targetLanguage) setTargetLanguage(profile.targetLanguage)
-    }).catch(() => {})
-  }, [])
-
-  const handleLanguageChange = async (language: string) => {
-    setTargetLanguage(language)
-    try {
-      await api.profilePatch({ targetLanguage: language })
-    } catch (err) {
-      console.error('Failed to update language:', err)
-    }
-  }
+  // Prefetch common data on first mount
+  useEffect(() => { api.prefetch() }, [])
 
   const isActive = (href: string) => {
     const basePath = href.split('?')[0]
@@ -266,7 +261,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <div className="w-1.5 h-1.5 rounded-full bg-green" />
               AI ready
             </div>
-            <Select value={targetLanguage} onValueChange={handleLanguageChange}>
+            <Select value={targetLanguage} onValueChange={setTargetLanguage}>
               <SelectTrigger className="h-auto px-2.5 py-1 rounded-md border border-border bg-bg-pure text-[13px] font-medium text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,.04)] hover:bg-bg-hover transition-colors gap-1.5 w-auto">
                 <SelectValue>
                   {SUPPORTED_LANGUAGES.find(l => l.id === targetLanguage)?.nativeLabel ?? targetLanguage}

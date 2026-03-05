@@ -29,6 +29,8 @@ export interface UseSonioxOptions {
   endpointDetection?: boolean
   /** Max endpoint delay in ms (default: 1500) */
   maxEndpointDelayMs?: number
+  /** ISO 639-1 language code for STT (default: 'ja') */
+  languageCode?: string
 }
 
 export interface UseSonioxReturn {
@@ -57,7 +59,7 @@ export function useSoniox(
   onUtterance: (utterance: RealtimeUtterance) => void,
   onEndpoint?: () => void,
 ): UseSonioxReturn {
-  const { endpointDetection = false, maxEndpointDelayMs = 1500 } = options
+  const { endpointDetection = false, maxEndpointDelayMs = 1500, languageCode = 'ja' } = options
 
   const [partialText, setPartialText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
@@ -115,7 +117,7 @@ export function useSoniox(
 
       const recording = clientRef.current.realtime.record({
         model: 'stt-rt-v4',
-        language_hints: ['ja'],
+        language_hints: [languageCode],
         language_hints_strict: true,
         enable_endpoint_detection: endpointDetection,
         ...(endpointDetection ? { max_endpoint_delay_ms: maxEndpointDelayMs } : {}),
@@ -189,7 +191,7 @@ export function useSoniox(
       console.error('[soniox] start error:', err)
       setError(err instanceof Error ? err.message : 'Failed to start recording')
     }
-  }, [endpointDetection, maxEndpointDelayMs])
+  }, [endpointDetection, maxEndpointDelayMs, languageCode])
 
   const stop = useCallback(async () => {
     const recording = recordingRef.current

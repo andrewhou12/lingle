@@ -3,6 +3,8 @@ export interface SupportedLanguage {
   label: string
   nativeLabel: string
   flag: string
+  /** ISO 639-1 language code for STT APIs (Soniox, OpenAI Whisper) */
+  sttCode: string
   greeting: {
     morning: string
     afternoon: string
@@ -16,6 +18,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Japanese',
     nativeLabel: '\u65E5\u672C\u8A9E',
     flag: '\uD83C\uDDEF\uD83C\uDDF5',
+    sttCode: 'ja',
     greeting: {
       morning: '\u304A\u306F\u3088\u3046\uFF01',
       afternoon: '\u3053\u3093\u306B\u3061\u306F\uFF01',
@@ -27,6 +30,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Korean',
     nativeLabel: '\uD55C\uAD6D\uC5B4',
     flag: '\uD83C\uDDF0\uD83C\uDDF7',
+    sttCode: 'ko',
     greeting: {
       morning: '\uC88B\uC740 \uC544\uCE68\uC774\uC5D0\uC694!',
       afternoon: '\uC548\uB155\uD558\uC138\uC694!',
@@ -38,6 +42,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Mandarin Chinese',
     nativeLabel: '\u4E2D\u6587',
     flag: '\uD83C\uDDE8\uD83C\uDDF3',
+    sttCode: 'zh',
     greeting: {
       morning: '\u65E9\u4E0A\u597D\uFF01',
       afternoon: '\u4F60\u597D\uFF01',
@@ -49,6 +54,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Spanish',
     nativeLabel: 'Espa\u00F1ol',
     flag: '\uD83C\uDDEA\uD83C\uDDF8',
+    sttCode: 'es',
     greeting: {
       morning: '\u00A1Buenos d\u00EDas!',
       afternoon: '\u00A1Buenas tardes!',
@@ -60,6 +66,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'French',
     nativeLabel: 'Fran\u00E7ais',
     flag: '\uD83C\uDDEB\uD83C\uDDF7',
+    sttCode: 'fr',
     greeting: {
       morning: 'Bonjour !',
       afternoon: 'Bonjour !',
@@ -71,6 +78,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'German',
     nativeLabel: 'Deutsch',
     flag: '\uD83C\uDDE9\uD83C\uDDEA',
+    sttCode: 'de',
     greeting: {
       morning: 'Guten Morgen!',
       afternoon: 'Guten Tag!',
@@ -82,6 +90,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Italian',
     nativeLabel: 'Italiano',
     flag: '\uD83C\uDDEE\uD83C\uDDF9',
+    sttCode: 'it',
     greeting: {
       morning: 'Buongiorno!',
       afternoon: 'Buon pomeriggio!',
@@ -93,6 +102,7 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
     label: 'Portuguese',
     nativeLabel: 'Portugu\u00EAs',
     flag: '\uD83C\uDDE7\uD83C\uDDF7',
+    sttCode: 'pt',
     greeting: {
       morning: 'Bom dia!',
       afternoon: 'Boa tarde!',
@@ -123,4 +133,9 @@ export function getGreetingForLanguage(languageId: string): { native: string; en
   }
 
   return { native, english: 'What would you like to practice today?' }
+}
+
+/** Get the ISO 639-1 STT language code for a given language ID. Falls back to 'en'. */
+export function getSttCode(languageId: string): string {
+  return getLanguageById(languageId)?.sttCode ?? 'en'
 }

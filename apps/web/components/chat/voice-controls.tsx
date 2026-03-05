@@ -3,6 +3,8 @@
 import { useCallback } from 'react'
 import { Mic, Loader2 } from 'lucide-react'
 import { useVoice } from '@/hooks/use-voice'
+import { useLanguage } from '@/hooks/use-language'
+import { getSttCode } from '@/lib/languages'
 import { cn } from '@/lib/utils'
 
 interface VoiceControlsProps {
@@ -11,7 +13,8 @@ interface VoiceControlsProps {
 }
 
 export function VoiceControls({ onTranscript, disabled }: VoiceControlsProps) {
-  const voice = useVoice()
+  const { targetLanguage } = useLanguage()
+  const voice = useVoice({ languageCode: getSttCode(targetLanguage) })
 
   const handleClick = useCallback(async () => {
     if (disabled) return

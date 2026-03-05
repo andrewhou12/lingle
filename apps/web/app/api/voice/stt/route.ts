@@ -9,6 +9,9 @@ export const POST = withAuth(async (request) => {
     return NextResponse.json({ error: 'audio file is required' }, { status: 400 })
   }
 
+  // Language code from client, defaults to 'ja' for backwards compatibility
+  const language = (formData.get('language') as string) || 'ja'
+
   const openai = new OpenAI()
 
   const file = new File([audioFile], 'recording.webm', { type: audioFile.type || 'audio/webm' })
@@ -16,7 +19,7 @@ export const POST = withAuth(async (request) => {
   const transcription = await openai.audio.transcriptions.create({
     model: 'gpt-4o-mini-transcribe',
     file,
-    language: 'ja',
+    language,
   })
 
   return NextResponse.json({ text: transcription.text })

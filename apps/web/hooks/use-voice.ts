@@ -2,6 +2,11 @@
 
 import { useState, useCallback, useRef } from 'react'
 
+interface UseVoiceOptions {
+  /** ISO 639-1 language code for STT (default: 'ja') */
+  languageCode?: string
+}
+
 interface UseVoiceReturn {
   isRecording: boolean
   isTranscribing: boolean
@@ -10,7 +15,8 @@ interface UseVoiceReturn {
   stopRecording: () => Promise<string | null>
 }
 
-export function useVoice(): UseVoiceReturn {
+export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
+  const { languageCode = 'ja' } = options
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +58,7 @@ export function useVoice(): UseVoiceReturn {
         try {
           const formData = new FormData()
           formData.append('audio', blob)
+          formData.append('language', languageCode)
           const res = await fetch('/api/voice/stt', { method: 'POST', body: formData })
           if (!res.ok) {
             setError('Transcription failed')
