@@ -1,0 +1,126 @@
+export interface SupportedLanguage {
+  id: string
+  label: string
+  nativeLabel: string
+  flag: string
+  greeting: {
+    morning: string
+    afternoon: string
+    evening: string
+  }
+}
+
+export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
+  {
+    id: 'Japanese',
+    label: 'Japanese',
+    nativeLabel: '\u65E5\u672C\u8A9E',
+    flag: '\uD83C\uDDEF\uD83C\uDDF5',
+    greeting: {
+      morning: '\u304A\u306F\u3088\u3046\uFF01',
+      afternoon: '\u3053\u3093\u306B\u3061\u306F\uFF01',
+      evening: '\u3053\u3093\u3070\u3093\u306F\uFF01',
+    },
+  },
+  {
+    id: 'Korean',
+    label: 'Korean',
+    nativeLabel: '\uD55C\uAD6D\uC5B4',
+    flag: '\uD83C\uDDF0\uD83C\uDDF7',
+    greeting: {
+      morning: '\uC88B\uC740 \uC544\uCE68\uC774\uC5D0\uC694!',
+      afternoon: '\uC548\uB155\uD558\uC138\uC694!',
+      evening: '\uC88B\uC740 \uC800\uB141\uC774\uC5D0\uC694!',
+    },
+  },
+  {
+    id: 'Mandarin Chinese',
+    label: 'Mandarin Chinese',
+    nativeLabel: '\u4E2D\u6587',
+    flag: '\uD83C\uDDE8\uD83C\uDDF3',
+    greeting: {
+      morning: '\u65E9\u4E0A\u597D\uFF01',
+      afternoon: '\u4F60\u597D\uFF01',
+      evening: '\u665A\u4E0A\u597D\uFF01',
+    },
+  },
+  {
+    id: 'Spanish',
+    label: 'Spanish',
+    nativeLabel: 'Espa\u00F1ol',
+    flag: '\uD83C\uDDEA\uD83C\uDDF8',
+    greeting: {
+      morning: '\u00A1Buenos d\u00EDas!',
+      afternoon: '\u00A1Buenas tardes!',
+      evening: '\u00A1Buenas noches!',
+    },
+  },
+  {
+    id: 'French',
+    label: 'French',
+    nativeLabel: 'Fran\u00E7ais',
+    flag: '\uD83C\uDDEB\uD83C\uDDF7',
+    greeting: {
+      morning: 'Bonjour !',
+      afternoon: 'Bonjour !',
+      evening: 'Bonsoir !',
+    },
+  },
+  {
+    id: 'German',
+    label: 'German',
+    nativeLabel: 'Deutsch',
+    flag: '\uD83C\uDDE9\uD83C\uDDEA',
+    greeting: {
+      morning: 'Guten Morgen!',
+      afternoon: 'Guten Tag!',
+      evening: 'Guten Abend!',
+    },
+  },
+  {
+    id: 'Italian',
+    label: 'Italian',
+    nativeLabel: 'Italiano',
+    flag: '\uD83C\uDDEE\uD83C\uDDF9',
+    greeting: {
+      morning: 'Buongiorno!',
+      afternoon: 'Buon pomeriggio!',
+      evening: 'Buonasera!',
+    },
+  },
+  {
+    id: 'Portuguese',
+    label: 'Portuguese',
+    nativeLabel: 'Portugu\u00EAs',
+    flag: '\uD83C\uDDE7\uD83C\uDDF7',
+    greeting: {
+      morning: 'Bom dia!',
+      afternoon: 'Boa tarde!',
+      evening: 'Boa noite!',
+    },
+  },
+]
+
+export function getLanguageById(id: string): SupportedLanguage | undefined {
+  return SUPPORTED_LANGUAGES.find((l) => l.id === id)
+}
+
+export function getGreetingForLanguage(languageId: string): { native: string; english: string } {
+  const lang = getLanguageById(languageId)
+  const hour = new Date().getHours()
+
+  if (!lang) {
+    return { native: 'Hello!', english: 'What would you like to practice today?' }
+  }
+
+  let native: string
+  if (hour < 11) {
+    native = lang.greeting.morning
+  } else if (hour < 17) {
+    native = lang.greeting.afternoon
+  } else {
+    native = lang.greeting.evening
+  }
+
+  return { native, english: 'What would you like to practice today?' }
+}

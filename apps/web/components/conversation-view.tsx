@@ -40,69 +40,150 @@ import {
   MODE_PLACEHOLDERS,
   getAllModes,
 } from '@/lib/experience-scenarios'
+import { getGreetingForLanguage } from '@/lib/languages'
 
-const MODE_DEFAULT_PROMPTS: Record<string, string> = {
-  conversation: "Let's have a casual conversation in Japanese.",
-  tutor: "I'd like to practice Japanese with a tutor.",
-  immersion: 'Create an immersive Japanese listening exercise.',
-  reference: 'I have some questions about Japanese.',
-}
-
-function getGreeting(): { japanese: string; english: string } {
-  const hour = new Date().getHours()
-  let japanese: string
-  if (hour < 11) {
-    japanese = '\u304A\u306F\u3088\u3046\uFF01'
-  } else if (hour < 17) {
-    japanese = '\u3053\u3093\u306B\u3061\u306F\uFF01'
-  } else {
-    japanese = '\u3053\u3093\u3070\u3093\u306F\uFF01'
+function getModeDefaultPrompts(language: string): Record<string, string> {
+  return {
+    conversation: `Let's have a casual conversation in ${language}.`,
+    tutor: `I'd like to practice ${language} with a tutor.`,
+    immersion: `Create an immersive ${language} listening exercise.`,
+    reference: `I have some questions about ${language}.`,
   }
-  return { japanese, english: 'What would you like to practice today?' }
 }
 
-/* ── Suggestions per mode ── */
-const SUGGESTIONS: Record<ScenarioMode, { icon: string; label: string }[]> = {
+/* ── Suggestions per mode per language ── */
+const LANGUAGE_SUGGESTIONS: Record<string, Record<ScenarioMode, { icon: string; label: string }[]>> = {
+  Japanese: {
+    conversation: [
+      { icon: '\uD83C\uDF5C', label: 'Order ramen at a busy Tokyo shop' },
+      { icon: '\uD83D\uDE86', label: 'Ask for directions at Shinjuku station' },
+      { icon: '\uD83C\uDFEE', label: 'Haggle at an Osaka flea market' },
+      { icon: '\uD83C\uDF38', label: 'Small talk during hanami season' },
+      { icon: '\u2615', label: 'Chat with a barista in Kyoto' },
+      { icon: '\uD83C\uDFE8', label: 'Check into a ryokan in Hakone' },
+      { icon: '\uD83D\uDE95', label: 'Give directions to a taxi driver' },
+      { icon: '\uD83C\uDF89', label: 'Make plans for a weekend trip' },
+    ],
+    tutor: [
+      { icon: '\u270D\uFE0F', label: 'Master the \u3066-form conjugation' },
+      { icon: '\uD83D\uDD24', label: 'Learn 20 essential counters' },
+      { icon: '\uD83C\uDF8C', label: 'Keigo \u2014 polite speech patterns' },
+      { icon: '\uD83D\uDD0A', label: 'Pitch accent fundamentals' },
+      { icon: '\uD83D\uDCD6', label: 'Difference between \u306F and \u304C' },
+      { icon: '\uD83D\uDCAC', label: 'Casual vs. polite form practice' },
+      { icon: '\uD83D\uDD22', label: 'Japanese time expressions' },
+      { icon: '\uD83C\uDFAF', label: 'Common particle mistakes' },
+    ],
+    immersion: [
+      { icon: '\uD83D\uDCF0', label: 'Read today\u2019s NHK Easy News' },
+      { icon: '\uD83C\uDFAC', label: 'Analyze a scene from Your Name' },
+      { icon: '\uD83D\uDCD6', label: 'Manga panel \u2014 decode slang' },
+      { icon: '\uD83C\uDFB5', label: 'Break down Yoasobi lyrics' },
+      { icon: '\uD83C\uDFAE', label: 'Translate a game dialogue' },
+      { icon: '\uD83D\uDCFA', label: 'News clip listening practice' },
+      { icon: '\uD83D\uDCDD', label: 'Read a short story excerpt' },
+      { icon: '\uD83C\uDF99\uFE0F', label: 'Podcast transcript breakdown' },
+    ],
+    reference: [
+      { icon: '\uD83D\uDDC2\uFE0F', label: 'JLPT N3 vocabulary deck' },
+      { icon: '\uD83D\uDCD0', label: 'Particle cheat sheet' },
+      { icon: '\uD83C\uDE33', label: 'Kanji by radicals \u2014 RTK method' },
+      { icon: '\uD83D\uDCCB', label: 'Common set phrases \u2014 \u6163\u7528\u53E5' },
+      { icon: '\uD83D\uDD0D', label: 'Verb conjugation table' },
+      { icon: '\uD83D\uDCDA', label: 'Onomatopoeia dictionary' },
+      { icon: '\uD83C\uDDEF\uD83C\uDDF5', label: 'Cultural etiquette notes' },
+      { icon: '\uD83D\uDCC8', label: 'JLPT grammar comparison chart' },
+    ],
+  },
+  Korean: {
+    conversation: [
+      { icon: '\uD83C\uDF5C', label: 'Order bibimbap at a Seoul restaurant' },
+      { icon: '\uD83D\uDE87', label: 'Navigate the subway in Busan' },
+      { icon: '\uD83D\uDED2', label: 'Shop at Myeongdong market' },
+      { icon: '\uD83C\uDFB6', label: 'Chat about your favorite K-pop group' },
+      { icon: '\u2615', label: 'Order drinks at a Korean caf\u00E9' },
+      { icon: '\uD83C\uDFE8', label: 'Book a hanok guesthouse in Jeonju' },
+      { icon: '\uD83D\uDE95', label: 'Hail a taxi in Gangnam' },
+      { icon: '\uD83C\uDF89', label: 'Plan a trip to Jeju Island' },
+    ],
+    tutor: [
+      { icon: '\u270D\uFE0F', label: 'Korean honorific speech levels' },
+      { icon: '\uD83D\uDD24', label: 'Essential Korean counters (\uAC1C, \uBA85, \uBC88)' },
+      { icon: '\uD83D\uDCD6', label: 'Difference between \uC740/\uB294 and \uC774/\uAC00' },
+      { icon: '\uD83D\uDCAC', label: '\uBC18\uB9D0 vs. \uC874\uB313\uB9D0 practice' },
+      { icon: '\uD83D\uDD22', label: 'Sino-Korean vs. native numbers' },
+      { icon: '\uD83C\uDFAF', label: 'Common particle mistakes' },
+      { icon: '\uD83D\uDD0A', label: 'Korean pronunciation rules' },
+      { icon: '\uD83D\uDCDA', label: 'Verb conjugation patterns' },
+    ],
+    immersion: [
+      { icon: '\uD83D\uDCFA', label: 'Analyze a K-drama dialogue scene' },
+      { icon: '\uD83C\uDFB5', label: 'Break down BTS song lyrics' },
+      { icon: '\uD83D\uDCF0', label: 'Read Korean news for beginners' },
+      { icon: '\uD83C\uDFAC', label: 'Movie scene \u2014 decode slang' },
+      { icon: '\uD83C\uDFAE', label: 'Translate a webtoon panel' },
+      { icon: '\uD83D\uDCDD', label: 'Read a short Korean story' },
+      { icon: '\uD83C\uDF99\uFE0F', label: 'Korean podcast breakdown' },
+      { icon: '\uD83D\uDCD6', label: 'Webtoon dialogue practice' },
+    ],
+    reference: [
+      { icon: '\uD83D\uDDC2\uFE0F', label: 'TOPIK vocabulary by level' },
+      { icon: '\uD83D\uDCD0', label: 'Korean particle cheat sheet' },
+      { icon: '\uD83D\uDD0D', label: 'Verb conjugation table' },
+      { icon: '\uD83D\uDCCB', label: 'Common Korean expressions' },
+      { icon: '\uD83D\uDCDA', label: 'Korean onomatopoeia guide' },
+      { icon: '\uD83C\uDDF0\uD83C\uDDF7', label: 'Cultural etiquette notes' },
+      { icon: '\uD83D\uDCC8', label: 'TOPIK grammar patterns' },
+      { icon: '\uD83D\uDD24', label: 'Hangul reading practice' },
+    ],
+  },
+}
+
+const DEFAULT_SUGGESTIONS: Record<ScenarioMode, { icon: string; label: string }[]> = {
   conversation: [
-    { icon: '\uD83C\uDF5C', label: 'Order ramen at a busy Tokyo shop' },
-    { icon: '\uD83D\uDE86', label: 'Ask for directions at Shinjuku station' },
-    { icon: '\uD83C\uDFEE', label: 'Haggle at an Osaka flea market' },
-    { icon: '\uD83C\uDF38', label: 'Small talk during hanami season' },
-    { icon: '\u2615', label: 'Chat with a barista in Kyoto' },
-    { icon: '\uD83C\uDFE8', label: 'Check into a ryokan in Hakone' },
-    { icon: '\uD83D\uDE95', label: 'Give directions to a taxi driver' },
+    { icon: '\u2615', label: 'Order coffee at a local caf\u00E9' },
+    { icon: '\uD83D\uDE86', label: 'Ask for directions at a train station' },
+    { icon: '\uD83D\uDED2', label: 'Go grocery shopping at a market' },
     { icon: '\uD83C\uDF89', label: 'Make plans for a weekend trip' },
+    { icon: '\uD83C\uDFE8', label: 'Check into a hotel' },
+    { icon: '\uD83D\uDE95', label: 'Give directions to a taxi driver' },
+    { icon: '\uD83C\uDF74', label: 'Order food at a restaurant' },
+    { icon: '\uD83D\uDCAC', label: 'Small talk with a new friend' },
   ],
   tutor: [
-    { icon: '\u270D\uFE0F', label: 'Master the \u3066-form conjugation' },
-    { icon: '\uD83D\uDD24', label: 'Learn 20 essential counters' },
-    { icon: '\uD83C\uDF8C', label: 'Keigo \u2014 polite speech patterns' },
-    { icon: '\uD83D\uDD0A', label: 'Pitch accent fundamentals' },
-    { icon: '\uD83D\uDCD6', label: 'Difference between \u306F and \u304C' },
-    { icon: '\uD83D\uDCAC', label: 'Casual vs. polite form practice' },
-    { icon: '\uD83D\uDD22', label: 'Japanese time expressions' },
-    { icon: '\uD83C\uDFAF', label: 'Common particle mistakes' },
+    { icon: '\u270D\uFE0F', label: 'Key verb conjugation patterns' },
+    { icon: '\uD83D\uDCD6', label: 'Essential grammar structures' },
+    { icon: '\uD83D\uDCAC', label: 'Formal vs. informal speech' },
+    { icon: '\uD83D\uDD22', label: 'Numbers and counting' },
+    { icon: '\uD83D\uDD0A', label: 'Pronunciation fundamentals' },
+    { icon: '\uD83C\uDFAF', label: 'Common beginner mistakes' },
+    { icon: '\uD83D\uDD24', label: 'Everyday vocabulary' },
+    { icon: '\uD83D\uDCDA', label: 'Reading practice' },
   ],
   immersion: [
-    { icon: '\uD83D\uDCF0', label: 'Read today\u2019s NHK Easy News' },
-    { icon: '\uD83C\uDFAC', label: 'Analyze a scene from Your Name' },
-    { icon: '\uD83D\uDCD6', label: 'Manga panel \u2014 decode slang' },
-    { icon: '\uD83C\uDFB5', label: 'Break down Yoasobi lyrics' },
+    { icon: '\uD83D\uDCF0', label: 'Read a news article for beginners' },
+    { icon: '\uD83C\uDFAC', label: 'Analyze a movie dialogue scene' },
+    { icon: '\uD83C\uDFB5', label: 'Break down song lyrics' },
     { icon: '\uD83C\uDFAE', label: 'Translate a game dialogue' },
-    { icon: '\uD83D\uDCFA', label: 'News clip listening practice' },
+    { icon: '\uD83D\uDCFA', label: 'TV show listening practice' },
     { icon: '\uD83D\uDCDD', label: 'Read a short story excerpt' },
     { icon: '\uD83C\uDF99\uFE0F', label: 'Podcast transcript breakdown' },
+    { icon: '\uD83D\uDCD6', label: 'Cultural reading passage' },
   ],
   reference: [
-    { icon: '\uD83D\uDDC2\uFE0F', label: 'JLPT N3 vocabulary deck' },
-    { icon: '\uD83D\uDCD0', label: 'Particle cheat sheet' },
-    { icon: '\uD83C\uDE33', label: 'Kanji by radicals \u2014 RTK method' },
-    { icon: '\uD83D\uDCCB', label: 'Common set phrases \u2014 \u6163\u7528\u53E5' },
+    { icon: '\uD83D\uDDC2\uFE0F', label: 'Core vocabulary list' },
     { icon: '\uD83D\uDD0D', label: 'Verb conjugation table' },
-    { icon: '\uD83D\uDCDA', label: 'Onomatopoeia dictionary' },
-    { icon: '\uD83C\uDDEF\uD83C\uDDF5', label: 'Cultural etiquette notes' },
-    { icon: '\uD83D\uDCC8', label: 'JLPT grammar comparison chart' },
+    { icon: '\uD83D\uDCD0', label: 'Grammar cheat sheet' },
+    { icon: '\uD83D\uDCCB', label: 'Common expressions and idioms' },
+    { icon: '\uD83D\uDCDA', label: 'Cultural etiquette notes' },
+    { icon: '\uD83D\uDCC8', label: 'Grammar comparison chart' },
+    { icon: '\uD83D\uDD24', label: 'Writing system guide' },
+    { icon: '\uD83C\uDFAF', label: 'Pronunciation guide' },
   ],
+}
+
+function getSuggestions(language: string): Record<ScenarioMode, { icon: string; label: string }[]> {
+  return LANGUAGE_SUGGESTIONS[language] ?? DEFAULT_SUGGESTIONS
 }
 
 const SUGGESTION_TITLES: Record<ScenarioMode, string> = {
@@ -138,10 +219,10 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`
 }
 
-const DEFAULT_SUGGESTIONS = [
-  '\u3053\u3093\u306B\u3061\u306F\uFF01',
+const CHAT_DEFAULT_SUGGESTIONS = [
+  'Hello!',
   'What should we talk about?',
-  '\u3082\u3046\u4E00\u5EA6\u304A\u9858\u3044\u3057\u307E\u3059',
+  'Can you repeat that?',
 ]
 
 type Phase = 'idle' | 'conversation'
@@ -168,6 +249,7 @@ function ConversationViewInner() {
   const [inputMode, setInputMode] = useState<'chat' | 'voice'>('chat')
   const [voiceSessionConfig, setVoiceSessionConfig] = useState<{ prompt: string; mode: ScenarioMode } | null>(null)
   const [chosenChoiceIds, setChosenChoiceIds] = useState<Set<string>>(new Set())
+  const [targetLanguage, setTargetLanguage] = useState('Japanese')
   const [difficultyLevel, setDifficultyLevel] = useState(3) // default intermediate
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
   const [showAllSuggestions, setShowAllSuggestions] = useState(false)
@@ -329,10 +411,14 @@ function ConversationViewInner() {
     prevIsSendingRef.current = isSending
   }, [isSending, messages, difficultyLevel, difficultyViolations])
 
-  // Fetch recent sessions for idle screen
+  // Fetch profile for language and recent sessions
   useEffect(() => {
     if (phase === 'idle') {
       api.conversationList().then(setRecentSessions).catch(() => {})
+      api.profileGet().then((profile) => {
+        if (profile?.targetLanguage) setTargetLanguage(profile.targetLanguage)
+        if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
+      }).catch(() => {})
     }
   }, [phase])
 
@@ -340,9 +426,10 @@ function ConversationViewInner() {
     setIsLoading(true)
     setError(null)
     try {
-      // Fetch profile for difficulty level
-      const profile = api.peekCache<{ difficultyLevel?: number }>('/profile')
+      // Fetch profile for difficulty level and language
+      const profile = api.peekCache<{ difficultyLevel?: number; targetLanguage?: string }>('/profile')
       if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
+      if (profile?.targetLanguage) setTargetLanguage(profile.targetLanguage)
 
       const result = await api.conversationPlan(prompt, mode)
       setSessionId(result._sessionId ?? null)
@@ -365,14 +452,15 @@ function ConversationViewInner() {
   }, [setMessages, sendMessage])
 
   const handleFreePromptSubmit = useCallback(async () => {
-    const text = input.trim() || MODE_DEFAULT_PROMPTS[selectedMode] || MODE_DEFAULT_PROMPTS.conversation
+    const defaults = getModeDefaultPrompts(targetLanguage)
+    const text = input.trim() || defaults[selectedMode] || defaults.conversation
     setInput('')
     if (inputMode === 'voice') {
       setVoiceSessionConfig({ prompt: text, mode: selectedMode })
     } else {
       await handleStartSession(text, selectedMode)
     }
-  }, [input, selectedMode, inputMode, handleStartSession])
+  }, [input, selectedMode, inputMode, targetLanguage, handleStartSession])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isSending) return
@@ -440,9 +528,10 @@ function ConversationViewInner() {
 
   // Idle Phase — experience launcher
   if (phase === 'idle') {
-    const greeting = getGreeting()
+    const greeting = getGreetingForLanguage(targetLanguage)
     const modes = getAllModes()
-    const suggestions = SUGGESTIONS[selectedMode]
+    const allSuggestions = getSuggestions(targetLanguage)
+    const suggestions = allSuggestions[selectedMode]
     const textareaRef = idleTextareaRef
 
     return (
@@ -452,7 +541,7 @@ function ConversationViewInner() {
           {/* Greeting */}
           <div className="text-center mb-8 idle-entrance">
             <div className="font-jp text-[44px] font-light tracking-[0.04em] text-text-primary leading-[1.2] mb-2">
-              {greeting.japanese}
+              {greeting.native}
             </div>
             <p className="text-[15px] text-text-secondary">{greeting.english}</p>
           </div>
@@ -852,7 +941,7 @@ function ConversationViewInner() {
               {/* Suggestion chips */}
               {(messages.length === 0 || (messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !isSending)) && (
                 <SuggestionChips
-                  suggestions={dynamicSuggestions ?? DEFAULT_SUGGESTIONS}
+                  suggestions={dynamicSuggestions ?? CHAT_DEFAULT_SUGGESTIONS}
                   onSelect={handleSuggestionSelect}
                 />
               )}

@@ -4,9 +4,9 @@ import OpenAI from 'openai'
 import { parseMessage } from '@/lib/message-parser'
 
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
-const openai = new OpenAI()
 
 export const POST = withAuth(async (request) => {
+  const openai = new OpenAI()
   const body = await request.json()
   const { text, voice: voiceParam, speed: speedParam } = body
   if (!text || typeof text !== 'string') {
