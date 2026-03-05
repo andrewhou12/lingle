@@ -3,6 +3,7 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import { createConversationTools } from '@/lib/conversation-tools'
+import { formatPlanForPrompt, type SessionPlan } from '@/lib/session-plan'
 import type { ConversationMessage, ConversationToolCall } from '@lingle/shared/types'
 import type { Prisma } from '@prisma/client'
 
@@ -20,19 +21,26 @@ export const POST = withAuth(async (request, { userId }) => {
 
   const session = await prisma.conversationSession.findUniqueOrThrow({
     where: { id: sessionId },
+    select: { systemPrompt: true, sessionPlan: true },
   })
   if (!session.systemPrompt) throw new Error('Session has no system prompt')
+
+  // Combine static system prompt + dynamic session plan
+  const planBlock = session.sessionPlan
+    ? `\n\n═══ SESSION PLAN ═══\n${formatPlanForPrompt(session.sessionPlan as unknown as SessionPlan)}\n\nFollow this plan. Track milestones. Adapt if the learner's needs shift — call updateSessionPlan to record changes.`
+    : ''
+  const system = session.systemPrompt + planBlock
 
   const tools = createConversationTools(userId, sessionId)
   const modelMessages = await convertToModelMessages(messages, { tools })
 
   console.log('[send] modelMessages count:', modelMessages.length)
   console.log('[send] tools:', Object.keys(tools))
-  console.log('[send] system prompt length:', session.systemPrompt.length)
+  console.log('[send] system prompt length:', system.length)
 
   const result = streamText({
     model: anthropic('claude-sonnet-4-20250514'),
-    system: session.systemPrompt,
+    system,
     messages: modelMessages,
     tools,
     maxOutputTokens: 2048,

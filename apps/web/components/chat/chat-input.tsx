@@ -5,11 +5,13 @@ import { ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from './ime/ime-candidate-panel'
+import { VoiceControls } from './voice-controls'
 
 interface ChatInputProps {
   value: string
   onChange: (value: string) => void
   onSend: () => void
+  onVoiceTranscript?: (text: string) => void
   disabled?: boolean
   placeholder?: string
   showRomaji?: boolean
@@ -27,7 +29,7 @@ function useIsMac() {
   return isMac
 }
 
-export function ChatInput({ value, onChange, onSend, disabled, placeholder, showRomaji, onToggleRomaji, minRows = 1 }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled, placeholder, showRomaji, onToggleRomaji, minRows = 1 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const isMac = useIsMac()
@@ -265,9 +267,16 @@ export function ChatInput({ value, onChange, onSend, disabled, placeholder, show
               <span className="text-[13px] leading-none">👓</span>
             </button>
           )}
-          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[13px] cursor-default hover:bg-bg-hover transition-colors" title="Voice input">
-            🎤
-          </button>
+          <VoiceControls
+            onTranscript={(text) => {
+              if (onVoiceTranscript) {
+                onVoiceTranscript(text)
+              } else {
+                onChange(value ? value + ' ' + text : text)
+              }
+            }}
+            disabled={disabled}
+          />
           <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[15px] leading-none cursor-default hover:bg-bg-hover transition-colors" title="Attach">
             +
           </button>

@@ -1,8 +1,65 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import { prisma } from '@lingle/db'
+import type { Prisma } from '@prisma/client'
+import type { SessionPlan } from '@/lib/session-plan'
 
 export function createConversationTools(_userId: string, _sessionId: string) {
   return {
+    updateSessionPlan: tool({
+      description:
+        'Update the session plan when the direction changes — e.g., completing milestones, adjusting goals based on learner performance, shifting focus. Call this proactively when you notice the session evolving.',
+      inputSchema: z.object({
+        completedMilestones: z
+          .array(z.number())
+          .optional()
+          .describe('Indices (0-based) of milestones just completed'),
+        newGoals: z
+          .array(z.string())
+          .optional()
+          .describe('Replace goals if focus has shifted'),
+        newFocus: z.string().optional().describe('Updated one-line focus if the session direction changed'),
+        addVocabulary: z
+          .array(z.string())
+          .optional()
+          .describe('New vocabulary to add to targets'),
+        addGrammar: z
+          .array(z.string())
+          .optional()
+          .describe('New grammar patterns to add to targets'),
+      }),
+      execute: async ({ completedMilestones, newGoals, newFocus, addVocabulary, addGrammar }) => {
+        const session = await prisma.conversationSession.findUniqueOrThrow({
+          where: { id: _sessionId },
+          select: { sessionPlan: true },
+        })
+        const plan = (session.sessionPlan ?? {}) as unknown as SessionPlan
+
+        if (completedMilestones?.length && plan.milestones) {
+          for (const idx of completedMilestones) {
+            if (plan.milestones[idx]) {
+              plan.milestones[idx].completed = true
+            }
+          }
+        }
+        if (newGoals) plan.goals = newGoals
+        if (newFocus) plan.focus = newFocus
+        if (addVocabulary?.length) {
+          plan.targetVocabulary = [...(plan.targetVocabulary ?? []), ...addVocabulary]
+        }
+        if (addGrammar?.length) {
+          plan.targetGrammar = [...(plan.targetGrammar ?? []), ...addGrammar]
+        }
+
+        await prisma.conversationSession.update({
+          where: { id: _sessionId },
+          data: { sessionPlan: plan as unknown as Prisma.InputJsonValue },
+        })
+
+        return { updated: true, plan }
+      },
+    }),
+
     suggestActions: tool({
       description:
         'Suggest 2-3 contextual next actions the learner could take. These can be responses, actions, or questions — whatever fits the moment. Call this at the end of every response, AFTER your text.',

@@ -6,7 +6,8 @@ import { parseMessage } from '@/lib/message-parser'
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 
 export const POST = withAuth(async (request) => {
-  const { text } = await request.json()
+  const body = await request.json()
+  const { text, voice: voiceParam, speed: speedParam } = body
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -27,9 +28,10 @@ export const POST = withAuth(async (request) => {
   const openai = new OpenAI()
   const response = await openai.audio.speech.create({
     model: 'tts-1',
-    voice: 'shimmer',
+    voice: (voiceParam as 'shimmer' | 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova') || 'shimmer',
     input: spoken,
     response_format: 'mp3',
+    speed: typeof speedParam === 'number' ? Math.max(0.25, Math.min(4.0, speedParam)) : undefined,
   })
 
   const buffer = Buffer.from(await response.arrayBuffer())

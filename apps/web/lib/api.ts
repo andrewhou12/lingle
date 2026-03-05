@@ -1,4 +1,5 @@
 import type { LearnerProfile } from '@lingle/shared/types'
+import type { SessionPlan } from '@/lib/session-plan'
 
 class LingleApiClient {
   private cache = new Map<string, { data: unknown; ts: number }>()
@@ -58,9 +59,14 @@ class LingleApiClient {
 
   // Conversation
   conversationPlan = (prompt?: string, mode?: string) =>
-    this.request<{ _sessionId: string; sessionFocus: string }>('/conversation/plan', {
+    this.request<{ _sessionId: string; sessionFocus: string; plan: SessionPlan }>('/conversation/plan', {
       method: 'POST',
       body: JSON.stringify({ ...(prompt ? { prompt } : {}), ...(mode ? { mode } : {}) }),
+    })
+  conversationPlanUpdate = (sessionId: string, updates: Partial<SessionPlan>) =>
+    this.request<{ plan: SessionPlan }>('/conversation/plan/update', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, updates }),
     })
   conversationEnd = (sessionId: string) =>
     this.request<null>('/conversation/end', {
