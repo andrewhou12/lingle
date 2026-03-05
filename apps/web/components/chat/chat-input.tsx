@@ -17,6 +17,7 @@ interface ChatInputProps {
   showRomaji?: boolean
   onToggleRomaji?: () => void
   minRows?: number
+  allowEmpty?: boolean
 }
 
 const IME_TOOLTIP_KEY = 'lingle-ime-tooltip-dismissed'
@@ -29,7 +30,7 @@ function useIsMac() {
   return isMac
 }
 
-export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled, placeholder, showRomaji, onToggleRomaji, minRows = 1 }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled, placeholder, showRomaji, onToggleRomaji, minRows = 1, allowEmpty }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const isMac = useIsMac()
@@ -102,7 +103,7 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
     ime.reset()
   }, [ime])
 
-  const canSend = value.trim().length > 0 && !disabled
+  const canSend = (allowEmpty || value.trim().length > 0) && !disabled
 
   // Dynamic placeholder
   const dynamicPlaceholder = ime.imeActive

@@ -2,61 +2,130 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { prisma } from '@lingle/db'
 import type { Prisma } from '@prisma/client'
-import type { SessionPlan } from '@/lib/session-plan'
+import {
+  normalizePlan,
+  isConversationPlan,
+  isTutorPlan,
+  type SessionPlan,
+  type ConversationPlan,
+  type TutorPlan,
+} from '@/lib/session-plan'
+import type { ScenarioMode } from '@/lib/experience-scenarios'
 
-export function createConversationTools(_userId: string, _sessionId: string) {
-  return {
+// --- Tool availability matrix per mode ---
+
+export const MODE_TOOLS: Record<ScenarioMode, string[]> = {
+  conversation: ['updateSessionPlan', 'suggestActions', 'displayChoices', 'showCorrection', 'showVocabularyCard', 'showGrammarNote'],
+  tutor: ['updateSessionPlan', 'suggestActions', 'displayChoices', 'showCorrection', 'showVocabularyCard', 'showGrammarNote'],
+  immersion: ['updateSessionPlan', 'suggestActions', 'displayChoices', 'showVocabularyCard', 'showGrammarNote'],
+  reference: ['suggestActions', 'displayChoices', 'showVocabularyCard', 'showGrammarNote'],
+}
+
+export function createConversationTools(_userId: string, _sessionId: string, mode: ScenarioMode = 'conversation') {
+  const allTools = {
     updateSessionPlan: tool({
       description:
-        'Update the session plan when the direction changes — e.g., completing milestones, adjusting goals based on learner performance, shifting focus. Call this proactively when you notice the session evolving.',
+        mode === 'conversation'
+          ? 'Update the scene: shift the topic, change register or tone, introduce tension or a new dynamic. Call this when the conversation naturally evolves.'
+          : mode === 'tutor'
+          ? 'Advance the lesson: mark steps active/completed/skipped, update the objective, add concepts, annotate steps with notes. Call this as you progress through the lesson.'
+          : 'Update the session plan: mark milestones complete, adjust goals, shift focus. Call this when you complete a teaching objective or when the session direction shifts.',
       inputSchema: z.object({
-        completedMilestones: z
-          .array(z.number())
-          .optional()
-          .describe('Indices (0-based) of milestones just completed'),
-        newGoals: z
-          .array(z.string())
-          .optional()
-          .describe('Replace goals if focus has shifted'),
-        newFocus: z.string().optional().describe('Updated one-line focus if the session direction changed'),
-        addVocabulary: z
-          .array(z.string())
-          .optional()
-          .describe('New vocabulary to add to targets'),
-        addGrammar: z
-          .array(z.string())
-          .optional()
-          .describe('New grammar patterns to add to targets'),
+        // --- Conversation fields ---
+        newTopic: z.string().optional().describe('[conversation] New conversation topic'),
+        newRegister: z.string().optional().describe('[conversation] New register (casual/polite/keigo/mixed)'),
+        newTone: z.string().optional().describe('[conversation] New tone (lighthearted/serious/etc)'),
+        newSetting: z.string().optional().describe('[conversation] New setting'),
+        newTension: z.string().optional().describe('[conversation] New conversational tension'),
+        newDynamic: z.string().optional().describe('[conversation] New conversation dynamic'),
+        // --- Tutor fields ---
+        markStepActive: z.number().optional().describe('[tutor] Index (0-based) of the step to mark as active'),
+        markStepCompleted: z.array(z.number()).optional().describe('[tutor] Indices (0-based) of steps to mark completed'),
+        markStepSkipped: z.array(z.number()).optional().describe('[tutor] Indices (0-based) of steps to mark skipped'),
+        newObjective: z.string().optional().describe('[tutor] Updated lesson objective'),
+        addConcepts: z.array(z.object({
+          label: z.string(),
+          type: z.enum(['grammar', 'vocabulary', 'usage']),
+        })).optional().describe('[tutor] New concepts to add'),
+        stepNotes: z.array(z.object({
+          index: z.number(),
+          notes: z.string(),
+        })).optional().describe('[tutor] Annotate steps with notes'),
+        // --- Immersion/reference fields (legacy) ---
+        completedMilestones: z.array(z.number()).optional().describe('[immersion/reference] Indices (0-based) of milestones just completed'),
+        newGoals: z.array(z.string()).optional().describe('[immersion/reference] Replace goals if focus has shifted'),
+        newFocus: z.string().optional().describe('[immersion/reference] Updated one-line focus'),
       }),
-      execute: async ({ completedMilestones, newGoals, newFocus, addVocabulary, addGrammar }) => {
+      execute: async (input) => {
         const session = await prisma.conversationSession.findUniqueOrThrow({
           where: { id: _sessionId },
-          select: { sessionPlan: true },
+          select: { sessionPlan: true, mode: true },
         })
-        const plan = (session.sessionPlan ?? {}) as unknown as SessionPlan
+        const plan = normalizePlan(session.sessionPlan, session.mode)
 
-        if (completedMilestones?.length && plan.milestones) {
-          for (const idx of completedMilestones) {
-            if (plan.milestones[idx]) {
-              plan.milestones[idx].completed = true
+        let updated: SessionPlan
+
+        if (isConversationPlan(plan)) {
+          const p: ConversationPlan = { ...plan }
+          if (input.newTopic) p.topic = input.newTopic
+          if (input.newRegister) p.register = input.newRegister
+          if (input.newTone) p.tone = input.newTone
+          if (input.newSetting) p.setting = input.newSetting
+          if (input.newTension) p.tension = input.newTension
+          if (input.newDynamic) p.dynamic = input.newDynamic
+          updated = p
+        } else if (isTutorPlan(plan)) {
+          const p: TutorPlan = { ...plan, steps: plan.steps.map((s) => ({ ...s })), concepts: [...plan.concepts] }
+          if (input.markStepActive != null && p.steps[input.markStepActive]) {
+            // Deactivate any currently active step
+            for (const s of p.steps) {
+              if (s.status === 'active') s.status = 'upcoming'
+            }
+            p.steps[input.markStepActive].status = 'active'
+          }
+          if (input.markStepCompleted?.length) {
+            for (const idx of input.markStepCompleted) {
+              if (p.steps[idx]) p.steps[idx].status = 'completed'
             }
           }
-        }
-        if (newGoals) plan.goals = newGoals
-        if (newFocus) plan.focus = newFocus
-        if (addVocabulary?.length) {
-          plan.targetVocabulary = [...(plan.targetVocabulary ?? []), ...addVocabulary]
-        }
-        if (addGrammar?.length) {
-          plan.targetGrammar = [...(plan.targetGrammar ?? []), ...addGrammar]
+          if (input.markStepSkipped?.length) {
+            for (const idx of input.markStepSkipped) {
+              if (p.steps[idx]) p.steps[idx].status = 'skipped'
+            }
+          }
+          if (input.newObjective) p.objective = input.newObjective
+          if (input.addConcepts?.length) {
+            p.concepts = [...p.concepts, ...input.addConcepts]
+          }
+          if (input.stepNotes?.length) {
+            for (const { index, notes } of input.stepNotes) {
+              if (p.steps[index]) p.steps[index].notes = notes
+            }
+          }
+          updated = p
+        } else {
+          // Immersion/reference — legacy behavior
+          const p = { ...plan } as SessionPlan & Record<string, unknown>
+          if (input.completedMilestones?.length && 'milestones' in p && Array.isArray(p.milestones)) {
+            p.milestones = p.milestones.map((m: { description: string; completed: boolean }, i: number) =>
+              input.completedMilestones!.includes(i) ? { ...m, completed: true } : m
+            )
+          }
+          if (input.newGoals && 'goals' in p) {
+            (p as { goals: string[] }).goals = input.newGoals
+          }
+          if (input.newFocus && 'focus' in p) {
+            (p as { focus: string }).focus = input.newFocus
+          }
+          updated = p as SessionPlan
         }
 
         await prisma.conversationSession.update({
           where: { id: _sessionId },
-          data: { sessionPlan: plan as unknown as Prisma.InputJsonValue },
+          data: { sessionPlan: updated as unknown as Prisma.InputJsonValue },
         })
 
-        return { updated: true, plan }
+        return { updated: true, plan: updated }
       },
     }),
 
@@ -105,7 +174,7 @@ export function createConversationTools(_userId: string, _sessionId: string) {
         grammarPoint: z
           .string()
           .optional()
-          .describe('The grammar point involved, if applicable (e.g. "て-form")'),
+          .describe('The grammar point involved, if applicable (e.g. "te-form")'),
       }),
       execute: async (input) => {
         return input
@@ -132,9 +201,9 @@ export function createConversationTools(_userId: string, _sessionId: string) {
       description:
         'Show a grammar explanation card. Use when teaching a grammar point, when the learner asks about grammar, or when a grammar pattern comes up that deserves explanation.',
       inputSchema: z.object({
-        pattern: z.string().describe('The grammar pattern (e.g. "〜てもいいですか")'),
+        pattern: z.string().describe('The grammar pattern (e.g. "~temoidesuka")'),
         meaning: z.string().describe('What the pattern means in English'),
-        formation: z.string().describe('How to form it (e.g. "Verb て-form + もいいですか")'),
+        formation: z.string().describe('How to form it (e.g. "Verb te-form + moidesuka")'),
         examples: z
           .array(
             z.object({
@@ -152,6 +221,17 @@ export function createConversationTools(_userId: string, _sessionId: string) {
       },
     }),
   }
+
+  // Filter tools to only those available for this mode
+  const allowedTools = MODE_TOOLS[mode] ?? MODE_TOOLS.conversation
+  const filtered: Record<string, typeof allTools[keyof typeof allTools]> = {}
+  for (const toolName of allowedTools) {
+    if (toolName in allTools) {
+      filtered[toolName] = allTools[toolName as keyof typeof allTools]
+    }
+  }
+
+  return filtered
 }
 
 export type ConversationTools = ReturnType<typeof createConversationTools>

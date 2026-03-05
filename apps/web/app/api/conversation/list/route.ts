@@ -10,11 +10,20 @@ export const GET = withAuth(async (_request, { userId }) => {
   })
 
   return NextResponse.json(
-    sessions.map((s) => ({
-      id: s.id,
-      timestamp: s.timestamp.toISOString(),
-      durationSeconds: s.durationSeconds,
-      sessionFocus: (s.sessionPlan as { sessionFocus?: string })?.sessionFocus ?? '',
-    }))
+    sessions.map((s) => {
+      const plan = (s.sessionPlan ?? {}) as Record<string, unknown>
+      // Prefer AI-generated title, then topic (conversation/tutor), then focus (immersion/reference)
+      const title = (plan.generatedTitle as string)
+        || (plan.topic as string)
+        || (plan.focus as string)
+        || ''
+      return {
+        id: s.id,
+        timestamp: s.timestamp.toISOString(),
+        durationSeconds: s.durationSeconds,
+        mode: s.mode ?? 'conversation',
+        sessionFocus: title,
+      }
+    })
   )
 })

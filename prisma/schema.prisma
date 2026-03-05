@@ -180,6 +180,7 @@ model ConversationSession {
   id              String   @id @default(uuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id])
+  mode            String   @default("conversation")
   timestamp       DateTime @default(now())
   durationSeconds Int?
   transcript      Json

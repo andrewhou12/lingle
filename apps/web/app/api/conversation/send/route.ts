@@ -3,7 +3,8 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import { createConversationTools } from '@/lib/conversation-tools'
-import { formatPlanForPrompt, type SessionPlan } from '@/lib/session-plan'
+import { normalizePlan, formatPlanForPrompt } from '@/lib/session-plan'
+import type { ScenarioMode } from '@/lib/experience-scenarios'
 import type { ConversationMessage, ConversationToolCall } from '@lingle/shared/types'
 import type { Prisma } from '@prisma/client'
 
@@ -11,6 +12,7 @@ export const POST = withAuth(async (request, { userId }) => {
   const body = await request.json()
   const messages: UIMessage[] = body.messages
   const sessionId: string | undefined = body.sessionId
+  const voiceMode: boolean = body.voiceMode === true
 
   if (!sessionId) {
     return new Response(JSON.stringify({ error: 'Missing sessionId in request body' }), {
@@ -21,17 +23,40 @@ export const POST = withAuth(async (request, { userId }) => {
 
   const session = await prisma.conversationSession.findUniqueOrThrow({
     where: { id: sessionId },
-    select: { systemPrompt: true, sessionPlan: true },
+    select: { systemPrompt: true, sessionPlan: true, mode: true },
   })
   if (!session.systemPrompt) throw new Error('Session has no system prompt')
 
-  // Combine static system prompt + dynamic session plan
-  const planBlock = session.sessionPlan
-    ? `\n\n═══ SESSION PLAN ═══\n${formatPlanForPrompt(session.sessionPlan as unknown as SessionPlan)}\n\nFollow this plan. Track milestones. Adapt if the learner's needs shift — call updateSessionPlan to record changes.`
-    : ''
-  const system = session.systemPrompt + planBlock
+  const sessionMode = (session.mode || 'conversation') as ScenarioMode
 
-  const tools = createConversationTools(userId, sessionId)
+  // Combine static system prompt + dynamic session plan
+  const plan = session.sessionPlan ? normalizePlan(session.sessionPlan, sessionMode) : null
+  const planInstruction =
+    sessionMode === 'conversation'
+      ? 'Use this scene card to guide the conversation. Stay in character. If the conversation evolves, call updateSessionPlan to update the scene.'
+      : sessionMode === 'tutor'
+      ? 'Follow this lesson plan step by step. Call updateSessionPlan to mark steps active as you begin them, and completed when done. Adapt if the learner needs to skip or revisit.'
+      : sessionMode === 'reference'
+      ? 'Follow this plan. Track milestones.'
+      : 'Follow this plan. Track milestones. Adapt if the learner\'s needs shift — call updateSessionPlan to record changes.'
+  const planBlock = plan
+    ? `\n\n═══ SESSION PLAN ═══\n${formatPlanForPrompt(plan)}\n\n${planInstruction}`
+    : ''
+  const voiceBlock = voiceMode
+    ? `\n\n═══ VOICE MODE ═══
+This is a live voice conversation. The learner is speaking aloud and hearing your
+responses via text-to-speech.
+
+1. Keep responses SHORT. 1-3 sentences max. No monologues.
+2. Do NOT use displayChoices or suggestActions. Present options conversationally.
+3. End sentences cleanly with 。！？ — the TTS needs clear boundaries.
+4. No markdown, no bullet points, no lists. Just natural speech.
+5. Corrections, vocabulary cards, and grammar notes still work as visual overlays.
+6. If the learner's speech was unclear, ask them to repeat naturally.`
+    : ''
+  const system = session.systemPrompt + planBlock + voiceBlock
+
+  const tools = createConversationTools(userId, sessionId, sessionMode)
   const modelMessages = await convertToModelMessages(messages, { tools })
 
   console.log('[send] modelMessages count:', modelMessages.length)

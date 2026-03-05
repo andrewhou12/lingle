@@ -15,6 +15,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@lingle/db": "workspace:*",
     "@lingle/shared": "workspace:*",
+    "@soniox/client": "^1.0.2",
     "@supabase/ssr": "^0.6.0",
     "@supabase/supabase-js": "^2.97.0",
     "@tailwindcss/postcss": "^4.2.0",

@@ -1,19 +1,59 @@
 import { getDifficultyLevel } from './difficulty-levels'
 
+const TOOL_DOCS: Record<string, string> = {
+  displayChoices:
+    '**displayChoices** — When offering the learner options to pick from (e.g., "what would you say next?", quiz questions, practice exercises). 2-4 choices with optional English hints.',
+  showCorrection:
+    '**showCorrection** — When the learner makes a grammatical or vocabulary error and you want to gently highlight it. Include what they wrote, the corrected form, and a brief explanation.',
+  showVocabularyCard:
+    '**showVocabularyCard** — When introducing a new word, when the learner asks about a word, or when a word comes up that deserves attention. Include the word, reading, meaning, and optionally an example sentence.',
+  showGrammarNote:
+    '**showGrammarNote** — When teaching a grammar point, when the learner asks about grammar, or when a pattern deserves explanation. Include the pattern, meaning, formation rule, and 1-3 examples.',
+  suggestActions:
+    '**suggestActions** — Always call this at the end of every response with 2-3 contextual next actions.',
+  updateSessionPlan:
+    '**updateSessionPlan** — Update the session plan when something changes.',
+}
+
+const MODE_TOOL_DOCS: Partial<Record<string, Record<string, string>>> = {
+  updateSessionPlan: {
+    conversation:
+      '**updateSessionPlan** — Update the scene: shift the topic, change register or tone, introduce tension or a new dynamic. Call this when the conversation naturally evolves to a new subject or mood.',
+    tutor:
+      '**updateSessionPlan** — Advance the lesson: mark steps active/completed/skipped, update the objective, add new concepts, annotate steps with notes. Call this as you progress through each lesson step.',
+    immersion:
+      '**updateSessionPlan** — Update the session plan: mark milestones complete, adjust goals, shift focus. Call this when you complete a teaching objective or the session direction shifts.',
+    reference:
+      '**updateSessionPlan** — Update the session plan: mark milestones complete, adjust goals, shift focus.',
+  },
+}
+
 export function buildSystemPrompt({
   userPrompt,
   mode,
   difficultyLevel,
   nativeLanguage,
   targetLanguage,
+  availableTools,
 }: {
   userPrompt: string
   mode: string
   difficultyLevel: number
   nativeLanguage: string
   targetLanguage: string
+  availableTools?: string[]
 }): string {
   const level = getDifficultyLevel(difficultyLevel)
+
+  // Build tool docs section — only describe tools that are available, with mode-specific overrides
+  const toolNames = availableTools ?? Object.keys(TOOL_DOCS)
+  const toolDocLines = toolNames
+    .filter((name) => name in TOOL_DOCS)
+    .map((name) => {
+      const modeOverride = MODE_TOOL_DOCS[name]?.[mode]
+      return `- ${modeOverride ?? TOOL_DOCS[name]}`
+    })
+    .join('\n')
 
   return `You are Lingle, a ${targetLanguage} language learning engine.
 
@@ -31,12 +71,7 @@ ${getModeBlock(mode)}
 
 You have tools that render interactive UI cards inline. Use them naturally:
 
-- **displayChoices** — When offering the learner options to pick from (e.g., "what would you say next?", quiz questions, practice exercises). 2-4 choices with optional English hints.
-- **showCorrection** — When the learner makes a grammatical or vocabulary error and you want to gently highlight it. Include what they wrote, the corrected form, and a brief explanation.
-- **showVocabularyCard** — When introducing a new word, when the learner asks about a word, or when a word comes up that deserves attention. Include the word, reading, meaning, and optionally an example sentence.
-- **showGrammarNote** — When teaching a grammar point, when the learner asks about grammar, or when a pattern deserves explanation. Include the pattern, meaning, formation rule, and 1-3 examples.
-- **suggestActions** — Always call this at the end of every response with 2-3 contextual next actions.
-- **updateSessionPlan** — Update the session plan: mark milestones complete, adjust goals, add new vocabulary/grammar targets. Call this when you complete a teaching objective or when the session direction shifts.
+${toolDocLines}
 
 ═══ TOOL RULES ═══
 1. ALWAYS write your conversational text BEFORE calling any tools. Never respond with only tool calls.
@@ -58,7 +93,7 @@ ${level.behaviorBlock}
 4. RUBY ANNOTATIONS. {kanji|reading} per difficulty spec.
 5. KEEP IT NATURAL. Respond like a real person would. Don't over-teach in conversation mode. Don't under-explain in tutor or reference mode.
 6. PACE. ${getModePacing(mode)}
-7. FOLLOW THE PLAN. Reference your session plan to decide what to do next. Don't repeat completed milestones. When you achieve a goal or the learner redirects, call updateSessionPlan to record the change.`
+7. FOLLOW THE PLAN. Reference your session plan to decide what to do next. Don't repeat completed milestones.${availableTools?.includes('updateSessionPlan') !== false ? ' When you achieve a goal or the learner redirects, call updateSessionPlan to record the change.' : ''}`
 }
 
 function getModeBlock(mode: string): string {

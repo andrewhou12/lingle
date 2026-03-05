@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Square, PanelRight, Volume2, VolumeX } from 'lucide-react'
+import { Square, PanelRight, Volume2, VolumeX, Mic, MessageSquare, ChevronRight, ArrowUp } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import Markdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
@@ -28,6 +29,9 @@ import { VocabularyCard, VocabularyCardSkeleton } from '@/components/chat/vocabu
 import { GrammarNote, GrammarNoteSkeleton } from '@/components/chat/grammar-note'
 import { LearningPanel } from '@/components/panels/learning-panel'
 import { Spinner } from '@/components/spinner'
+import { VoiceSessionOverlay } from '@/components/voice/voice-session-overlay'
+import { useJapaneseIME } from '@/hooks/use-japanese-ime'
+import { IMECandidatePanel } from '@/components/chat/ime/ime-candidate-panel'
 import { cn } from '@/lib/utils'
 import {
   type ScenarioMode,
@@ -36,6 +40,13 @@ import {
   MODE_PLACEHOLDERS,
   getAllModes,
 } from '@/lib/experience-scenarios'
+
+const MODE_DEFAULT_PROMPTS: Record<string, string> = {
+  conversation: "Let's have a casual conversation in Japanese.",
+  tutor: "I'd like to practice Japanese with a tutor.",
+  immersion: 'Create an immersive Japanese listening exercise.',
+  reference: 'I have some questions about Japanese.',
+}
 
 function getGreeting(): { japanese: string; english: string } {
   const hour = new Date().getHours()
@@ -47,7 +58,84 @@ function getGreeting(): { japanese: string; english: string } {
   } else {
     japanese = '\u3053\u3093\u3070\u3093\u306F\uFF01'
   }
-  return { japanese, english: 'What would you like to do today?' }
+  return { japanese, english: 'What would you like to practice today?' }
+}
+
+/* ── Suggestions per mode ── */
+const SUGGESTIONS: Record<ScenarioMode, { icon: string; label: string }[]> = {
+  conversation: [
+    { icon: '\uD83C\uDF5C', label: 'Order ramen at a busy Tokyo shop' },
+    { icon: '\uD83D\uDE86', label: 'Ask for directions at Shinjuku station' },
+    { icon: '\uD83C\uDFEE', label: 'Haggle at an Osaka flea market' },
+    { icon: '\uD83C\uDF38', label: 'Small talk during hanami season' },
+    { icon: '\u2615', label: 'Chat with a barista in Kyoto' },
+    { icon: '\uD83C\uDFE8', label: 'Check into a ryokan in Hakone' },
+    { icon: '\uD83D\uDE95', label: 'Give directions to a taxi driver' },
+    { icon: '\uD83C\uDF89', label: 'Make plans for a weekend trip' },
+  ],
+  tutor: [
+    { icon: '\u270D\uFE0F', label: 'Master the \u3066-form conjugation' },
+    { icon: '\uD83D\uDD24', label: 'Learn 20 essential counters' },
+    { icon: '\uD83C\uDF8C', label: 'Keigo \u2014 polite speech patterns' },
+    { icon: '\uD83D\uDD0A', label: 'Pitch accent fundamentals' },
+    { icon: '\uD83D\uDCD6', label: 'Difference between \u306F and \u304C' },
+    { icon: '\uD83D\uDCAC', label: 'Casual vs. polite form practice' },
+    { icon: '\uD83D\uDD22', label: 'Japanese time expressions' },
+    { icon: '\uD83C\uDFAF', label: 'Common particle mistakes' },
+  ],
+  immersion: [
+    { icon: '\uD83D\uDCF0', label: 'Read today\u2019s NHK Easy News' },
+    { icon: '\uD83C\uDFAC', label: 'Analyze a scene from Your Name' },
+    { icon: '\uD83D\uDCD6', label: 'Manga panel \u2014 decode slang' },
+    { icon: '\uD83C\uDFB5', label: 'Break down Yoasobi lyrics' },
+    { icon: '\uD83C\uDFAE', label: 'Translate a game dialogue' },
+    { icon: '\uD83D\uDCFA', label: 'News clip listening practice' },
+    { icon: '\uD83D\uDCDD', label: 'Read a short story excerpt' },
+    { icon: '\uD83C\uDF99\uFE0F', label: 'Podcast transcript breakdown' },
+  ],
+  reference: [
+    { icon: '\uD83D\uDDC2\uFE0F', label: 'JLPT N3 vocabulary deck' },
+    { icon: '\uD83D\uDCD0', label: 'Particle cheat sheet' },
+    { icon: '\uD83C\uDE33', label: 'Kanji by radicals \u2014 RTK method' },
+    { icon: '\uD83D\uDCCB', label: 'Common set phrases \u2014 \u6163\u7528\u53E5' },
+    { icon: '\uD83D\uDD0D', label: 'Verb conjugation table' },
+    { icon: '\uD83D\uDCDA', label: 'Onomatopoeia dictionary' },
+    { icon: '\uD83C\uDDEF\uD83C\uDDF5', label: 'Cultural etiquette notes' },
+    { icon: '\uD83D\uDCC8', label: 'JLPT grammar comparison chart' },
+  ],
+}
+
+const SUGGESTION_TITLES: Record<ScenarioMode, string> = {
+  conversation: 'Suggested Scenarios',
+  tutor: 'Suggested Lessons',
+  immersion: 'Suggested Content',
+  reference: 'Browse Topics',
+}
+
+const MODE_DOTS: Record<string, string> = {
+  conversation: '#22a355',
+  tutor: '#3b6ec2',
+  immersion: '#8b5cf6',
+  reference: '#c8572a',
+}
+
+function formatRelativeTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return ''
+  const mins = Math.round(seconds / 60)
+  return `${mins} min`
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -67,6 +155,7 @@ export function ConversationView() {
 }
 
 function ConversationViewInner() {
+  const router = useRouter()
   const [phase, setPhase] = useState<Phase>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionTitle, setSessionTitle] = useState<string>('Conversation')
@@ -75,10 +164,17 @@ function ConversationViewInner() {
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<ScenarioMode>('conversation')
+  const [activeMode, setActiveMode] = useState<ScenarioMode>('conversation')
+  const [inputMode, setInputMode] = useState<'chat' | 'voice'>('chat')
+  const [voiceSessionConfig, setVoiceSessionConfig] = useState<{ prompt: string; mode: ScenarioMode } | null>(null)
   const [chosenChoiceIds, setChosenChoiceIds] = useState<Set<string>>(new Set())
   const [difficultyLevel, setDifficultyLevel] = useState(3) // default intermediate
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false)
+  const [recentSessions, setRecentSessions] = useState<{ id: string; timestamp: string; durationSeconds: number | null; mode: string; sessionFocus: string }[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const idleTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const idleIme = useJapaneseIME(input, setInput)
   const sessionIdRef = useRef<string | null>(null)
   sessionIdRef.current = sessionId
   const { showRomaji, toggle: toggleRomaji } = useRomaji()
@@ -233,6 +329,13 @@ function ConversationViewInner() {
     prevIsSendingRef.current = isSending
   }, [isSending, messages, difficultyLevel, difficultyViolations])
 
+  // Fetch recent sessions for idle screen
+  useEffect(() => {
+    if (phase === 'idle') {
+      api.conversationList().then(setRecentSessions).catch(() => {})
+    }
+  }, [phase])
+
   const handleStartSession = useCallback(async (prompt: string, mode: ScenarioMode) => {
     setIsLoading(true)
     setError(null)
@@ -245,6 +348,7 @@ function ConversationViewInner() {
       setSessionId(result._sessionId ?? null)
       setSessionTitle(result.sessionFocus || MODE_LABELS[mode])
       setSessionPlan(result.plan ?? null)
+      setActiveMode(mode)
       setChosenChoiceIds(new Set())
       panelAutoOpenedRef.current = false
       setMessages([])
@@ -261,11 +365,14 @@ function ConversationViewInner() {
   }, [setMessages, sendMessage])
 
   const handleFreePromptSubmit = useCallback(async () => {
-    if (!input.trim()) return
-    const text = input.trim()
+    const text = input.trim() || MODE_DEFAULT_PROMPTS[selectedMode] || MODE_DEFAULT_PROMPTS.conversation
     setInput('')
-    await handleStartSession(text, selectedMode)
-  }, [input, selectedMode, handleStartSession])
+    if (inputMode === 'voice') {
+      setVoiceSessionConfig({ prompt: text, mode: selectedMode })
+    } else {
+      await handleStartSession(text, selectedMode)
+    }
+  }, [input, selectedMode, inputMode, handleStartSession])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isSending) return
@@ -305,6 +412,7 @@ function ConversationViewInner() {
     setSessionId(null)
     setSessionTitle('Conversation')
     setSessionPlan(null)
+    setActiveMode('conversation')
     setMessages([])
     panel.close()
   }, [sessionId, setMessages, panel])
@@ -319,80 +427,302 @@ function ConversationViewInner() {
     }
   }, [sessionId])
 
+  // Voice overlay
+  if (voiceSessionConfig) {
+    return (
+      <VoiceSessionOverlay
+        prompt={voiceSessionConfig.prompt}
+        mode={voiceSessionConfig.mode}
+        onEnd={() => setVoiceSessionConfig(null)}
+      />
+    )
+  }
+
   // Idle Phase — experience launcher
   if (phase === 'idle') {
     const greeting = getGreeting()
     const modes = getAllModes()
+    const suggestions = SUGGESTIONS[selectedMode]
+    const textareaRef = idleTextareaRef
 
     return (
-      <div className="h-full flex flex-col items-center px-6 pt-12 pb-6 overflow-auto">
-        <div className="max-w-[720px] w-full flex flex-col items-center">
-          {/* Logo */}
-          <h1 className="logo-shimmer text-[42px] italic font-serif font-semibold mb-6 select-none">
-            Lingle
-          </h1>
+      <div className="h-full flex flex-col items-center overflow-auto">
+        <div className="w-full max-w-[620px] flex flex-col items-center pt-12 pb-12 px-6">
 
-          {/* Japanese greeting */}
-          <p className="text-[28px] font-jp font-medium text-text-primary mb-1.5">
-            {greeting.japanese}
-          </p>
-
-          {/* English line */}
-          <p className="text-[15px] text-text-secondary mb-8">
-            {greeting.english}
-          </p>
+          {/* Greeting */}
+          <div className="text-center mb-8 idle-entrance">
+            <div className="font-jp text-[44px] font-light tracking-[0.04em] text-text-primary leading-[1.2] mb-2">
+              {greeting.japanese}
+            </div>
+            <p className="text-[15px] text-text-secondary">{greeting.english}</p>
+          </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-warm-soft rounded-lg w-full">
+            <div className="mb-6 p-3 bg-warm-soft rounded-xl w-full">
               <span className="text-[13px] text-accent-warm">{error}</span>
             </div>
           )}
 
           {/* Loading overlay */}
           {isLoading ? (
-            <div className="flex items-center gap-2.5 py-3 mb-6">
+            <div className="flex items-center gap-2.5 py-3">
               <Spinner size={16} />
               <span className="text-[14px] text-text-muted">Starting session...</span>
             </div>
           ) : (
             <>
-              {/* Mode tabs */}
-              <div className="w-full mb-2 grid grid-cols-4 gap-2">
+              {/* Tabs — pill style */}
+              <div className="idle-entrance flex gap-0.5 p-[3px] bg-bg-hover border border-border rounded-[10px] mb-6" style={{ animationDelay: '0.07s', opacity: 0 }}>
                 {modes.map((mode) => (
                   <button
                     key={mode}
                     className={cn(
-                      'flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-lg text-[13px] font-medium border cursor-pointer transition-all',
+                      'px-3.5 py-[5px] rounded-md text-[14px] font-medium cursor-pointer transition-[background,color] duration-100 whitespace-nowrap border-none',
                       selectedMode === mode
-                        ? 'bg-accent-brand text-white border-accent-brand shadow-[var(--shadow-sm)]'
-                        : 'bg-bg-pure text-text-secondary border-border-subtle hover:border-border-strong hover:bg-bg-hover'
+                        ? 'bg-accent-brand text-white'
+                        : 'bg-transparent text-text-muted hover:bg-bg-hover hover:text-text-primary'
                     )}
-                    onClick={() => setSelectedMode(mode)}
+                    onClick={() => { setSelectedMode(mode); setShowAllSuggestions(false) }}
                   >
-                    <span>{MODE_LABELS[mode]}</span>
-                    <span className={cn(
-                      'text-[11px] font-normal',
-                      selectedMode === mode ? 'text-white/70' : 'text-text-muted'
-                    )}>
-                      {MODE_DESCRIPTIONS[mode]}
-                    </span>
+                    {MODE_LABELS[mode]}
                   </button>
                 ))}
               </div>
 
-              {/* Free prompt input */}
-              <div className="w-full mt-4">
-                <ChatInput
-                  value={input}
-                  onChange={setInput}
-                  onSend={handleFreePromptSubmit}
-                  disabled={isLoading}
-                  placeholder={MODE_PLACEHOLDERS[selectedMode]}
-                  showRomaji={showRomaji}
-                  onToggleRomaji={toggleRomaji}
-                  minRows={2}
-                />
+              {/* Input box */}
+              <div className="w-full idle-entrance" style={{ animationDelay: '0.13s', opacity: 0 }}>
+                <div className="relative">
+                  <div className="bg-bg-pure border border-border rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)] transition-[border-color,box-shadow] duration-150 focus-within:border-border-strong focus-within:shadow-[0_2px_8px_rgba(0,0,0,.06),0_1px_4px_rgba(0,0,0,.04)]">
+                    <div className="relative">
+                      {/* IME composition highlight layer */}
+                      {idleIme.mode !== 'direct' && idleIme.composedText && idleIme.compositionStart >= 0 && (
+                        <div
+                          className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words px-4 pt-3.5 pb-2.5 overflow-hidden text-left"
+                          style={{ font: 'inherit', fontSize: '14.5px', lineHeight: '1.65' }}
+                          aria-hidden="true"
+                        >
+                          <span style={{ color: 'transparent' }}>{input.slice(0, idleIme.compositionStart)}</span>
+                          <span className="rounded-[3px]" style={{ color: 'transparent', backgroundColor: 'rgba(62, 99, 221, 0.12)' }}>
+                            {idleIme.composedText}
+                          </span>
+                          <span style={{ color: 'transparent' }}>{input.slice(idleIme.compositionStart + idleIme.composedText.length)}</span>
+                        </div>
+                      )}
+
+                      {/* IME suggestion overlay */}
+                      {idleIme.mode !== 'direct' && idleIme.composedText && idleIme.compositionStart >= 0 && idleIme.suggestion && (
+                        <div
+                          className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words px-4 pt-3.5 pb-2.5 text-left"
+                          style={{ font: 'inherit', fontSize: '14.5px', lineHeight: '1.65' }}
+                          aria-hidden="true"
+                        >
+                          <span style={{ visibility: 'hidden' }}>{input.slice(0, idleIme.compositionStart)}</span>
+                          <span className="relative inline-block">
+                            <span className="absolute bottom-full left-0 mb-1 whitespace-nowrap bg-bg-secondary border border-border rounded-md px-2 py-0.5 text-[14px] font-jp text-text-primary shadow-sm z-20">
+                              {idleIme.suggestion}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
+                      <textarea
+                        ref={textareaRef}
+                        value={input}
+                        onChange={(e) => {
+                          if (idleIme.imeActive && idleIme.mode !== 'direct') return
+                          setInput(e.target.value)
+                          const ta = e.target
+                          ta.style.height = 'auto'
+                          ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
+                        }}
+                        placeholder={idleIme.imeActive ? "Type romaji to write Japanese... (e.g., 'taberu' \u2192 \u98DF\u3079\u308B)" : MODE_PLACEHOLDERS[selectedMode]}
+                        onKeyDown={(e) => {
+                          const consumed = idleIme.handleKeyDown(e)
+                          if (consumed) return
+                          if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+                            e.preventDefault()
+                            idleIme.toggleIME()
+                            return
+                          }
+                          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                            e.preventDefault()
+                            handleFreePromptSubmit()
+                          }
+                        }}
+                        onBlur={() => {
+                          if (idleIme.mode !== 'direct') idleIme.reset()
+                        }}
+                        className="block w-full border-none outline-none resize-none bg-transparent text-[14.5px] text-text-primary leading-[1.65] px-4 pt-3.5 pb-2.5 min-h-[56px] placeholder:text-text-placeholder relative z-10"
+                        style={{ fontFamily: 'inherit' }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between px-3 pb-2.5 pt-2 border-t border-bg-hover">
+                      <div className="flex gap-1.5">
+                        {/* IME toggle */}
+                        <button
+                          className={cn(
+                            'w-7 h-7 rounded-md flex items-center justify-center border cursor-pointer text-[13px] font-bold font-jp transition-[border-color,color,background] duration-100',
+                            idleIme.imeActive
+                              ? 'border-accent-brand/30 bg-accent-brand/10 text-accent-brand'
+                              : 'border-border bg-transparent text-text-muted hover:border-border-strong hover:text-text-primary hover:bg-bg-secondary'
+                          )}
+                          onClick={idleIme.toggleIME}
+                          title={idleIme.imeActive ? 'Japanese IME on' : 'Japanese IME off'}
+                        >
+                          {idleIme.imeActive ? '\u3042' : 'A'}
+                        </button>
+                        {/* Voice */}
+                        <button
+                          className="w-7 h-7 rounded-md flex items-center justify-center border border-border bg-transparent cursor-pointer text-text-muted transition-[border-color,color,background] duration-100 hover:border-border-strong hover:text-text-primary hover:bg-bg-secondary"
+                          title="Voice"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+                          </svg>
+                        </button>
+                        {/* Attach */}
+                        <button
+                          className="w-7 h-7 rounded-md flex items-center justify-center border border-border bg-transparent cursor-pointer text-text-muted transition-[border-color,color,background] duration-100 hover:border-border-strong hover:text-text-primary hover:bg-bg-secondary"
+                          title="Attach"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] text-text-placeholder select-none">
+                          {idleIme.imeActive
+                            ? idleIme.mode !== 'direct'
+                              ? 'Enter confirm \u00B7 Space candidates \u00B7 Esc revert'
+                              : '\u23CE send \u00B7 \u2318Space toggle IME'
+                            : '\u23CE send \u00B7 \u21E7\u23CE newline'
+                          }
+                        </span>
+                        <button
+                          className={cn(
+                            'w-8 h-8 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center justify-center transition-opacity duration-150 shrink-0',
+                            !input.trim() && 'bg-bg-active cursor-default'
+                          )}
+                          onClick={handleFreePromptSubmit}
+                        >
+                          <ArrowUp size={14} className={input.trim() ? 'text-white' : 'text-text-muted'} />
+                        </button>
+                    </div>
+                  </div>
+                </div>
+
+                  {/* IME Candidate panel */}
+                  {idleIme.showCandidates && idleIme.candidates.length > 0 && (
+                    <IMECandidatePanel
+                      candidates={idleIme.candidates}
+                      selectedIndex={idleIme.selectedIndex}
+                      onSelect={(index) => {
+                        const ta = textareaRef.current
+                        if (!ta) return
+                        const candidate = idleIme.candidates[index]
+                        if (candidate) {
+                          idleIme.insertText(ta, candidate.surface)
+                          idleIme.reset()
+                        }
+                      }}
+                      onDismiss={() => idleIme.reset()}
+                    />
+                  )}
+                </div>
+
+                {/* Mode toggle — Chat / Voice */}
+                <div className="flex justify-center mt-2.5">
+                  <div className="flex gap-0.5 p-[3px] bg-bg-hover border border-border rounded-lg">
+                    <button
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-[5px] rounded-md text-[13px] font-medium cursor-pointer transition-all duration-100 border-none',
+                        inputMode === 'chat'
+                          ? 'bg-bg-pure text-text-primary shadow-[0_1px_2px_rgba(0,0,0,.06)]'
+                          : 'bg-transparent text-text-muted hover:text-text-primary'
+                      )}
+                      onClick={() => setInputMode('chat')}
+                    >
+                      <MessageSquare size={12} />
+                      Chat
+                    </button>
+                    <button
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-[5px] rounded-md text-[13px] font-medium cursor-pointer transition-all duration-100 border-none',
+                        inputMode === 'voice'
+                          ? 'bg-bg-pure text-text-primary shadow-[0_1px_2px_rgba(0,0,0,.06)]'
+                          : 'bg-transparent text-text-muted hover:text-text-primary'
+                      )}
+                      onClick={() => setInputMode('voice')}
+                    >
+                      <Mic size={12} />
+                      Voice
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Suggestions */}
+              <div className="w-full mt-8 idle-entrance" style={{ animationDelay: '0.19s', opacity: 0 }}>
+                <div className="flex justify-between items-center mb-2.5">
+                  <span className="text-[11px] font-semibold tracking-[0.07em] uppercase text-text-muted">
+                    {SUGGESTION_TITLES[selectedMode]}
+                  </span>
+                  <button
+                    className="bg-transparent border-none cursor-pointer text-[13px] text-text-muted hover:text-text-primary transition-colors"
+                    onClick={() => setShowAllSuggestions((v) => !v)}
+                  >
+                    {showAllSuggestions ? 'Show less' : 'See all \u2192'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {suggestions.slice(0, showAllSuggestions ? suggestions.length : 4).map((s, i) => (
+                    <button
+                      key={i}
+                      className="flex items-start gap-2.5 p-3 rounded-lg bg-bg-pure border border-border-subtle cursor-pointer text-left w-full shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)] transition-[box-shadow,border-color,transform] duration-150 hover:border-border-strong hover:shadow-[0_2px_8px_rgba(0,0,0,.06),0_1px_4px_rgba(0,0,0,.04)] hover:-translate-y-px"
+                      onClick={() => {
+                        setInput(s.label)
+                        textareaRef.current?.focus()
+                      }}
+                      style={{ fontFamily: 'inherit' }}
+                    >
+                      <span className="text-[20px] leading-none mt-0.5 shrink-0">{s.icon}</span>
+                      <div className="text-[13px] font-medium text-text-primary leading-[1.4]">{s.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent sessions — hide sessions shorter than 60s */}
+              {recentSessions.filter(s => s.durationSeconds !== null && s.durationSeconds >= 60).length > 0 && (
+                <div className="w-full mt-7 idle-entrance" style={{ animationDelay: '0.25s', opacity: 0 }}>
+                  <div className="text-[11px] font-semibold tracking-[0.07em] uppercase text-text-muted mb-1.5">
+                    Recent Sessions
+                  </div>
+                  <div className="bg-bg-pure border border-border-subtle rounded-lg overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+                    {recentSessions.filter(s => s.durationSeconds !== null && s.durationSeconds >= 60).slice(0, 5).map((session, i) => {
+                      const dot = MODE_DOTS[session.mode] || '#9b9b9b'
+                      const duration = formatDuration(session.durationSeconds)
+                      const time = formatRelativeTime(session.timestamp)
+                      const label = session.sessionFocus || MODE_LABELS[session.mode as ScenarioMode] || 'Session'
+                      return (
+                        <button
+                          key={session.id}
+                          className="flex items-center gap-3 px-2.5 py-2 bg-transparent border-none w-full cursor-pointer text-left transition-colors hover:bg-bg-hover"
+                          style={{ fontFamily: 'inherit', borderTop: i > 0 ? '1px solid var(--bg-hover)' : 'none' }}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dot }} />
+                          <span className="flex-1 text-[13px] font-medium text-text-primary truncate">{label}</span>
+                          <span className="text-[12px] text-text-muted shrink-0">
+                            {time}{duration ? ` \u00B7 ${duration}` : ''}
+                          </span>
+                          <ChevronRight size={12} className="text-text-muted" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -405,7 +735,12 @@ function ConversationViewInner() {
     <div className="h-full flex flex-col -m-6">
       {/* Session info sticky bar */}
       <div className="flex items-center justify-between px-6 py-2.5 border-b border-border shrink-0 bg-bg">
-        <span className="text-[13px] font-medium text-text-primary truncate">{sessionTitle}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="shrink-0 px-1.5 py-0.5 rounded bg-bg-secondary text-[11px] font-medium text-text-muted uppercase tracking-wide">
+            {MODE_LABELS[activeMode]}
+          </span>
+          <span className="text-[13px] font-medium text-text-primary truncate">{sessionTitle}</span>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
             className={cn(
@@ -430,6 +765,14 @@ function ConversationViewInner() {
             title="Toggle session panel"
           >
             <PanelRight size={16} />
+          </button>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-lg bg-bg-secondary px-3 py-1.5 text-[13px] font-medium text-text-secondary border border-border cursor-pointer transition-colors hover:border-accent-brand hover:text-accent-brand"
+            onClick={() => router.push(`/conversation/voice?sessionId=${sessionId}`)}
+            title="Switch to voice mode"
+          >
+            <Mic size={12} />
+            Voice
           </button>
           <button
             className={cn(
@@ -501,8 +844,8 @@ function ConversationViewInner() {
           {/* Bottom area: escape hatch + chips + input */}
           <div className="px-6 pt-2 pb-4 flex flex-col gap-3">
             <div className="max-w-3xl mx-auto w-full flex flex-col gap-3">
-              {/* Escape hatch */}
-              {messages.length > 0 && !isSending && (
+              {/* Escape hatch — hidden for reference/immersion modes */}
+              {messages.length > 0 && !isSending && activeMode !== 'reference' && activeMode !== 'immersion' && (
                 <EscapeHatch onUse={handleEscapeHatch} />
               )}
 
@@ -536,6 +879,7 @@ function ConversationViewInner() {
               messages={messages}
               plan={sessionPlan}
               sessionId={sessionId}
+              mode={activeMode}
               onPlanUpdate={handlePlanUpdate}
             />
           </div>

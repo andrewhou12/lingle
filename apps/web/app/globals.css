@@ -232,6 +232,14 @@
   animation: logo-shimmer 5s ease-in-out infinite;
 }
 
+@keyframes idle-entrance {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.idle-entrance {
+  animation: idle-entrance 0.4s ease-out both;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -257,6 +265,143 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 }
+
+/* ── Voice session styles ── */
+.voice-paper-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.voice-paper-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: .22;
+  mask-image: radial-gradient(ellipse 130% 130% at 50% 50%, black 0%, transparent 100%);
+}
+.voice-paper-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 75% at 50% 40%, rgba(255,255,255,.97) 0%, transparent 80%);
+}
+.voice-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.5s ease;
+  background: radial-gradient(ellipse 90% 60% at 50% 100%, rgba(200,87,42,.03) 0%, transparent 70%);
+}
+.voice-atmosphere.on { opacity: 1; }
+
+@keyframes voice-float-up {
+  0% { opacity: 0; transform: translateY(4px) scale(.75); }
+  18% { opacity: .65; transform: translateY(-8px) scale(1); }
+  75% { opacity: .25; transform: translateY(-38px) scale(.9); }
+  100% { opacity: 0; transform: translateY(-60px) scale(.8); }
+}
+.voice-float-char {
+  position: absolute;
+  font-family: var(--font-jp);
+  color: var(--text-primary);
+  pointer-events: none;
+  opacity: 0;
+  animation: voice-float-up 2.2s cubic-bezier(.2,.6,.4,1) forwards;
+}
+
+@keyframes voice-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .2; }
+}
+
+@keyframes voice-fade-up {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes voice-slide-in-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Voice plan sidebar typography */
+.voice-plan-body h3 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 14px 0 5px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.voice-plan-body h3:first-child { margin-top: 0; }
+.voice-plan-body p {
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.voice-plan-body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.voice-plan-body ul li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.voice-plan-body ul li::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.voice-plan-body strong { font-weight: 600; color: var(--text-primary); }
+.voice-plan-body em { font-style: italic; color: var(--text-muted); }
+.voice-plan-body code {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-active);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+/* Voice steer message */
+.voice-steer-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(200,87,42,.05);
+  border: 1px solid rgba(200,87,42,.18);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin: 6px 0;
+  animation: voice-fade-up 0.3s ease both;
+}
+
+/* Voice correction inline */
+.voice-correction-good { background: rgba(238,252,244,.97); border: 1px solid rgba(60,179,113,.3); }
+.voice-correction-ok { background: rgba(255,252,238,.97); border: 1px solid rgba(200,160,42,.3); }
+.voice-correction-bad { background: rgba(255,247,238,.97); border: 1px solid rgba(200,87,42,.3); }
 
 @layer base {
   * {

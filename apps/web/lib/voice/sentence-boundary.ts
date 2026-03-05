@@ -1,12 +1,12 @@
-const JP_SENTENCE_ENDINGS = /[。！？\n]/
+const SENTENCE_ENDINGS = /[。！？.!?\n]/
 const JP_QUOTE_END = /」\s/
 const MAX_FLUSH_LENGTH = 120
 
 export interface SentenceBoundaryTracker {
   /** Feed new text (full accumulated text). Returns newly completed sentences. */
   feed(fullText: string): string[]
-  /** Force-flush any remaining buffered text. */
-  flush(): string | null
+  /** Force-flush any remaining buffered text. Returns the remaining unflushed text. */
+  flush(fullText: string): string | null
   /** Reset the tracker. */
   reset(): void
 }
@@ -24,8 +24,7 @@ export function createSentenceBoundaryTracker(): SentenceBoundaryTracker {
         const char = newText[i]
         const remaining = newText.slice(i)
 
-        // Check for Japanese sentence endings
-        if (JP_SENTENCE_ENDINGS.test(char) || JP_QUOTE_END.test(remaining.slice(0, 2))) {
+        if (SENTENCE_ENDINGS.test(char) || JP_QUOTE_END.test(remaining.slice(0, 2))) {
           const sentence = newText.slice(searchStart, i + 1).trim()
           if (sentence) {
             sentences.push(sentence)
@@ -58,10 +57,10 @@ export function createSentenceBoundaryTracker(): SentenceBoundaryTracker {
       return sentences
     },
 
-    flush(): string | null {
-      // This will be called when the stream finishes
-      // The caller should just pass the remaining text
-      return null
+    flush(fullText: string): string | null {
+      const remaining = fullText.slice(cursor).trim()
+      cursor = fullText.length
+      return remaining || null
     },
 
     reset() {

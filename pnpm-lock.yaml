@@ -48,6 +48,9 @@ importers:
       '@lingle/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@soniox/client':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@supabase/ssr':
         specifier: ^0.6.0
         version: 0.6.1(@supabase/supabase-js@2.97.0)
@@ -1553,6 +1556,9 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@soniox/client@1.0.2':
+    resolution: {integrity: sha512-5NsUKncu6sJ5CdDb3Ddj2iRAjWtxxElceEmBu6dDnmg8Kcji/fNkabcgSY8k61CshRHzYbUs7WOrYkPcstvaIw==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -5142,6 +5148,8 @@ snapshots:
   '@sec-ant/readable-stream@0.4.1': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@soniox/client@1.0.2': {}
 
   '@standard-schema/spec@1.1.0': {}
 
