@@ -1,9 +1,58 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+
+const FLOATING_CHARS = [
+  '\u3042', '\u304B', '\u3055', '\u305F', '\u306A', '\u306F', '\u307E', '\u3084', '\u3089', '\u308F',
+  '\u30A2', '\u30AB', '\u30B5', '\u30BF', '\u30CA', '\u30CF', '\u30DE', '\u30E4', '\u30E9', '\u30EF',
+  '\u8A71', '\u8AAD', '\u66F8', '\u805E', '\u5B66', '\u8A00', '\u8449', '\u97F3', '\u58F0', '\u9053',
+]
+
+function FloatingCharacters() {
+  const chars = useMemo(() =>
+    FLOATING_CHARS.map((char, i) => ({
+      char,
+      left: `${5 + (i * 31.7) % 90}%`,
+      top: `${8 + (i * 23.3) % 80}%`,
+      delay: (i * 0.4) % 5,
+      duration: 6 + (i % 4) * 2,
+      size: 22 + (i % 3) * 10,
+    })), [])
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes floatChar {
+          0%, 100% { transform: translateY(0px) rotate(-3deg); }
+          50% { transform: translateY(-20px) rotate(5deg); }
+        }
+      `}} />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
+        {chars.map((c, i) => (
+          <span
+            key={i}
+            style={{
+              position: 'absolute',
+              left: c.left,
+              top: c.top,
+              fontSize: c.size,
+              color: '#9b9b9b',
+              opacity: 0.15,
+              fontFamily: '"Noto Sans JP", sans-serif',
+              userSelect: 'none',
+              animation: `floatChar ${c.duration}s ease-in-out ${c.delay}s infinite`,
+            }}
+          >
+            {c.char}
+          </span>
+        ))}
+      </div>
+    </>
+  )
+}
 
 function GoogleLogo() {
   return (
@@ -66,6 +115,7 @@ export default function GetStartedPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-bg relative overflow-hidden">
+      <FloatingCharacters />
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 h-[54px] relative z-10 border-b border-border-subtle">
         <a href="/" className="flex items-center gap-2 no-underline">
@@ -97,51 +147,25 @@ export default function GetStartedPage() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6 relative z-[1]">
-        <h1 className="text-[clamp(36px,5vw,64px)] font-bold text-text-primary tracking-[-0.04em] leading-[1.12] mb-6">
-          Your learning experience<br />is{' '}
-          <span className="font-serif italic font-light">almost ready</span>
+        <h1 className="text-[clamp(36px,5vw,64px)] font-bold text-text-primary tracking-[-0.04em] leading-[1.12] mb-4">
+          Your language learning<br />experience{' '}
+          <span className="font-serif italic font-light">starts here</span>
         </h1>
 
-        {/* Preview cards */}
-        <div className="flex gap-4 mb-10">
-          {/* Blurred chat preview */}
-          <div className="w-[200px] h-[140px] rounded-xl border border-border-subtle bg-bg-pure p-4 flex flex-col gap-2 overflow-hidden shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-bg-active flex items-center justify-center text-[11px] text-text-muted font-semibold">
-                AI
-              </div>
-              <div>
-                <div className="text-[11px] text-text-secondary font-semibold">Lingle Agent</div>
-                <div className="text-[11px] text-text-muted">Ready to chat</div>
-              </div>
-            </div>
-            <div className="flex-1 rounded-lg bg-bg-secondary blur-[4px] flex flex-col gap-1.5 p-2">
-              <div className="h-2 w-4/5 bg-bg-active rounded" />
-              <div className="h-2 w-3/5 bg-bg-active rounded" />
-              <div className="h-2 w-[70%] bg-bg-active rounded self-end" />
-            </div>
-          </div>
-
-          <div className="w-[200px] h-[140px] rounded-xl border border-border-subtle bg-bg-pure p-4 flex flex-col gap-2 overflow-hidden shadow-sm">
-            <div className="text-[11px] text-text-muted font-semibold tracking-[.06em] uppercase">
-              Your prompt
-            </div>
-            <div className="flex-1 rounded-lg text-[13px] text-text-secondary leading-relaxed overflow-hidden">
-              {prompt || 'Your conversation awaits...'}
-            </div>
-          </div>
-        </div>
+        <p className="text-[17px] text-text-secondary mb-10 max-w-[440px] leading-relaxed">
+          Sign up to immerse yourself in real conversations, tailored to your level.
+        </p>
 
         {/* CTA */}
         <button
           onClick={() => setShowAuth(true)}
           className="rounded-xl bg-accent-brand px-8 py-3 text-[15px] font-semibold text-white border-none cursor-pointer transition-all duration-150 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
         >
-          Sign up for free to start
+          Get started free
         </button>
 
         <p className="text-[13px] text-text-muted mt-4">
-          Free forever. No credit card required.
+          No credit card required.
         </p>
       </div>
 
