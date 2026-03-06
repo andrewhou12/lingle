@@ -70,8 +70,80 @@ class LingleApiClient {
       method: 'POST',
       body: JSON.stringify({ sessionId, updates }),
     })
+  conversationGet = (id: string) =>
+    this.request<{
+      id: string
+      timestamp: string
+      durationSeconds: number | null
+      transcript: { role: string; content: string; timestamp?: string }[]
+      sessionPlan: Record<string, unknown> | null
+      systemPrompt: string | null
+    }>(`/conversation/${id}`)
   conversationEnd = (sessionId: string) =>
     this.request<null>('/conversation/end', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    })
+
+  // Stats
+  statsToday = () => this.request<{ minutesToday: number }>('/stats/today')
+  statsSummary = () =>
+    this.request<{
+      totalSessions: number
+      totalMinutes: number
+      currentStreak: number
+      longestStreak: number
+      averageSessionMinutes: number
+    }>('/stats/summary')
+  statsAnalysis = () =>
+    this.request<{
+      status: 'ok' | 'insufficient_data'
+      sessionCount?: number
+      analysis?: {
+        levelAssessment: {
+          currentLevel: string
+          confidence: 'low' | 'medium' | 'high'
+          summary: string
+          evidencePoints: string[]
+        }
+        strengths: { area: string; detail: string }[]
+        mistakesAndHabits: {
+          pattern: string
+          detail: string
+          severity: 'minor' | 'notable' | 'persistent'
+        }[]
+        skillScores: {
+          reading: number
+          listening: number
+          speaking: number
+          writing: number
+          vocabulary: number
+          grammar: number
+        }
+      }
+    }>('/stats/analysis')
+  statsSessionAnalysis = (sessionId: string) =>
+    this.request<{
+      status: 'ok' | 'insufficient_data'
+      analysis?: {
+        overallRating: 'excellent' | 'good' | 'developing' | 'needs_work'
+        summary: string
+        targetLanguageUsage: { percentage: number; assessment: string }
+        vocabularyUsed: { word: string; reading?: string; meaning: string; usedWell: boolean }[]
+        grammarPoints: { pattern: string; example: string; correct: boolean; note?: string }[]
+        errors: { original: string; corrected: string; type: string; explanation: string }[]
+        strengths: string[]
+        suggestions: string[]
+        skillScores: {
+          reading: number
+          listening: number
+          speaking: number
+          writing: number
+          vocabulary: number
+          grammar: number
+        }
+      }
+    }>('/stats/session-analysis', {
       method: 'POST',
       body: JSON.stringify({ sessionId }),
     })

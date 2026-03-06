@@ -2,24 +2,34 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Globe, GraduationCap } from 'lucide-react'
+import { ArrowLeft, Globe, GraduationCap, Target } from 'lucide-react'
 import type { LearnerProfile } from '@lingle/shared/types'
 import { Spinner } from '@/components/spinner'
 import { api } from '@/lib/api'
 import { DIFFICULTY_LEVELS } from '@/lib/difficulty-levels'
+import { useLanguage } from '@/hooks/use-language'
+
+const DAILY_GOAL_OPTIONS = [
+  { minutes: 10, label: '10 min', description: 'Light' },
+  { minutes: 20, label: '20 min', description: 'Moderate' },
+  { minutes: 30, label: '30 min', description: 'Standard' },
+  { minutes: 60, label: '60 min', description: 'Intensive' },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { targetLanguage } = useLanguage()
   const [profile, setProfile] = useState<LearnerProfile | null>(() => api.peekCache<LearnerProfile>('/profile') ?? null)
   const [isLoading, setIsLoading] = useState(() => !api.peekCache('/profile'))
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    setIsLoading(true)
     api.profileGet().then((p) => {
       setProfile(p)
       setIsLoading(false)
     })
-  }, [])
+  }, [targetLanguage])
 
   const handleDifficultyChange = async (level: number) => {
     if (!profile || isSaving) return
@@ -30,7 +40,20 @@ export default function SettingsPage() {
       setProfile(updated)
     } catch (err) {
       console.error('Failed to update difficulty:', err)
-      // Revert on error
+      setProfile(profile)
+    }
+    setIsSaving(false)
+  }
+
+  const handleGoalChange = async (minutes: number) => {
+    if (!profile || isSaving) return
+    setIsSaving(true)
+    setProfile({ ...profile, dailyGoalMinutes: minutes })
+    try {
+      const updated = await api.profilePatch({ dailyGoalMinutes: minutes })
+      setProfile(updated)
+    } catch (err) {
+      console.error('Failed to update daily goal:', err)
       setProfile(profile)
     }
     setIsSaving(false)
@@ -75,7 +98,7 @@ export default function SettingsPage() {
         Difficulty
       </span>
 
-      <div className="rounded-xl border border-border bg-bg">
+      <div className="rounded-xl border border-border bg-bg mb-6">
         <div className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
@@ -106,6 +129,38 @@ export default function SettingsPage() {
                   <span className="text-[13px] font-medium text-text-primary">{level.label}</span>
                   <span className="text-[11px] text-text-muted leading-snug">{level.shortDescription}</span>
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <span className="text-[11px] font-medium text-text-muted uppercase tracking-wide block mb-3">
+        Daily Goal
+      </span>
+
+      <div className="rounded-xl border border-border bg-bg">
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+              <Target size={16} />
+            </div>
+            <span className="text-[13px] font-medium">Practice time per day</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {DAILY_GOAL_OPTIONS.map((option) => (
+              <button
+                key={option.minutes}
+                className={`px-3 py-2.5 rounded-lg border text-center cursor-pointer transition-all ${
+                  profile.dailyGoalMinutes === option.minutes
+                    ? 'border-accent-brand bg-bg-hover'
+                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
+                }`}
+                onClick={() => handleGoalChange(option.minutes)}
+                disabled={isSaving}
+              >
+                <div className="text-[15px] font-semibold text-text-primary">{option.label}</div>
+                <div className="text-[11px] text-text-muted">{option.description}</div>
               </button>
             ))}
           </div>

@@ -10,11 +10,11 @@ Reference spec for sizing, color, typography, and component conventions across t
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--bg` | `#fafaf8` | Primary background |
+| `--bg` | `#fefefe` | Primary background |
 | `--bg-pure` | `#ffffff` | Cards, elevated surfaces |
-| `--bg-secondary` | `#f7f7f5` | Sidebar, secondary panels |
-| `--bg-hover` | `#f1f1ef` | Hover states |
-| `--bg-active` | `#ebebea` | Active/pressed states |
+| `--bg-secondary` | `#f9f9f9` | Sidebar, secondary panels |
+| `--bg-hover` | `#f3f3f3` | Hover states |
+| `--bg-active` | `#ececec` | Active/pressed states |
 
 ### Text
 
@@ -30,7 +30,7 @@ Reference spec for sizing, color, typography, and component conventions across t
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--border` | `#e9e9e7` | Standard borders, dividers |
-| `--border-subtle` | `#eeeeea` | Light card borders |
+| `--border-subtle` | `#efefef` | Light card borders |
 | `--border-strong` | `#d4d4d1` | Prominent borders |
 
 ### Accents

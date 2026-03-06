@@ -53,5 +53,41 @@ Title:`,
     },
   })
 
+  // Update streak on the learner profile
+  const profile = await prisma.learnerProfile.findUnique({ where: { userId: dbSession.userId } })
+  if (profile) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    let newStreak = profile.currentStreak
+    if (profile.lastActiveDate) {
+      const lastActive = new Date(profile.lastActiveDate)
+      lastActive.setHours(0, 0, 0, 0)
+
+      if (lastActive.getTime() === today.getTime()) {
+        // Already active today — no change
+      } else if (lastActive.getTime() === yesterday.getTime()) {
+        newStreak = profile.currentStreak + 1
+      } else {
+        newStreak = 1
+      }
+    } else {
+      newStreak = 1
+    }
+
+    await prisma.learnerProfile.update({
+      where: { userId: dbSession.userId },
+      data: {
+        currentStreak: newStreak,
+        longestStreak: Math.max(profile.longestStreak, newStreak),
+        lastActiveDate: new Date(),
+        totalSessions: profile.totalSessions + 1,
+      },
+    })
+  }
+
   return NextResponse.json(null)
 })

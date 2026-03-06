@@ -194,13 +194,6 @@ const SUGGESTION_TITLES: Record<ScenarioMode, string> = {
   reference: 'Browse Topics',
 }
 
-const MODE_DOTS: Record<string, string> = {
-  conversation: '#22a355',
-  tutor: '#3b6ec2',
-  immersion: '#8b5cf6',
-  reference: '#c8572a',
-}
-
 function formatRelativeTime(timestamp: string): string {
   const date = new Date(timestamp)
   const now = new Date()
@@ -420,7 +413,7 @@ function ConversationViewInner() {
         if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
       }).catch(() => {})
     }
-  }, [phase])
+  }, [phase, targetLanguage])
 
   // Pick up pending prompt from landing page / onboarding
   useEffect(() => {
@@ -804,7 +797,6 @@ function ConversationViewInner() {
                   </div>
                   <div className="bg-bg-pure border border-border-subtle rounded-lg overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,.04)]">
                     {recentSessions.filter(s => s.durationSeconds !== null && s.durationSeconds >= 60).slice(0, 5).map((session, i) => {
-                      const dot = MODE_DOTS[session.mode] || '#9b9b9b'
                       const duration = formatDuration(session.durationSeconds)
                       const time = formatRelativeTime(session.timestamp)
                       const label = session.sessionFocus || MODE_LABELS[session.mode as ScenarioMode] || 'Session'
@@ -814,7 +806,7 @@ function ConversationViewInner() {
                           className="flex items-center gap-3 px-2.5 py-2 bg-transparent border-none w-full cursor-pointer text-left transition-colors hover:bg-bg-hover"
                           style={{ fontFamily: 'inherit', borderTop: i > 0 ? '1px solid var(--bg-hover)' : 'none' }}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dot }} />
+                          <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-text-primary" />
                           <span className="flex-1 text-[13px] font-medium text-text-primary truncate">{label}</span>
                           <span className="text-[12px] text-text-muted shrink-0">
                             {time}{duration ? ` \u00B7 ${duration}` : ''}

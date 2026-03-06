@@ -14,8 +14,10 @@ export interface LearnerProfile {
   id: number
   targetLanguage: string
   nativeLanguage: string
+  dailyGoalMinutes: number
   difficultyLevel: number
   totalSessions: number
+  currentStreak: number
   lastActiveDate: string | null
 }
 

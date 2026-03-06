@@ -57,12 +57,12 @@
 
 /* ── Design tokens ── */
 :root {
-  --bg: #fafaf8;
+  --bg: #fefefe;
   --bg-pure: #ffffff;
-  --bg-secondary: #f7f7f5;
-  --bg-hover: #f1f1ef;
-  --bg-active: #ebebea;
-  --border-subtle: #eeeeea;
+  --bg-secondary: #f9f9f9;
+  --bg-hover: #f3f3f3;
+  --bg-active: #ececec;
+  --border-subtle: #efefef;
   --border-strong: #d4d4d1;
   --text-primary: #1a1a1a;
   --text-secondary: #6b6b6b;

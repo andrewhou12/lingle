@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { SUPPORTED_LANGUAGES } from '@/lib/languages'
 import { LanguageProvider, useLanguage } from '@/hooks/use-language'
+import { getDifficultyLevel } from '@/lib/difficulty-levels'
 
 /* ── Nav Sections ── */
 
@@ -44,21 +45,21 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Practice',
     items: [
       { id: 'practice', href: '/conversation', emoji: '\uD83D\uDCAC', label: 'Practice' },
-      { id: 'review', href: '/conversation?tab=review', emoji: '\uD83D\uDD01', label: 'Review', badge: 12 },
+      // { id: 'review', href: '/conversation?tab=review', emoji: '\uD83D\uDD01', label: 'Review', badge: 12 },
     ],
   },
-  {
-    label: 'Learn',
-    items: [
-      { id: 'lessons', href: '/conversation?tab=lessons', emoji: '\uD83D\uDCDA', label: 'Lessons' },
-      { id: 'vocabulary', href: '/conversation?tab=vocabulary', emoji: '\uD83D\uDDC3\uFE0F', label: 'Vocabulary' },
-      { id: 'kanji', href: '/conversation?tab=kanji', emoji: '\uD83C\uDE33', label: 'Kanji' },
-    ],
-  },
+  // {
+  //   label: 'Learn',
+  //   items: [
+  //     { id: 'lessons', href: '/conversation?tab=lessons', emoji: '\uD83D\uDCDA', label: 'Lessons' },
+  //     { id: 'vocabulary', href: '/conversation?tab=vocabulary', emoji: '\uD83D\uDDC3\uFE0F', label: 'Vocabulary' },
+  //     { id: 'kanji', href: '/conversation?tab=kanji', emoji: '\uD83C\uDE33', label: 'Kanji' },
+  //   ],
+  // },
   {
     label: 'Track',
     items: [
-      { id: 'progress', href: '/conversation?tab=progress', emoji: '\uD83D\uDCC8', label: 'Progress' },
+      { id: 'progress', href: '/progress', emoji: '\uD83D\uDD52', label: 'History' },
       { id: 'settings', href: '/settings', emoji: '\u2699\uFE0F', label: 'Settings' },
     ],
   },
@@ -68,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const BREADCRUMB_MAP: Record<string, string> = {
   '/conversation': 'Practice',
+  '/progress': 'History',
   '/settings': 'Settings',
 }
 
@@ -86,28 +88,52 @@ function LogoIcon() {
 }
 
 function DailyGoalWidget() {
+  const { targetLanguage } = useLanguage()
+  const [level, setLevel] = useState<string | null>(null)
+  const [streak, setStreak] = useState<number | null>(null)
+  const [minutesToday, setMinutesToday] = useState<number | null>(null)
+  const [goalMinutes, setGoalMinutes] = useState(30)
+
+  useEffect(() => {
+    api.profileGet().then((p) => {
+      if (p) {
+        const dl = getDifficultyLevel(p.difficultyLevel)
+        setLevel(dl.label.match(/\(([^)]+)\)/)?.[1] ?? dl.label)
+        setStreak(p.currentStreak)
+        setGoalMinutes(p.dailyGoalMinutes ?? 30)
+      }
+    }).catch(() => {})
+
+    api.statsToday().then((s) => {
+      setMinutesToday(s.minutesToday)
+    }).catch(() => {})
+  }, [targetLanguage])
+
+  const mins = minutesToday ?? 0
+  const pct = Math.min(100, Math.round((mins / goalMinutes) * 100))
+
   return (
-    <div className="mx-2.5 mt-2.5 mb-1">
-      <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+    <Link href="/progress" className="block mx-2.5 mt-2.5 mb-1 no-underline">
+      <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] transition-colors duration-100 hover:bg-bg-hover cursor-pointer">
         <div className="flex justify-between items-center mb-2">
           <span className="text-[13px] font-medium text-text-primary">Daily goal</span>
-          <span className="text-[12px] text-text-muted">18 / 30 min</span>
+          <span className="text-[12px] text-text-muted">{mins} / {goalMinutes} min</span>
         </div>
         <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
-          <div className="h-full w-[60%] rounded-full bg-accent-brand transition-[width] duration-300" />
+          <div className="h-full rounded-full bg-accent-brand transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
         <div className="flex justify-between mt-2.5">
           <div>
-            <div className="text-[13px] font-semibold text-text-primary">7</div>
+            <div className="text-[13px] font-semibold text-text-primary">{streak ?? 0}</div>
             <div className="text-[12px] text-text-muted">day streak</div>
           </div>
           <div className="text-right">
-            <div className="text-[13px] font-semibold text-text-primary">N3</div>
+            <div className="text-[13px] font-semibold text-text-primary">{level ?? '--'}</div>
             <div className="text-[12px] text-text-muted">current level</div>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -159,6 +185,28 @@ function UserFooter() {
   )
 }
 
+function OnlineIndicator() {
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+
+  return (
+    <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
+      <div className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-green' : 'bg-text-muted'}`} />
+      {online ? 'Online' : 'Offline'}
+    </div>
+  )
+}
+
 /* ── Layout ── */
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -181,7 +229,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
     return pathname === basePath || pathname.startsWith(basePath + '/')
   }
 
-  const breadcrumb = BREADCRUMB_MAP[pathname] ?? ''
+  const breadcrumb = BREADCRUMB_MAP[pathname] ?? (pathname.startsWith('/progress/') ? 'Session Details' : '')
   const isVoiceRoute = pathname.startsWith('/conversation/voice')
 
   // Voice mode is full-screen — render children with no shell
@@ -215,6 +263,8 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
               {section.items.map((item) => {
                 const active = item.id === 'practice'
                   ? pathname === '/conversation'
+                  : item.id === 'progress'
+                  ? pathname === '/progress' || pathname.startsWith('/progress/')
                   : item.id === 'settings'
                   ? pathname === '/settings'
                   : false
@@ -258,10 +308,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
             <span className="text-text-primary font-medium">{breadcrumb || 'Home'}</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
-              <div className="w-1.5 h-1.5 rounded-full bg-green" />
-              AI ready
-            </div>
+            <OnlineIndicator />
             <Select value={targetLanguage} onValueChange={setTargetLanguage}>
               <SelectTrigger className="h-auto px-2.5 py-1 rounded-md border border-border bg-bg-pure text-[13px] font-medium text-text-secondary shadow-[0_1px_2px_rgba(0,0,0,.04)] hover:bg-bg-hover transition-colors gap-1.5 w-auto">
                 <SelectValue>

@@ -39,6 +39,7 @@ model LearnerProfile {
   learningGoals           String[] @default([])
   dailyNewItemLimit       Int      @default(10)
   targetRetention         Float    @default(0.90)
+  dailyGoalMinutes        Int      @default(30)
   difficultyLevel         Int      @default(2)
   computedLevel           String   @default("A1")
   comprehensionCeiling    String   @default("A1")
@@ -52,6 +53,7 @@ model LearnerProfile {
   currentStreak           Int      @default(0)
   longestStreak           Int      @default(0)
   lastActiveDate          DateTime?
+  perLanguageSettings     Json     @default("{}")
   errorPatternSummary     Json     @default("{}")
   avoidancePatternSummary Json     @default("{}")
   createdAt               DateTime @default(now())
@@ -182,6 +184,7 @@ model ConversationSession {
   userId          String
   user            User     @relation(fields: [userId], references: [id])
   mode            String   @default("conversation")
+  targetLanguage  String   @default("Japanese")
   timestamp       DateTime @default(now())
   durationSeconds Int?
   transcript      Json
@@ -193,6 +196,7 @@ model ConversationSession {
   systemPrompt    String?
 
   @@index([userId])
+  @@index([userId, targetLanguage])
 }
 
 model TomInference {

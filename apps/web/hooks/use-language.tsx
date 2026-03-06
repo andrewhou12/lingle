@@ -23,9 +23,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setTargetLanguage = useCallback(async (language: string) => {
-    setLang(language)
     try {
       await api.profilePatch({ targetLanguage: language })
+      // State update after DB write so re-fetches read the new language
+      setLang(language)
     } catch (err) {
       console.error('Failed to update language:', err)
     }
