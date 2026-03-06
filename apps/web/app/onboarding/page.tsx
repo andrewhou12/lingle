@@ -268,13 +268,6 @@ export default function OnboardingPage() {
   const [level, setLevel] = useState('')
   const [transitioning, setTransitioning] = useState(false)
 
-  // Redirect if user already has a profile
-  useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then(profile => {
-      if (profile) router.replace('/conversation')
-    }).catch(() => {})
-  }, [router])
-
   const totalSteps = 4
 
   const canAdvance = step === 0 ? !!language : step === 1 ? goals.length > 0 : step === 2 ? !!level : true
