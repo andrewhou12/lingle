@@ -3,6 +3,7 @@ import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
+import { withUsageCheck } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 import { buildSystemPrompt } from '@/lib/experience-prompt'
 import { getDifficultyLevel } from '@/lib/difficulty-levels'
@@ -204,7 +205,7 @@ function getFallbackPlan(mode: string, sessionFocus: string): SessionPlan {
   }
 }
 
-export const POST = withAuth(async (request, { userId }) => {
+export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   let prompt: string | undefined
   let mode: string | undefined
   try {
@@ -302,4 +303,4 @@ Make the plan specific to the user's prompt and difficulty level.`
   })
 
   return NextResponse.json({ _sessionId: session.id, sessionFocus, plan })
-})
+}))

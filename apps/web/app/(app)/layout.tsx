@@ -71,6 +71,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/conversation': 'Practice',
   '/progress': 'History',
   '/settings': 'Settings',
+  '/upgrade': 'Upgrade',
 }
 
 /* ── Subcomponents ── */
@@ -87,6 +88,29 @@ function LogoIcon() {
   )
 }
 
+function UsageBanner() {
+  const [usage, setUsage] = useState<{ usedSeconds: number; limitSeconds: number; isLimitReached: boolean; plan: string } | null>(null)
+
+  useEffect(() => {
+    api.usageGet().then(setUsage).catch(() => {})
+  }, [])
+
+  if (!usage) {
+    return (
+      <div className="mx-2.5 mt-2.5 mb-1">
+        <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+          <div className="h-[52px]" />
+        </div>
+      </div>
+    )
+  }
+
+  const isPro = usage.plan === 'pro'
+  const usedMinutes = Math.floor(usage.usedSeconds / 60)
+  const limitMinutes = usage.limitSeconds === -1 ? null : Math.floor(usage.limitSeconds / 60)
+  const percentage = limitMinutes ? Math.min(100, (usage.usedSeconds / usage.limitSeconds) * 100) : 0
+  const isNearLimit = percentage >= 80
+  const isAtLimit = usage.isLimitReached
 function DailyGoalWidget() {
   const { targetLanguage } = useLanguage()
   const [level, setLevel] = useState<string | null>(null)
@@ -116,6 +140,14 @@ function DailyGoalWidget() {
     <Link href="/progress" className="block mx-2.5 mt-2.5 mb-1 no-underline">
       <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] transition-colors duration-100 hover:bg-bg-hover cursor-pointer">
         <div className="flex justify-between items-center mb-2">
+          <span className="text-[13px] font-medium text-text-primary">
+            {isPro ? 'Pro plan' : 'Free plan'}
+          </span>
+          <span className="text-[12px] text-text-muted">
+            {isPro
+              ? `${usedMinutes} min today`
+              : `${usedMinutes} / ${limitMinutes} min`}
+          </span>
           <span className="text-[13px] font-medium text-text-primary">Daily goal</span>
           <span className="text-[12px] text-text-muted">{mins} / {goalMinutes} min</span>
         </div>
@@ -132,6 +164,29 @@ function DailyGoalWidget() {
             <div className="text-[12px] text-text-muted">current level</div>
           </div>
         </div>
+        {!isPro && (
+          <>
+            <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-[width] duration-300',
+                  isAtLimit ? 'bg-accent-warm' : isNearLimit ? 'bg-[#d4a017]' : 'bg-accent-brand'
+                )}
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            {isNearLimit && !isAtLimit && (
+              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-brand font-medium hover:underline block no-underline">
+                Upgrade for unlimited practice
+              </Link>
+            )}
+            {isAtLimit && (
+              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-warm font-medium hover:underline block no-underline">
+                Limit reached &mdash; upgrade to continue
+              </Link>
+            )}
+          </>
+        )}
       </div>
     </Link>
   )
@@ -303,6 +358,8 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
           )}
         </div>
 
+        {/* Usage banner */}
+        <UsageBanner />
         {/* Daily goal widget — hidden when collapsed */}
         {!collapsed && <DailyGoalWidget />}
 

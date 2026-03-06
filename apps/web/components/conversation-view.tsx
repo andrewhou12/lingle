@@ -42,6 +42,9 @@ import { VoiceSessionOverlay } from '@/components/voice/voice-session-overlay'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from '@/components/chat/ime/ime-candidate-panel'
 import { cn } from '@/lib/utils'
+import { UsageLimitError } from '@/lib/api'
+import { UsageLimitModal } from '@/components/usage-limit-modal'
+import type { UsageInfo } from '@lingle/shared/types'
 import {
   type ScenarioMode,
   MODE_LABELS,
@@ -273,6 +276,12 @@ function ConversationViewInner() {
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
   const [showAllSuggestions, setShowAllSuggestions] = useState(false)
   const [recentSessions, setRecentSessions] = useState<{ id: string; timestamp: string; durationSeconds: number | null; mode: string; sessionFocus: string }[]>([])
+  const [showUsageLimitModal, setShowUsageLimitModal] = useState(false)
+  const [usageLimitMinutes, setUsageLimitMinutes] = useState(10)
+  const [usageRemainingSeconds, setUsageRemainingSeconds] = useState<number | null>(null)
+  const sessionStartTimeRef = useRef<number | null>(null)
+  const usageAtStartRef = useRef<UsageInfo | null>(null)
+  const usageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const idleTextareaRef = useRef<HTMLTextAreaElement>(null)
   const idleIme = useJapaneseIME(input, setInput, { initialActive: false })
@@ -302,8 +311,36 @@ function ConversationViewInner() {
     transport,
     onError: (err) => {
       console.error('[useChat] error:', err)
+      // Detect usage limit error from streaming transport
+      if (err?.message?.includes('403') || err?.message?.includes('usage_limit_exceeded')) {
+        setShowUsageLimitModal(true)
+      }
     },
   })
+
+  // Usage timer — track remaining time during active sessions
+  useEffect(() => {
+    if (phase !== 'conversation' || !sessionStartTimeRef.current || !usageAtStartRef.current) {
+      return
+    }
+    const usage = usageAtStartRef.current
+    if (usage.plan === 'pro' || usage.limitSeconds === -1) return
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - sessionStartTimeRef.current!) / 1000)
+      const remaining = Math.max(0, usage.remainingSeconds - elapsed)
+      setUsageRemainingSeconds(remaining)
+      if (remaining <= 0) {
+        setShowUsageLimitModal(true)
+        if (usageTimerRef.current) clearInterval(usageTimerRef.current)
+      }
+    }
+    tick()
+    usageTimerRef.current = setInterval(tick, 15_000)
+    return () => {
+      if (usageTimerRef.current) clearInterval(usageTimerRef.current)
+    }
+  }, [phase])
 
   const isSending = status === 'streaming' || status === 'submitted'
 
@@ -459,9 +496,20 @@ function ConversationViewInner() {
     setIsLoading(true)
     setError(null)
     try {
-      // Fetch profile for difficulty level
-      const profile = api.peekCache<{ difficultyLevel?: number }>('/profile')
+      // Fetch usage info and profile for difficulty level
+      const [usageInfo, profile] = await Promise.all([
+        api.usageGet().catch(() => null),
+        Promise.resolve(api.peekCache<{ difficultyLevel?: number }>('/profile')),
+      ])
       if (profile?.difficultyLevel) setDifficultyLevel(profile.difficultyLevel)
+
+      // Check usage before starting
+      if (usageInfo && usageInfo.isLimitReached) {
+        setUsageLimitMinutes(usageInfo.limitSeconds === -1 ? 10 : Math.floor(usageInfo.limitSeconds / 60))
+        setShowUsageLimitModal(true)
+        setIsLoading(false)
+        return
+      }
 
       const result = await api.conversationPlan(prompt, mode)
       setSessionId(result._sessionId ?? null)
@@ -472,13 +520,27 @@ function ConversationViewInner() {
       panelAutoOpenedRef.current = false
       setMessages([])
       setPhase('conversation')
+
+      // Start usage timer
+      sessionStartTimeRef.current = Date.now()
+      usageAtStartRef.current = usageInfo
+      if (usageInfo && usageInfo.limitSeconds !== -1) {
+        setUsageRemainingSeconds(usageInfo.remainingSeconds)
+        setUsageLimitMinutes(Math.floor(usageInfo.limitSeconds / 60))
+      }
+
       // Send the prompt as the first user message
       requestAnimationFrame(() => {
         sendMessage({ text: prompt })
       })
     } catch (err) {
-      console.error('Failed to start session:', err)
-      setError(err instanceof Error ? err.message : 'Failed to start session. Please try again.')
+      if (err instanceof UsageLimitError) {
+        setUsageLimitMinutes(Math.floor(err.limitSeconds / 60))
+        setShowUsageLimitModal(true)
+      } else {
+        console.error('Failed to start session:', err)
+        setError(err instanceof Error ? err.message : 'Failed to start session. Please try again.')
+      }
     }
     setIsLoading(false)
   }, [setMessages, sendMessage])
@@ -995,11 +1057,21 @@ function ConversationViewInner() {
                 onChange={setInput}
                 onSend={handleSend}
                 onVoiceTranscript={handleVoiceTranscript}
-                disabled={isSending}
-                placeholder="Type your message..."
+                disabled={isSending || showUsageLimitModal}
+                placeholder={showUsageLimitModal ? 'Daily limit reached' : 'Type your message...'}
                 showRomaji={showRomaji}
                 onToggleRomaji={toggleRomaji}
               />
+              {/* Usage countdown warning */}
+              {usageRemainingSeconds !== null && usageRemainingSeconds > 0 && usageRemainingSeconds <= 120 && (
+                <div className="flex items-center justify-center gap-1.5 py-1.5 text-[12px] text-accent-warm">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  {Math.floor(usageRemainingSeconds / 60)}:{String(usageRemainingSeconds % 60).padStart(2, '0')} remaining today
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1017,6 +1089,13 @@ function ConversationViewInner() {
           </div>
         )}
       </div>
+
+      <UsageLimitModal
+        open={showUsageLimitModal}
+        onClose={() => setShowUsageLimitModal(false)}
+        usedMinutes={usageLimitMinutes}
+        limitMinutes={usageLimitMinutes}
+      />
     </div>
   )
 }

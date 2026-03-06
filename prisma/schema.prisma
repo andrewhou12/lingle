@@ -27,6 +27,8 @@ model User {
   tomInferences        TomInference[]
   itemContextLogs      ItemContextLog[]
   curriculumItems      CurriculumItem[]
+  subscription         Subscription?
+  dailyUsage           DailyUsage[]
 }
 
 model LearnerProfile {
@@ -275,4 +277,32 @@ model CurriculumItem {
   introducedAt    DateTime?
 
   @@index([userId, status, priority])
+}
+
+model Subscription {
+  id                   Int       @id @default(autoincrement())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id])
+  plan                 String    @default("free") // "free" | "pro"
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               String    @default("active") // "active" | "canceled" | "past_due"
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model DailyUsage {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+  date                DateTime @db.Date
+  conversationSeconds Int      @default(0)
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
