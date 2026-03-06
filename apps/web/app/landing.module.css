@@ -40,6 +40,11 @@
   font-family: var(--font-serif); font-size: 18px; font-weight: 400;
   font-style: italic; color: var(--text-primary); letter-spacing: -.03em;
 }
+.beta-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  background: var(--bg-hover); color: var(--text-secondary); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 2px 6px; line-height: 1; white-space: nowrap;
+}
 .nav-links { display: flex; align-items: center; gap: 2px; position: absolute; left: 50%; transform: translateX(-50%); }
 .nav-link { font-size: 13.5px; color: var(--text-secondary); text-decoration: none; padding: 5px 11px; border-radius: 6px; transition: background .1s, color .1s; }
 .nav-link:hover { background: var(--bg-hover); color: var(--text-primary); }

@@ -56,9 +56,12 @@ export default function SignInPage() {
     <div className="flex flex-col items-center justify-center h-screen bg-bg">
       <div className="flex flex-col items-center gap-8 max-w-[400px] w-full p-6">
         <div className="flex flex-col items-center gap-2">
-          <span className="text-[32px] font-bold tracking-tight font-serif italic">
-            Lingle
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[32px] font-bold tracking-tight font-serif italic">
+              Lingle
+            </span>
+            <span className="text-[11px] font-semibold tracking-wide uppercase bg-bg-hover text-text-secondary border border-border-strong rounded-sm px-1.5 py-0.5 leading-none mt-1">Beta</span>
+          </div>
           <span className="text-[15px] text-text-muted text-center">
             Your AI-powered language learning companion
           </span>

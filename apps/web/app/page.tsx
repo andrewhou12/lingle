@@ -300,6 +300,7 @@ export default function LandingPage() {
         <Link href="/" className={s['nav-logo']}>
           <div className={s['nav-logo-mark']}><LogoSVG /></div>
           <span className={s['nav-logo-text']}>Lingle</span>
+          <span className={s['beta-badge']}>Beta</span>
         </Link>
         <div className={s['nav-links']}>
           <a href="#modes" className={s['nav-link']}>How it works</a>
@@ -891,6 +892,7 @@ export default function LandingPage() {
           <Link href="/" className={s['footer-logo']}>
             <div className={s['footer-logo-mark']}><LogoSVG size={13} /></div>
             <span className={s['footer-logo-name']}>Lingle</span>
+            <span className={s['beta-badge']}>Beta</span>
           </Link>
           <span className={s['footer-copy']}>© 2026 Lingle. All rights reserved.</span>
         </div>

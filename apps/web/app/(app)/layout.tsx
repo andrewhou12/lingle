@@ -199,6 +199,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
           <span className="font-serif text-[18px] font-normal italic text-text-primary tracking-tight">
             Lingle
           </span>
+          <span className="text-[9px] font-semibold tracking-wide uppercase bg-bg-hover text-text-secondary border border-border-strong rounded-sm px-1.5 py-0.5 leading-none">Beta</span>
         </div>
 
         {/* Daily goal widget */}
