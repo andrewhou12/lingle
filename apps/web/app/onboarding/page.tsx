@@ -51,7 +51,7 @@ function StepLanguage({ selected, onSelect }: { selected: string; onSelect: (id:
             key={lang.id}
             onClick={() => onSelect(lang.id)}
             className={cn(
-              "flex items-center gap-3.5 px-[18px] py-4 rounded-[14px] cursor-pointer transition-all duration-150 text-left border-[1.5px]",
+              "flex items-center gap-3.5 px-[18px] py-4 rounded-xl cursor-pointer transition-all duration-150 text-left border-[1.5px]",
               selected === lang.id
                 ? "bg-bg-active border-accent-brand"
                 : "bg-bg-pure border-border-subtle hover:border-border-strong"
@@ -91,7 +91,7 @@ function StepGoals({ selected, onToggle }: { selected: string[]; onToggle: (id: 
               key={goal.id}
               onClick={() => onToggle(goal.id)}
               className={cn(
-                "flex items-start gap-3 px-[18px] py-4 rounded-[14px] cursor-pointer transition-all duration-150 text-left border-[1.5px]",
+                "flex items-start gap-3 px-[18px] py-4 rounded-xl cursor-pointer transition-all duration-150 text-left border-[1.5px]",
                 active
                   ? "bg-bg-active border-accent-brand"
                   : "bg-bg-pure border-border-subtle hover:border-border-strong"
@@ -100,7 +100,7 @@ function StepGoals({ selected, onToggle }: { selected: string[]; onToggle: (id: 
               <span className="text-[22px] leading-none mt-0.5">{goal.icon}</span>
               <div className="flex-1">
                 <div className="text-[15px] font-semibold text-text-primary">{goal.label}</div>
-                <div className="text-[12.5px] text-text-muted mt-0.5 leading-snug">{goal.desc}</div>
+                <div className="text-[13px] text-text-muted mt-0.5 leading-snug">{goal.desc}</div>
               </div>
               {active && (
                 <div className="w-5 h-5 rounded-full bg-accent-brand flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5">
@@ -132,14 +132,14 @@ function StepLevel({ selected, onSelect }: { selected: string; onSelect: (id: st
               key={level.id}
               onClick={() => onSelect(level.id)}
               className={cn(
-                "flex items-center gap-3.5 px-5 py-4 rounded-[14px] cursor-pointer transition-all duration-150 text-left w-full border-[1.5px]",
+                "flex items-center gap-3.5 px-5 py-4 rounded-xl cursor-pointer transition-all duration-150 text-left w-full border-[1.5px]",
                 active
                   ? "bg-bg-active border-accent-brand"
                   : "bg-bg-pure border-border-subtle hover:border-border-strong"
               )}
             >
               <div className={cn(
-                "w-10 h-10 rounded-[10px] flex items-center justify-center text-[11px] font-bold tracking-[.02em] shrink-0 border",
+                "w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-bold tracking-[.02em] shrink-0 border",
                 active
                   ? "bg-accent-brand border-accent-brand text-white"
                   : "bg-bg-secondary border-border-subtle text-text-muted"
@@ -149,7 +149,7 @@ function StepLevel({ selected, onSelect }: { selected: string; onSelect: (id: st
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[15px] font-semibold text-text-primary">{level.label}</span>
-                  <span className="text-[10.5px] font-semibold text-text-muted bg-bg-secondary px-1.5 py-0.5 rounded border border-border-subtle">
+                  <span className="text-[11px] font-semibold text-text-muted bg-bg-secondary px-1.5 py-0.5 rounded-md border border-border-subtle">
                     {level.cefr}
                   </span>
                 </div>
@@ -195,7 +195,7 @@ function StepPreparing({ language }: { language: string }) {
 
   return (
     <div className="w-full max-w-[480px] flex flex-col items-center text-center">
-      <div className="w-[72px] h-[72px] rounded-[20px] bg-bg-secondary border border-border-subtle flex items-center justify-center text-[36px] mb-6 shadow-md">
+      <div className="w-[72px] h-[72px] rounded-2xl bg-bg-secondary border border-border-subtle flex items-center justify-center text-[36px] mb-6 shadow-md">
         {lang?.flag || '🌍'}
       </div>
       <h2 className="text-[28px] font-bold text-text-primary tracking-[-0.03em] mb-2">
@@ -206,7 +206,7 @@ function StepPreparing({ language }: { language: string }) {
       </p>
 
       {/* Progress bar */}
-      <div className="w-full max-w-[320px] h-1.5 bg-bg-active rounded-full overflow-hidden mb-5">
+      <div className="w-full max-w-[320px] h-2 bg-bg-active rounded-full overflow-hidden mb-5">
         <div
           className="h-full rounded-full bg-accent-brand transition-[width] duration-[600ms] ease-[cubic-bezier(.4,0,.2,1)]"
           style={{ width: `${progress}%` }}
@@ -218,12 +218,12 @@ function StepPreparing({ language }: { language: string }) {
           <div
             key={item.label}
             className={cn(
-              "flex items-center gap-2.5 text-[13.5px] transition-colors duration-300",
+              "flex items-center gap-2.5 text-[13px] transition-colors duration-300",
               item.done ? "text-text-primary" : "text-text-muted"
             )}
           >
             <div className={cn(
-              "w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300 shrink-0 border",
+              "w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 shrink-0 border",
               item.done
                 ? "bg-accent-brand border-accent-brand text-white"
                 : "bg-bg-active border-border-subtle text-transparent"
@@ -376,9 +376,9 @@ export default function OnboardingPage() {
             onClick={goNext}
             disabled={!canAdvance}
             className={cn(
-              "text-[14px] font-semibold border-none rounded-[10px] px-7 py-2.5 transition-all duration-150",
+              "text-[15px] font-semibold border-none rounded-xl px-8 py-3 transition-all duration-150",
               canAdvance
-                ? "text-white bg-accent-brand cursor-pointer shadow-sm hover:bg-[#444] hover:-translate-y-px"
+                ? "text-white bg-accent-brand cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
                 : "text-text-muted bg-bg-active cursor-default"
             )}
           >

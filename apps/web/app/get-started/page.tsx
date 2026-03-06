@@ -5,15 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
-function LogoSVG({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <path d="M24 4C24 4, 18 7, 14 12C10 17, 8 23, 8 28C9 26, 11 21, 14 16C17 11, 21 7, 24 4Z" stroke="white" strokeWidth="2.2" strokeLinejoin="round" fill="none"/>
-      <path d="M24 4C24 4, 27 9, 24 15C21 21, 16 26, 11 29C13 25, 17 20, 20 15C23 10, 26 7, 24 4Z" stroke="white" strokeWidth="2.2" strokeLinejoin="round" fill="none"/>
-    </svg>
-  )
-}
-
 function GoogleLogo() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -74,30 +65,30 @@ export default function GetStartedPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden bg-[#1a1a1a]">
-      {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(200,87,42,.08)_0%,transparent_70%)]" />
-
+    <div className="min-h-screen flex flex-col bg-bg relative overflow-hidden">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-8 h-[54px] relative z-10">
+      <nav className="flex items-center justify-between px-8 h-[54px] relative z-10 border-b border-border-subtle">
         <a href="/" className="flex items-center gap-2 no-underline">
-          <div className="w-[30px] h-[30px] bg-accent-brand rounded-lg flex items-center justify-center">
-            <LogoSVG />
+          <div className="w-[30px] h-[30px] bg-accent-brand rounded-lg flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,.2),inset_0_1px_0_rgba(255,255,255,.08)]">
+            <svg width="17" height="17" viewBox="0 0 32 32" fill="none">
+              <path d="M24 4C24 4, 18 7, 14 12C10 17, 8 23, 8 28C9 26, 11 21, 14 16C17 11, 21 7, 24 4Z" stroke="white" strokeWidth="2.2" strokeLinejoin="round" fill="none"/>
+              <path d="M24 4C24 4, 27 9, 24 15C21 21, 16 26, 11 29C13 25, 17 20, 20 15C23 10, 26 7, 24 4Z" stroke="white" strokeWidth="2.2" strokeLinejoin="round" fill="none"/>
+            </svg>
           </div>
-          <span className="font-serif text-[18px] font-normal italic text-[#f0ede8]">
+          <span className="font-serif text-[18px] font-normal italic text-text-primary tracking-[-0.03em]">
             Lingle
           </span>
         </a>
         <div className="flex gap-2 items-center">
           <button
             onClick={() => setShowAuth(true)}
-            className="text-[13.5px] text-[rgba(240,237,232,.5)] bg-transparent border-none px-3 py-1.5 rounded-md cursor-pointer hover:text-[rgba(240,237,232,.7)] transition-colors duration-150"
+            className="text-[13px] text-text-secondary bg-transparent border-none px-3 py-1.5 rounded-md cursor-pointer hover:text-text-primary hover:bg-bg-hover transition-colors duration-150"
           >
             Sign In
           </button>
           <button
             onClick={() => setShowAuth(true)}
-            className="text-[13.5px] font-medium text-white bg-accent-brand border-none rounded-[10px] px-4 py-[7px] cursor-pointer hover:bg-[#444] transition-colors duration-150"
+            className="text-[13px] font-medium text-white bg-accent-brand border-none rounded-xl px-4 py-[7px] cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-150"
           >
             Sign Up
           </button>
@@ -106,36 +97,36 @@ export default function GetStartedPage() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6 relative z-[1]">
-        <h1 className="text-[clamp(36px,5vw,64px)] font-bold text-[#f0ede8] tracking-[-0.04em] leading-[1.12] mb-6 idle-entrance">
+        <h1 className="text-[clamp(36px,5vw,64px)] font-bold text-text-primary tracking-[-0.04em] leading-[1.12] mb-6">
           Your learning experience<br />is{' '}
           <span className="font-serif italic font-light">almost ready</span>
         </h1>
 
         {/* Preview cards */}
-        <div className="flex gap-4 mb-10 idle-entrance" style={{ animationDelay: '.1s' }}>
+        <div className="flex gap-4 mb-10">
           {/* Blurred chat preview */}
-          <div className="w-[200px] h-[140px] rounded-2xl border border-[rgba(255,255,255,.1)] backdrop-blur-[10px] p-4 flex flex-col gap-2 overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,.08)_0%,rgba(255,255,255,.03)_100%)]">
+          <div className="w-[200px] h-[140px] rounded-xl border border-border-subtle bg-bg-pure p-4 flex flex-col gap-2 overflow-hidden shadow-sm">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[rgba(255,255,255,.1)] flex items-center justify-center text-[11px] text-[rgba(255,255,255,.5)] font-semibold">
+              <div className="w-7 h-7 rounded-lg bg-bg-active flex items-center justify-center text-[11px] text-text-muted font-semibold">
                 AI
               </div>
               <div>
-                <div className="text-[11px] text-[rgba(255,255,255,.6)] font-semibold">Lingle Agent</div>
-                <div className="text-[9px] text-[rgba(255,255,255,.3)]">Ready to chat</div>
+                <div className="text-[11px] text-text-secondary font-semibold">Lingle Agent</div>
+                <div className="text-[11px] text-text-muted">Ready to chat</div>
               </div>
             </div>
-            <div className="flex-1 rounded-lg bg-[rgba(255,255,255,.05)] blur-[4px] flex flex-col gap-1.5 p-2">
-              <div className="h-2 w-4/5 bg-[rgba(255,255,255,.1)] rounded" />
-              <div className="h-2 w-3/5 bg-[rgba(255,255,255,.1)] rounded" />
-              <div className="h-2 w-[70%] bg-[rgba(255,255,255,.1)] rounded self-end" />
+            <div className="flex-1 rounded-lg bg-bg-secondary blur-[4px] flex flex-col gap-1.5 p-2">
+              <div className="h-2 w-4/5 bg-bg-active rounded" />
+              <div className="h-2 w-3/5 bg-bg-active rounded" />
+              <div className="h-2 w-[70%] bg-bg-active rounded self-end" />
             </div>
           </div>
 
-          <div className="w-[200px] h-[140px] rounded-2xl border border-[rgba(255,255,255,.1)] backdrop-blur-[10px] p-4 flex flex-col gap-2 overflow-hidden bg-[linear-gradient(135deg,rgba(200,87,42,.12)_0%,rgba(255,255,255,.03)_100%)]">
-            <div className="text-[11px] text-[rgba(255,255,255,.5)] font-semibold tracking-[.06em] uppercase">
+          <div className="w-[200px] h-[140px] rounded-xl border border-border-subtle bg-bg-pure p-4 flex flex-col gap-2 overflow-hidden shadow-sm">
+            <div className="text-[11px] text-text-muted font-semibold tracking-[.06em] uppercase">
               Your prompt
             </div>
-            <div className="flex-1 rounded-lg text-[13px] text-[rgba(255,255,255,.7)] leading-relaxed overflow-hidden">
+            <div className="flex-1 rounded-lg text-[13px] text-text-secondary leading-relaxed overflow-hidden">
               {prompt || 'Your conversation awaits...'}
             </div>
           </div>
@@ -144,13 +135,12 @@ export default function GetStartedPage() {
         {/* CTA */}
         <button
           onClick={() => setShowAuth(true)}
-          className="text-[16px] font-semibold text-white bg-accent-warm border-none rounded-[14px] px-9 py-3.5 cursor-pointer shadow-[0_2px_12px_rgba(200,87,42,.4),0_8px_32px_rgba(200,87,42,.2)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(200,87,42,.5),0_12px_40px_rgba(200,87,42,.25)] idle-entrance"
-          style={{ animationDelay: '.2s' }}
+          className="rounded-xl bg-accent-brand px-8 py-3 text-[15px] font-semibold text-white border-none cursor-pointer transition-all duration-150 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
         >
           Sign up for free to start
         </button>
 
-        <p className="text-[13px] text-[rgba(240,237,232,.35)] mt-4 idle-entrance" style={{ animationDelay: '.3s' }}>
+        <p className="text-[13px] text-text-muted mt-4">
           Free forever. No credit card required.
         </p>
       </div>
@@ -158,33 +148,33 @@ export default function GetStartedPage() {
       {/* Auth Modal Overlay */}
       {showAuth && (
         <div
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
           onClick={(e) => { if (e.target === e.currentTarget) setShowAuth(false) }}
         >
-          <div className="w-full max-w-[420px] bg-[#1a1a1a] border border-[rgba(255,255,255,.12)] rounded-[20px] p-8 relative animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-[420px] bg-bg-pure border border-border-subtle rounded-xl p-8 relative shadow-pop animate-in zoom-in-95 duration-200">
             {/* Close */}
             <button
               onClick={() => setShowAuth(false)}
-              className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-[rgba(255,255,255,.06)] border border-[rgba(255,255,255,.1)] cursor-pointer flex items-center justify-center text-[rgba(255,255,255,.4)] text-[14px] hover:bg-[rgba(255,255,255,.1)] transition-colors duration-150"
+              className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-bg-hover border border-border-subtle cursor-pointer flex items-center justify-center text-text-muted text-[14px] hover:bg-bg-active transition-colors duration-150"
             >
               ✕
             </button>
 
             {/* Logo */}
             <div className="text-center mb-6">
-              <span className="font-serif text-[28px] font-normal italic text-[#f0ede8]">
+              <span className="font-serif text-[28px] font-normal italic text-text-primary">
                 Lingle
               </span>
-              <div className="text-[15px] font-semibold text-[#f0ede8] mt-2">
+              <div className="text-[15px] font-semibold text-text-primary mt-2">
                 Create your account
               </div>
-              <div className="text-[13px] text-[rgba(240,237,232,.5)] mt-1">
+              <div className="text-[13px] text-text-secondary mt-1">
                 Welcome! Sign in to get started.
               </div>
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-[rgba(200,87,42,.1)] border border-[rgba(200,87,42,.2)] text-accent-warm text-[13px] mb-4">
+              <div className="p-3 rounded-lg bg-warm-soft border border-warm-med text-accent-warm text-[13px] mb-4">
                 {error}
               </div>
             )}
@@ -194,7 +184,7 @@ export default function GetStartedPage() {
               onClick={handleGoogleSignIn}
               disabled={signingIn}
               className={cn(
-                "flex items-center justify-center gap-2.5 w-full py-3 px-4 bg-white border-none rounded-[10px] text-[14px] font-medium text-text-primary transition-colors duration-150 hover:bg-bg-secondary",
+                "flex items-center justify-center gap-2.5 w-full py-3 px-4 bg-bg-secondary border border-border-subtle rounded-xl text-[14px] font-medium text-text-primary transition-all duration-150 hover:bg-bg-hover hover:border-border-strong",
                 signingIn ? "cursor-wait opacity-60" : "cursor-pointer"
               )}
             >
@@ -202,7 +192,7 @@ export default function GetStartedPage() {
               {signingIn ? 'Signing in...' : 'Continue with Google'}
             </button>
 
-            <p className="text-[11px] text-[rgba(240,237,232,.3)] text-center mt-5 leading-normal">
+            <p className="text-[11px] text-text-muted text-center mt-5 leading-normal">
               By continuing, you accept our Privacy Policy and Terms of Use.
             </p>
           </div>
