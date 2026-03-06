@@ -795,23 +795,25 @@ function ConversationViewInner() {
                   <div className="text-[11px] font-semibold tracking-[0.07em] uppercase text-text-muted mb-1.5">
                     Recent Sessions
                   </div>
-                  <div className="bg-bg-pure border border-border-subtle rounded-lg overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,.04)]">
-                    {recentSessions.filter(s => s.durationSeconds !== null && s.durationSeconds >= 60).slice(0, 5).map((session, i) => {
+                  <div className="flex flex-col gap-1.5">
+                    {recentSessions.filter(s => s.durationSeconds !== null && s.durationSeconds >= 60).slice(0, 5).map((session) => {
                       const duration = formatDuration(session.durationSeconds)
                       const time = formatRelativeTime(session.timestamp)
                       const label = session.sessionFocus || MODE_LABELS[session.mode as ScenarioMode] || 'Session'
+                      const modeLabel = MODE_LABELS[session.mode as ScenarioMode] || session.mode
                       return (
                         <button
                           key={session.id}
-                          className="flex items-center gap-3 px-2.5 py-2 bg-transparent border-none w-full cursor-pointer text-left transition-colors hover:bg-bg-hover"
-                          style={{ fontFamily: 'inherit', borderTop: i > 0 ? '1px solid var(--bg-hover)' : 'none' }}
+                          className="flex items-center gap-3 px-3.5 py-3 bg-bg-pure border border-border-subtle rounded-lg w-full cursor-pointer text-left transition-[box-shadow,border-color,transform] duration-150 hover:border-border-strong hover:shadow-[0_2px_8px_rgba(0,0,0,.06)] hover:-translate-y-px shadow-[0_1px_2px_rgba(0,0,0,.04)]"
+                          style={{ fontFamily: 'inherit' }}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-text-primary" />
-                          <span className="flex-1 text-[13px] font-medium text-text-primary truncate">{label}</span>
-                          <span className="text-[12px] text-text-muted shrink-0">
-                            {time}{duration ? ` \u00B7 ${duration}` : ''}
-                          </span>
-                          <ChevronRight size={12} className="text-text-muted" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-medium text-text-primary truncate leading-snug">{label}</div>
+                            <div className="text-[11.5px] text-text-muted mt-0.5">
+                              {modeLabel} · {time}{duration ? ` · ${duration}` : ''}
+                            </div>
+                          </div>
+                          <ChevronRight size={13} className="text-text-muted/50 shrink-0" />
                         </button>
                       )
                     })}
