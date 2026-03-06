@@ -1,5 +1,18 @@
-import type { LearnerProfile } from '@lingle/shared/types'
+import type { LearnerProfile, UsageInfo, SubscriptionInfo } from '@lingle/shared/types'
 import type { SessionPlan } from '@/lib/session-plan'
+
+export class UsageLimitError extends Error {
+  usedSeconds: number
+  limitSeconds: number
+  plan: string
+  constructor(data: { usedSeconds: number; limitSeconds: number; plan: string }) {
+    super('Daily conversation limit reached')
+    this.name = 'UsageLimitError'
+    this.usedSeconds = data.usedSeconds
+    this.limitSeconds = data.limitSeconds
+    this.plan = data.plan
+  }
+}
 
 class LingleApiClient {
   private cache = new Map<string, { data: unknown; ts: number }>()
@@ -38,7 +51,13 @@ class LingleApiClient {
       headers: { 'Content-Type': 'application/json' },
       ...options,
     })
-    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (body.error === 'usage_limit_exceeded') {
+        throw new UsageLimitError(body)
+      }
+      throw new Error(`API error: ${res.status}`)
+    }
     this.cache.clear()
     return res.json()
   }
@@ -48,7 +67,13 @@ class LingleApiClient {
       headers: { 'Content-Type': 'application/json' },
       ...options,
     })
-    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (body.error === 'usage_limit_exceeded') {
+        throw new UsageLimitError(body)
+      }
+      throw new Error(`API error: ${res.status}`)
+    }
     const data = await res.json()
     this.cache.set(path, { data, ts: Date.now() })
     return data as T
@@ -82,6 +107,22 @@ class LingleApiClient {
     this.request<LearnerProfile>('/profile', {
       method: 'PATCH',
       body: JSON.stringify(updates),
+    })
+
+  // Usage & Subscription
+  usageGet = () => this.request<UsageInfo>('/usage')
+  subscriptionGet = () => this.request<SubscriptionInfo>('/subscription')
+
+  // Stripe
+  stripeCreateCheckout = () =>
+    this.request<{ url: string }>('/stripe/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  stripePortal = () =>
+    this.request<{ url: string }>('/stripe/portal', {
+      method: 'POST',
+      body: JSON.stringify({}),
     })
 
   // Prefetch

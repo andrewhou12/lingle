@@ -1,6 +1,7 @@
 import { streamText, type UIMessage, convertToModelMessages } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
+import { withUsageCheck } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 import { createConversationTools } from '@/lib/conversation-tools'
 import { normalizePlan, formatPlanForPrompt } from '@/lib/session-plan'
@@ -8,7 +9,7 @@ import type { ScenarioMode } from '@/lib/experience-scenarios'
 import type { ConversationMessage, ConversationToolCall } from '@lingle/shared/types'
 import type { Prisma } from '@prisma/client'
 
-export const POST = withAuth(async (request, { userId }) => {
+export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   const body = await request.json()
   const messages: UIMessage[] = body.messages
   const sessionId: string | undefined = body.sessionId
@@ -133,4 +134,4 @@ responses via text-to-speech.
   })
 
   return result.toUIMessageStreamResponse()
-})
+}))

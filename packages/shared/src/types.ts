@@ -26,3 +26,20 @@ export interface AuthUser {
   avatarUrl: string | null
   onboardingCompleted: boolean
 }
+
+export type PlanType = 'free' | 'pro'
+
+export interface UsageInfo {
+  usedSeconds: number
+  limitSeconds: number
+  remainingSeconds: number
+  isLimitReached: boolean
+  plan: PlanType
+}
+
+export interface SubscriptionInfo {
+  plan: PlanType
+  status: string
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
+}

@@ -5,13 +5,17 @@ import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import type { Prisma } from '@prisma/client'
 
-export const POST = withAuth(async (request, { userId: _userId }) => {
+export const POST = withAuth(async (request, { userId }) => {
+  void userId // used implicitly via dbSession.userId
   const { sessionId } = await request.json()
 
   const dbSession = await prisma.conversationSession.findUnique({ where: { id: sessionId } })
   if (!dbSession) return NextResponse.json(null)
 
-  const duration = Math.floor((Date.now() - dbSession.timestamp.getTime()) / 1000)
+  const duration = Math.min(
+    Math.floor((Date.now() - dbSession.timestamp.getTime()) / 1000),
+    3600 // cap at 60 min per session
+  )
 
   // Generate a short title from the transcript
   let generatedTitle: string | undefined
@@ -50,6 +54,21 @@ Title:`,
     data: {
       durationSeconds: duration,
       sessionPlan: planData as Prisma.InputJsonValue,
+    },
+  })
+
+  // Accumulate daily usage
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  await prisma.dailyUsage.upsert({
+    where: { userId_date: { userId: dbSession.userId, date: today } },
+    create: {
+      userId: dbSession.userId,
+      date: today,
+      conversationSeconds: duration,
+    },
+    update: {
+      conversationSeconds: { increment: duration },
     },
   })
 

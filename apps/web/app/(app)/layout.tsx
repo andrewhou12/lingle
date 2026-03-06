@@ -69,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
 const BREADCRUMB_MAP: Record<string, string> = {
   '/conversation': 'Practice',
   '/settings': 'Settings',
+  '/upgrade': 'Upgrade',
 }
 
 /* ── Subcomponents ── */
@@ -85,27 +86,66 @@ function LogoIcon() {
   )
 }
 
-function DailyGoalWidget() {
+function UsageBanner() {
+  const [usage, setUsage] = useState<{ usedSeconds: number; limitSeconds: number; isLimitReached: boolean; plan: string } | null>(null)
+
+  useEffect(() => {
+    api.usageGet().then(setUsage).catch(() => {})
+  }, [])
+
+  if (!usage) {
+    return (
+      <div className="mx-2.5 mt-2.5 mb-1">
+        <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+          <div className="h-[52px]" />
+        </div>
+      </div>
+    )
+  }
+
+  const isPro = usage.plan === 'pro'
+  const usedMinutes = Math.floor(usage.usedSeconds / 60)
+  const limitMinutes = usage.limitSeconds === -1 ? null : Math.floor(usage.limitSeconds / 60)
+  const percentage = limitMinutes ? Math.min(100, (usage.usedSeconds / usage.limitSeconds) * 100) : 0
+  const isNearLimit = percentage >= 80
+  const isAtLimit = usage.isLimitReached
+
   return (
     <div className="mx-2.5 mt-2.5 mb-1">
       <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-[13px] font-medium text-text-primary">Daily goal</span>
-          <span className="text-[12px] text-text-muted">18 / 30 min</span>
+          <span className="text-[13px] font-medium text-text-primary">
+            {isPro ? 'Pro plan' : 'Free plan'}
+          </span>
+          <span className="text-[12px] text-text-muted">
+            {isPro
+              ? `${usedMinutes} min today`
+              : `${usedMinutes} / ${limitMinutes} min`}
+          </span>
         </div>
-        <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
-          <div className="h-full w-[60%] rounded-full bg-accent-brand transition-[width] duration-300" />
-        </div>
-        <div className="flex justify-between mt-2.5">
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">7</div>
-            <div className="text-[12px] text-text-muted">day streak</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[13px] font-semibold text-text-primary">N3</div>
-            <div className="text-[12px] text-text-muted">current level</div>
-          </div>
-        </div>
+        {!isPro && (
+          <>
+            <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-[width] duration-300',
+                  isAtLimit ? 'bg-accent-warm' : isNearLimit ? 'bg-[#d4a017]' : 'bg-accent-brand'
+                )}
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            {isNearLimit && !isAtLimit && (
+              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-brand font-medium hover:underline block no-underline">
+                Upgrade for unlimited practice
+              </Link>
+            )}
+            {isAtLimit && (
+              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-warm font-medium hover:underline block no-underline">
+                Limit reached &mdash; upgrade to continue
+              </Link>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
@@ -202,8 +242,8 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
           <span className="text-[9px] font-semibold tracking-wide uppercase bg-bg-hover text-text-secondary border border-border-strong rounded-sm px-1.5 py-0.5 leading-none">Beta</span>
         </div>
 
-        {/* Daily goal widget */}
-        <DailyGoalWidget />
+        {/* Usage banner */}
+        <UsageBanner />
 
         {/* Nav sections */}
         <nav className="flex-1 overflow-y-auto px-2.5 pb-2.5">
