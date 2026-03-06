@@ -22,7 +22,8 @@ const LEVELS = [
   { id: 'elementary', label: 'Elementary', desc: 'I can handle simple daily conversations', cefr: 'A2', tag: 'N4' },
   { id: 'intermediate', label: 'Intermediate', desc: 'I can express opinions on familiar topics', cefr: 'B1', tag: 'N3' },
   { id: 'upper_intermediate', label: 'Upper Intermediate', desc: 'I understand most native content with effort', cefr: 'B2', tag: 'N2' },
-  { id: 'advanced', label: 'Advanced', desc: 'I\'m near-fluent and want to refine nuance', cefr: 'C1', tag: 'N1' },
+  { id: 'advanced', label: 'Advanced', desc: 'I can follow complex arguments and express nuance', cefr: 'C1', tag: 'N1' },
+  { id: 'near_native', label: 'Near-Native', desc: 'I\'m fluent and want to master subtlety and register', cefr: 'C2', tag: 'C2' },
 ]
 
 const LEVEL_TO_DIFFICULTY: Record<string, number> = {
@@ -32,6 +33,7 @@ const LEVEL_TO_DIFFICULTY: Record<string, number> = {
   intermediate: 3,
   upper_intermediate: 4,
   advanced: 5,
+  near_native: 6,
 }
 
 /* ── Step components ── */
