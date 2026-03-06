@@ -73,7 +73,8 @@ function autoConvert(kana: string): string | null {
 
 export function useJapaneseIME(
   value: string,
-  onChange: (value: string) => void
+  onChange: (value: string) => void,
+  options?: { initialActive?: boolean }
 ): UseJapaneseIMEReturn {
   const [imeActive, setImeActive] = useState(getStoredIMEState)
   const [mode, setMode] = useState<IMEMode>('direct')
@@ -90,8 +91,10 @@ export function useJapaneseIME(
 
   // Sync stored IME state after hydration
   useEffect(() => {
-    const stored = localStorage.getItem(IME_STORAGE_KEY)
-    const shouldBeActive = stored === null ? true : stored === 'true'
+    const initialActive = options?.initialActive
+    const shouldBeActive = initialActive !== undefined
+      ? initialActive
+      : (localStorage.getItem(IME_STORAGE_KEY) === null ? true : localStorage.getItem(IME_STORAGE_KEY) === 'true')
     if (shouldBeActive !== imeActive) {
       setImeActive(shouldBeActive)
     }

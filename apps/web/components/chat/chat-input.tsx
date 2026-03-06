@@ -36,7 +36,7 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
   const isMac = useIsMac()
   const toggleKeyLabel = useMemo(() => isMac ? '⌘Space' : 'Ctrl+Space', [isMac])
 
-  const ime = useJapaneseIME(value, onChange)
+  const ime = useJapaneseIME(value, onChange, { initialActive: true })
 
   // First-time tooltip
   useEffect(() => {

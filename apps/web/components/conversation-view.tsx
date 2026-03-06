@@ -257,7 +257,7 @@ function ConversationViewInner() {
   const [recentSessions, setRecentSessions] = useState<{ id: string; timestamp: string; durationSeconds: number | null; mode: string; sessionFocus: string }[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const idleTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const idleIme = useJapaneseIME(input, setInput)
+  const idleIme = useJapaneseIME(input, setInput, { initialActive: false })
   const sessionIdRef = useRef<string | null>(null)
   sessionIdRef.current = sessionId
   const { showRomaji, toggle: toggleRomaji } = useRomaji()
