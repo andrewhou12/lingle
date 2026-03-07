@@ -173,6 +173,7 @@ export function useVoiceConversation(
       onAnalysisResult: (turnIdx, result) => setAnalysisResults((prev) => ({ ...prev, [turnIdx]: result })),
       onTalkingChange: setIsTalking,
       getSessionId: () => sessionIdRef.current,
+      getRecentHistory: () => messagesRef.current.slice(-6).map((m) => ({ role: m.role, content: extractText(m) })).filter((m) => m.content),
       computeSignals: (utterance) => {
         const signals = computeTurnSignals(utterance.tokens, {
           targetLanguageCode: sttLanguageCode,
@@ -190,6 +191,7 @@ export function useVoiceConversation(
       tts: { reset: () => ttsRef.current.reset(), feedText: (t) => ttsRef.current.feedText(t), flushText: (t) => ttsRef.current.flushText(t), interrupt: () => ttsRef.current.interrupt(), get isDone() { return ttsRef.current.isDone } },
       sendMessage: (text) => sendMessageRef.current({ text }),
       getSessionId: () => sessionIdRef.current,
+      getRecentHistory: () => messagesRef.current.slice(-6).map((m) => ({ role: m.role, content: extractText(m) })).filter((m) => m.content),
       computeSignals: (utterance) => {
         const signals = computeTurnSignals(utterance.tokens, {
           targetLanguageCode: sttLanguageCode,

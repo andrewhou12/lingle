@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import { Fraunces, Noto_Serif_JP } from 'next/font/google'
+import { Fraunces, Noto_Serif_JP, Noto_Sans_JP } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import './globals.css'
 
@@ -17,6 +17,13 @@ const notoSerifJP = Noto_Serif_JP({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-noto-serif-jp',
+})
+
+const notoSansJP = Noto_Sans_JP({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-noto-sans-jp',
 })
 
 export const metadata: Metadata = {
@@ -35,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable} ${notoSerifJP.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable} ${notoSerifJP.variable} ${notoSansJP.variable}`}
       suppressHydrationWarning
     >
       <body>

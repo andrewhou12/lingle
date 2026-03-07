@@ -2,6 +2,7 @@ import { toRomaji } from 'wanakana'
 
 const RUBY_REGEX = /\{([^}|]+)\|([^}]+)\}/g
 const KANA_RUN_REGEX = /([ぁ-ゖァ-ヺー]+)/g
+const PAUSE_MARKER_REGEX = /<\d+>/g
 
 function ruby(text: string, rt: string): string {
   return `<ruby>${text}<rp>(</rp><rt>${rt}</rt><rp>)</rp></ruby>`
@@ -11,7 +12,7 @@ function ruby(text: string, rt: string): string {
  * Strip {漢字|かんじ} annotations, returning plain kanji text.
  */
 export function stripRubyAnnotations(text: string): string {
-  return text.replace(RUBY_REGEX, '$1')
+  return text.replace(RUBY_REGEX, '$1').replace(PAUSE_MARKER_REGEX, '')
 }
 
 /**

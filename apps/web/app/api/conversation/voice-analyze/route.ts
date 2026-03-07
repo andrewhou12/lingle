@@ -3,6 +3,7 @@ import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
+import { withUsageCheck } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 
 const voiceAnalysisSchema = z.object({
@@ -27,12 +28,12 @@ const voiceAnalysisSchema = z.object({
     examples: z.array(z.object({
       japanese: z.string(),
       english: z.string(),
-    })).min(1).max(2).describe('1-2 examples'),
+    })).describe('1-2 examples'),
     level: z.string().optional().describe('JLPT level'),
   })).describe('Only if assistant used a notable grammar pattern — 0-1 notes max'),
 })
 
-export const POST = withAuth(async (request) => {
+export const POST = withAuth(withUsageCheck(async (request, { userId: _userId }) => {
   const { sessionId, userMessage, assistantMessage, recentHistory } = await request.json()
 
   if (!sessionId || !userMessage || !assistantMessage) {
@@ -73,9 +74,10 @@ Learner info:
 
 Rules:
 - Only flag GENUINE errors in the learner's speech — not stylistic choices, casual speech, or natural variation
-- Vocabulary cards: only for words the ASSISTANT used that are clearly above the learner's current level. 0-2 max.
-- Grammar notes: only if the assistant used a notable pattern the learner likely hasn't seen. 0-1 max.
-- If everything looks fine, return empty arrays. Most turns should have 0 corrections.
+- Vocabulary cards: ONLY if the learner explicitly asked what a word means (e.g. "what does X mean?", "Xって何?"). Never proactively. 0-2 max.
+- Grammar notes: ONLY if the learner explicitly asked about a grammar point (e.g. "how do I use X?", "what's the difference between X and Y?"). Never proactively. 0-1 max.
+- If the learner didn't ask about vocabulary or grammar, return empty arrays for vocabularyCards and grammarNotes. Do NOT generate cards just because the assistant used a word or pattern.
+- If everything looks fine, return empty arrays. Most turns should have 0 corrections and 0 cards.
 - Be selective — quality over quantity.`,
     })
 
@@ -84,4 +86,4 @@ Rules:
     console.error('[voice-analyze] Analysis failed:', err)
     return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [] })
   }
-})
+}))

@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-helpers'
 import { parseMessage } from '@/lib/message-parser'
+import { getRimeWs } from '@/lib/rime-ws'
 
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
+const PAUSE_MARKER_REGEX = /<\d+>/g
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'urE3OJfJRxJuk9kAMN0Y'
+const TTS_PROVIDER = process.env.TTS_PROVIDER || 'elevenlabs'
 
 export const POST = withAuth(async (request) => {
-  if (!ELEVENLABS_API_KEY) {
-    return NextResponse.json({ error: 'ELEVENLABS_API_KEY not configured' }, { status: 500 })
-  }
-
   const body = await request.json()
-  const { text, voice: voiceParam } = body
+  const { text, voice: voiceParam, speed } = body
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -26,9 +25,47 @@ export const POST = withAuth(async (request) => {
     .filter(Boolean)
     .join(' ')
     .replace(RUBY_REGEX, '$1')
+    .replace(PAUSE_MARKER_REGEX, '')
 
   if (!spoken) {
     return NextResponse.json({ error: 'no speakable text' }, { status: 400 })
+  }
+
+  if (TTS_PROVIDER === 'rime') {
+    return synthesizeWithRime(spoken, speed)
+  }
+  return synthesizeWithElevenLabs(spoken, voiceParam)
+})
+
+async function synthesizeWithRime(text: string, speed?: number): Promise<Response> {
+  const rime = getRimeWs()
+
+  // Convert user speed (1.5x = faster) to Rime's speedAlpha (lower = faster)
+  if (speed && speed !== 1.0) {
+    rime.updateSpeed(1.0 / speed)
+  }
+
+  try {
+    const audioBuffer = await rime.synthesize(text)
+    const bytes = new Uint8Array(audioBuffer)
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': bytes.byteLength.toString(),
+      },
+    })
+  } catch (err) {
+    console.error('Rime TTS error:', err)
+    return NextResponse.json(
+      { error: 'TTS generation failed' },
+      { status: 500 },
+    )
+  }
+}
+
+async function synthesizeWithElevenLabs(text: string, voiceParam?: string): Promise<Response> {
+  if (!ELEVENLABS_API_KEY) {
+    return NextResponse.json({ error: 'ELEVENLABS_API_KEY not configured' }, { status: 500 })
   }
 
   const voiceId = voiceParam || ELEVENLABS_VOICE_ID
@@ -42,7 +79,7 @@ export const POST = withAuth(async (request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: spoken,
+        text,
         model_id: 'eleven_flash_v2_5',
         output_format: 'mp3_44100_128',
         voice_settings: {
@@ -70,4 +107,4 @@ export const POST = withAuth(async (request) => {
       'Transfer-Encoding': 'chunked',
     },
   })
-})
+}

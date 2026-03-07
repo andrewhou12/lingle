@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createSentenceBoundaryTracker } from '@/lib/voice/sentence-boundary'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
+import { PCMStreamPlayer } from '@/lib/voice/pcm-stream-player'
 
 export interface UseVoiceTTSReturn {
   /** Feed streaming LLM text — extracts complete sentences and queues them for TTS */
@@ -31,8 +32,10 @@ export interface UseVoiceTTSReturn {
 
 interface QueueItem {
   sentence: string
-  audioPromise: Promise<Blob | null>
+  streamPromise?: Promise<ReadableStream<Uint8Array> | null>
 }
+
+const SAMPLE_RATE = 24000
 
 export function useVoiceTTS(
   onPlaybackStart?: () => void,
@@ -48,8 +51,7 @@ export function useVoiceTTS(
   const trackerRef = useRef(createSentenceBoundaryTracker())
   const queueRef = useRef<QueueItem[]>([])
   const playingRef = useRef(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const blobUrlsRef = useRef<string[]>([])
+  const playerRef = useRef<PCMStreamPlayer | null>(null)
   const stoppedRef = useRef(false)
   const speedRef = useRef(1.0)
   const generationRef = useRef(0)
@@ -59,16 +61,28 @@ export function useVoiceTTS(
   onPlaybackEndRef.current = onPlaybackEnd
   const spokenSentencesRef = useRef<string[]>([])
   const progressAnimRef = useRef<number>(0)
+  const abortRef = useRef<AbortController>(new AbortController())
 
-  const fetchAudio = useCallback((sentence: string): Promise<Blob | null> => {
-    return fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: sentence }),
-    })
-      .then((res) => (res.ok ? res.blob() : null))
-      .catch(() => null)
+  const getPlayer = useCallback((): PCMStreamPlayer => {
+    if (!playerRef.current) {
+      playerRef.current = new PCMStreamPlayer(SAMPLE_RATE)
+    }
+    return playerRef.current
   }, [])
+
+  const fetchStreamingAudio = useCallback(
+    (sentence: string): Promise<ReadableStream<Uint8Array> | null> => {
+      return fetch('/api/tts/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sentence, speed: speedRef.current }),
+        signal: abortRef.current.signal,
+      })
+        .then((res) => (res.ok && res.body ? res.body : null))
+        .catch(() => null)
+    },
+    [],
+  )
 
   const stopProgressTracking = useCallback(() => {
     if (progressAnimRef.current) {
@@ -80,9 +94,9 @@ export function useVoiceTTS(
   const startProgressTracking = useCallback(() => {
     stopProgressTracking()
     const tick = () => {
-      const audio = audioRef.current
-      if (audio && audio.duration && isFinite(audio.duration)) {
-        setCurrentProgress(Math.min(audio.currentTime / audio.duration, 1))
+      const player = playerRef.current
+      if (player && player.isPlaying) {
+        setCurrentProgress(player.progress)
       }
       progressAnimRef.current = requestAnimationFrame(tick)
     }
@@ -95,19 +109,25 @@ export function useVoiceTTS(
     playingRef.current = false
     setIsPlaying(false)
     stopProgressTracking()
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
+
+    // Abort in-flight fetches
+    abortRef.current.abort()
+
+    // Interrupt PCM player
+    if (playerRef.current) {
+      playerRef.current.interrupt()
     }
-    for (const url of blobUrlsRef.current) {
-      URL.revokeObjectURL(url)
-    }
-    blobUrlsRef.current = []
+
     queueRef.current = []
   }, [stopProgressTracking])
 
   // Cleanup on unmount
-  useEffect(() => cleanup, [cleanup])
+  useEffect(() => {
+    return () => {
+      cleanup()
+      playerRef.current?.dispose()
+    }
+  }, [cleanup])
 
   const playNext = useCallback(async () => {
     const gen = generationRef.current
@@ -134,10 +154,13 @@ export function useVoiceTTS(
     }
 
     try {
-      const blob = await item.audioPromise
+      // Fetch this sentence's stream (use pre-fetched if available, otherwise fetch now)
+      const stream = item.streamPromise
+        ? await item.streamPromise
+        : await fetchStreamingAudio(item.sentence)
 
       if (gen !== generationRef.current) return
-      if (!blob) {
+      if (!stream) {
         // Skip failed fetches — still mark sentence as spoken
         spokenSentencesRef.current = [...spokenSentencesRef.current, item.sentence]
         setSpokenSentences(spokenSentencesRef.current)
@@ -145,23 +168,16 @@ export function useVoiceTTS(
         return
       }
 
-      const url = URL.createObjectURL(blob)
-      blobUrlsRef.current.push(url)
-
-      const audio = new Audio(url)
-      audio.playbackRate = speedRef.current
-      audioRef.current = audio
+      const player = getPlayer()
+      player.playbackRate = speedRef.current
 
       // Track current sentence
       setCurrentSentence(item.sentence)
       setCurrentProgress(0)
       startProgressTracking()
 
-      await new Promise<void>((resolve) => {
-        audio.onended = () => resolve()
-        audio.onerror = () => resolve()
-        audio.play().catch(() => resolve())
-      })
+      // Play streams PCM chunks progressively — resolves when all audio finishes
+      await player.play(stream)
 
       if (gen === generationRef.current) {
         stopProgressTracking()
@@ -182,7 +198,7 @@ export function useVoiceTTS(
         onPlaybackEndRef.current?.()
       }
     }
-  }, [startProgressTracking, stopProgressTracking])
+  }, [getPlayer, fetchStreamingAudio, startProgressTracking, stopProgressTracking])
 
   const enqueueSentence = useCallback(
     (sentence: string) => {
@@ -190,8 +206,8 @@ export function useVoiceTTS(
       const clean = stripRubyAnnotations(sentence)
       if (!clean.trim()) return
 
-      const audioPromise = fetchAudio(clean)
-      queueRef.current.push({ sentence: clean, audioPromise })
+      // Queue the sentence text — streaming audio is fetched just-in-time in playNext()
+      queueRef.current.push({ sentence: clean })
 
       if (!playingRef.current) {
         playingRef.current = true
@@ -201,7 +217,7 @@ export function useVoiceTTS(
         playNext()
       }
     },
-    [playNext, fetchAudio],
+    [playNext],
   )
 
   const feedText = useCallback(
@@ -229,6 +245,8 @@ export function useVoiceTTS(
   )
 
   const interrupt = useCallback(() => {
+    // Fire-and-forget: cancel any in-flight server-side synthesis
+    fetch('/api/tts/interrupt', { method: 'POST' }).catch(() => {})
     cleanup()
   }, [cleanup])
 
@@ -236,6 +254,7 @@ export function useVoiceTTS(
     cleanup()
     trackerRef.current = createSentenceBoundaryTracker()
     stoppedRef.current = false
+    abortRef.current = new AbortController()
     spokenSentencesRef.current = []
     setSpokenSentences([])
     setCurrentSentence(null)
@@ -248,8 +267,8 @@ export function useVoiceTTS(
     speedRef.current = clamped
     setSpeedState(clamped)
     // Apply to currently playing audio immediately
-    if (audioRef.current) {
-      audioRef.current.playbackRate = clamped
+    if (playerRef.current) {
+      playerRef.current.playbackRate = clamped
     }
   }, [])
 
