@@ -5,16 +5,13 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import {
-  MoreHorizontal,
-  LogOut,
-  ChevronRight,
-  PanelLeftClose,
-  PanelLeft,
-} from 'lucide-react'
-import {
   ChatBubbleLeftRightIcon,
   ClockIcon,
   Cog6ToothIcon,
+  EllipsisHorizontalIcon,
+  ArrowRightStartOnRectangleIcon,
+  ChevronRightIcon,
+  Bars3Icon,
 } from '@heroicons/react/24/outline'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -71,7 +68,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/conversation': 'Practice',
   '/progress': 'History',
   '/settings': 'Settings',
-  '/upgrade': 'Upgrade',
+  '/upgrade': 'Plan',
 }
 
 /* ── Subcomponents ── */
@@ -89,78 +86,15 @@ function LogoIcon() {
 }
 
 function UsageBanner() {
-  const [usage, setUsage] = useState<{ usedSeconds: number; limitSeconds: number; isLimitReached: boolean; plan: string } | null>(null)
-
-  useEffect(() => {
-    api.usageGet().then(setUsage).catch(() => {})
-  }, [])
-
-  if (!usage) {
-    return (
-      <div className="mx-2.5 mt-2.5 mb-1">
-        <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
-          <div className="h-[52px]" />
-        </div>
-      </div>
-    )
-  }
-
-  const isPro = usage.plan === 'pro'
-  const usedMinutes = Math.floor(usage.usedSeconds / 60)
-  const limitMinutes = usage.limitSeconds === -1 ? null : Math.floor(usage.limitSeconds / 60)
-  const percentage = limitMinutes ? Math.min(100, (usage.usedSeconds / usage.limitSeconds) * 100) : 0
-  const isNearLimit = percentage >= 80
-  const isAtLimit = usage.isLimitReached
-
-  return (
-    <div className="mx-2.5 mt-2.5 mb-1">
-      <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[13px] font-medium text-text-primary">
-            {isPro ? 'Pro plan' : 'Free plan'}
-          </span>
-          <span className="text-[12px] text-text-muted">
-            {isPro
-              ? `${usedMinutes} min today`
-              : `${usedMinutes} / ${limitMinutes} min`}
-          </span>
-        </div>
-        {!isPro && (
-          <>
-            <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-[width] duration-300',
-                  isAtLimit ? 'bg-accent-warm' : isNearLimit ? 'bg-[#d4a017]' : 'bg-accent-brand'
-                )}
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            {isNearLimit && !isAtLimit && (
-              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-brand font-medium hover:underline block no-underline">
-                Upgrade for unlimited practice
-              </Link>
-            )}
-            {isAtLimit && (
-              <Link href="/upgrade" className="mt-2.5 text-[12px] text-accent-warm font-medium hover:underline block no-underline">
-                Limit reached &mdash; upgrade to continue
-              </Link>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function DailyGoalWidget() {
   const { targetLanguage } = useLanguage()
+  const [usage, setUsage] = useState<{ usedSeconds: number; limitSeconds: number; isLimitReached: boolean; plan: string } | null>(null)
   const [level, setLevel] = useState<string | null>(null)
   const [streak, setStreak] = useState<number | null>(null)
   const [minutesToday, setMinutesToday] = useState<number | null>(null)
   const [goalMinutes, setGoalMinutes] = useState(30)
 
   useEffect(() => {
+    api.usageGet().then(setUsage).catch(() => {})
     api.profileGet().then((p) => {
       if (p) {
         const dl = getDifficultyLevel(p.difficultyLevel)
@@ -169,7 +103,6 @@ function DailyGoalWidget() {
         setGoalMinutes(p.dailyGoalMinutes ?? 30)
       }
     }).catch(() => {})
-
     api.statsToday().then((s) => {
       setMinutesToday(s.minutesToday)
     }).catch(() => {})
@@ -178,15 +111,34 @@ function DailyGoalWidget() {
   const mins = minutesToday ?? 0
   const pct = Math.min(100, Math.round((mins / goalMinutes) * 100))
 
+  const isPro = usage?.plan === 'pro'
+  const usedMinutes = usage ? Math.floor(usage.usedSeconds / 60) : 0
+  const limitMinutes = usage && usage.limitSeconds !== -1 ? Math.floor(usage.limitSeconds / 60) : null
+  const percentage = usage && limitMinutes ? Math.min(100, (usage.usedSeconds / usage.limitSeconds) * 100) : 0
+  const isNearLimit = percentage >= 80
+  const isAtLimit = usage?.isLimitReached ?? false
+
   return (
-    <Link href="/progress" className="block mx-2.5 mt-2.5 mb-1 no-underline">
-      <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] transition-colors duration-100 hover:bg-bg-hover cursor-pointer">
+    <div className="block mx-2.5 mt-2.5 mb-1">
+      <div className="p-3.5 bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)]">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-[13px] font-medium text-text-primary">Daily goal</span>
-          <span className="text-[12px] text-text-muted">{mins} / {goalMinutes} min</span>
+          <span className="text-[13px] font-medium text-text-primary">
+            {isPro ? 'Daily goal' : 'Daily limit'}
+          </span>
+          <span className="text-[12px] text-text-muted">
+            {isPro
+              ? `${mins} / ${goalMinutes} min`
+              : `${usedMinutes} / ${limitMinutes ?? '?'} min`}
+          </span>
         </div>
         <div className="h-1.5 rounded-full bg-bg-active overflow-hidden">
-          <div className="h-full rounded-full bg-accent-brand transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          <div
+            className={cn(
+              'h-full rounded-full transition-[width] duration-300',
+              !isPro && isAtLimit ? 'bg-accent-warm' : !isPro && isNearLimit ? 'bg-[#d4a017]' : 'bg-accent-brand'
+            )}
+            style={{ width: `${isPro ? pct : percentage}%` }}
+          />
         </div>
         <div className="flex justify-between mt-2.5">
           <div>
@@ -198,8 +150,21 @@ function DailyGoalWidget() {
             <div className="text-[12px] text-text-muted">current level</div>
           </div>
         </div>
+        {usage && !isPro && (
+          <Link
+            href="/upgrade"
+            className={cn(
+              'mt-3 flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-[13px] font-medium no-underline transition-colors duration-100',
+              isAtLimit
+                ? 'bg-accent-warm text-white hover:opacity-90'
+                : 'bg-accent-brand/10 text-accent-brand hover:bg-accent-brand/20'
+            )}
+          >
+            {isAtLimit ? 'Limit reached — upgrade to Pro' : 'Upgrade to Pro'}
+          </Link>
+        )}
       </div>
-    </Link>
+    </div>
   )
 }
 
@@ -242,7 +207,7 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
                   <span className="text-[14px] font-medium text-text-primary truncate leading-tight">{displayName}</span>
                   <span className="text-[12px] text-text-muted">Intermediate</span>
                 </div>
-                <MoreHorizontal size={14} className="text-text-muted shrink-0" />
+                <EllipsisHorizontalIcon className="w-3.5 h-3.5 text-text-muted shrink-0" />
               </>
             )}
           </button>
@@ -252,7 +217,7 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
             onClick={handleSignOut}
             className="flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer w-full bg-transparent border-none text-text-secondary text-[13px] transition-colors duration-100 hover:bg-bg-hover hover:text-text-primary"
           >
-            <LogOut size={14} />
+            <ArrowRightStartOnRectangleIcon className="w-3.5 h-3.5" />
             Sign out
           </button>
         </PopoverContent>
@@ -348,7 +313,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
                 <LogoIcon />
               </span>
               <span className="absolute inset-0 flex items-center justify-center text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                <PanelLeft size={18} />
+                <Bars3Icon className="w-[18px] h-[18px]" />
               </span>
             </button>
           ) : (
@@ -363,16 +328,14 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
                 className="ml-auto bg-transparent border-none cursor-pointer p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors duration-100 shrink-0 flex items-center justify-center"
                 title="Collapse sidebar"
               >
-                <PanelLeftClose size={16} />
+                <Bars3Icon className="w-4 h-4" />
               </button>
             </>
           )}
         </div>
 
-        {/* Usage banner */}
-        <UsageBanner />
-        {/* Daily goal widget — hidden when collapsed */}
-        {!collapsed && <DailyGoalWidget />}
+        {/* Usage & daily goal widget — hidden when collapsed */}
+        {!collapsed && <UsageBanner />}
 
         {/* Nav sections */}
         <nav className={cn('flex-1 overflow-y-auto pb-2.5', collapsed ? 'px-1' : 'px-2.5')}>
@@ -434,7 +397,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
         <header className="flex items-center justify-between px-6 h-[48px] border-b border-border shrink-0 relative z-10 bg-bg">
           <div className="flex items-center gap-1.5 text-[14px] text-text-muted">
             <span>Lingle</span>
-            <ChevronRight size={12} />
+            <ChevronRightIcon className="w-3 h-3" />
             <span className="text-text-primary font-medium">{breadcrumb || 'Home'}</span>
           </div>
           <div className="flex items-center gap-2.5">

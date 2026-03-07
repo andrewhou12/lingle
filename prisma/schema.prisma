@@ -196,6 +196,7 @@ model ConversationSession {
   avoidanceEvents Json
   sessionPlan     Json
   systemPrompt    String?
+  cachedAnalysis  Json?
 
   @@index([userId])
   @@index([userId, targetLanguage])

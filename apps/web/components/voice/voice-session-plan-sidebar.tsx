@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ChevronLeft, Send } from 'lucide-react'
+import { ChevronLeftIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan, isTutorPlan } from '@/lib/session-plan'
@@ -81,7 +81,7 @@ export function VoiceSessionPlanSidebar({
           onClick={onCollapse}
           className="w-[22px] h-[22px] rounded-md border-none bg-bg-hover cursor-pointer flex items-center justify-center text-text-muted transition-all hover:bg-bg-active hover:text-text-primary shrink-0"
         >
-          <ChevronLeft size={12} />
+          <ChevronLeftIcon className="w-3 h-3" />
         </button>
       </div>
 
@@ -143,7 +143,7 @@ export function VoiceSessionPlanSidebar({
             disabled={!inputValue.trim()}
             className="w-[34px] h-[34px] rounded-[10px] border-none cursor-pointer bg-accent-brand flex items-center justify-center shadow-[0_1px_4px_rgba(47,47,47,.2)] transition-all shrink-0 hover:bg-[#111] hover:-translate-y-px disabled:opacity-[.28] disabled:pointer-events-none"
           >
-            <Send size={14} className="text-white" />
+            <PaperAirplaneIcon className="w-3.5 h-3.5 text-white" />
           </button>
         </div>
       </div>

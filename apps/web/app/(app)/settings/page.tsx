@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Globe, GraduationCap, Target, Languages } from 'lucide-react'
+import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon } from '@heroicons/react/24/outline'
 import type { LearnerProfile } from '@lingle/shared/types'
 import { Spinner } from '@/components/spinner'
 import { api } from '@/lib/api'
@@ -77,7 +77,7 @@ export default function SettingsPage() {
           className="p-1.5 rounded-md text-text-secondary bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-bg-hover"
           onClick={() => router.back()}
         >
-          <ArrowLeft size={18} />
+          <ArrowLeftIcon className="w-[18px] h-[18px]" />
         </button>
         <h1 className="text-[28px] font-bold">Settings</h1>
       </div>
@@ -88,9 +88,9 @@ export default function SettingsPage() {
 
       <div className="rounded-xl border border-border bg-bg mb-6">
         <div className="flex flex-col">
-          <SettingsRow icon={<Languages size={16} />} label="Target Language" value={profile.targetLanguage} />
+          <SettingsRow icon={<LanguageIcon className="w-4 h-4" />} label="Target Language" value={profile.targetLanguage} />
           <hr className="border-t border-border m-0" />
-          <SettingsRow icon={<Globe size={16} />} label="Native Language" value={profile.nativeLanguage} />
+          <SettingsRow icon={<GlobeAltIcon className="w-4 h-4" />} label="Native Language" value={profile.nativeLanguage} />
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export default function SettingsPage() {
         <div className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
-              <GraduationCap size={16} />
+              <AcademicCapIcon className="w-4 h-4" />
             </div>
             <span className="text-[13px] font-medium">Level</span>
           </div>
@@ -143,7 +143,7 @@ export default function SettingsPage() {
         <div className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
-              <Target size={16} />
+              <FlagIcon className="w-4 h-4" />
             </div>
             <span className="text-[13px] font-medium">Practice time per day</span>
           </div>

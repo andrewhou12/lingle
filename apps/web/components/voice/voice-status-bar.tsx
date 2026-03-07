@@ -1,6 +1,6 @@
 'use client'
 
-import { Square } from 'lucide-react'
+import { StopIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import { type SessionPlan, isTutorPlan } from '@/lib/session-plan'
 
@@ -85,7 +85,7 @@ export function VoiceStatusBar({ title, duration, onEnd, plan, className }: Voic
           onClick={onEnd}
           className="inline-flex items-center gap-1.5 rounded-lg bg-warm-soft px-3 py-1.5 text-[13px] font-medium text-accent-warm border-none cursor-pointer transition-colors hover:bg-warm-med"
         >
-          <Square size={12} />
+          <StopIcon className="w-3 h-3" />
           End
         </button>
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { RotateCcw, BookOpen } from 'lucide-react'
+import { ArrowPathIcon, BookOpenIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { VoiceState } from '@/hooks/use-voice-conversation'
 
@@ -94,7 +94,7 @@ export function VoiceControls({
           title="Replay last line"
         >
           <div className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center bg-bg-secondary border-[1.5px] border-border transition-all group-hover:bg-bg-hover group-hover:border-border-strong">
-            <RotateCcw size={16} className="text-text-secondary" />
+            <ArrowPathIcon className="w-4 h-4 text-text-secondary" />
           </div>
           <span className="text-[10px] text-text-muted">Replay</span>
         </button>
@@ -157,7 +157,7 @@ export function VoiceControls({
           title="Vocabulary"
         >
           <div className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center bg-bg-secondary border-[1.5px] border-border transition-all group-hover:bg-bg-hover group-hover:border-border-strong relative">
-            <BookOpen size={16} className="text-text-secondary" />
+            <BookOpenIcon className="w-4 h-4 text-text-secondary" />
             {vocabCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-accent-warm text-white text-[8px] font-bold rounded-[7px] flex items-center justify-center px-[3px]">
                 {vocabCount}

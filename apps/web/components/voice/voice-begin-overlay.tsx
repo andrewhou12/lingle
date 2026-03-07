@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Send } from 'lucide-react'
+import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
@@ -230,7 +230,7 @@ export function VoiceBeginOverlay({ plan, mode, prompt, onBegin, onBack }: Voice
                   disabled={!inputValue.trim()}
                   className="absolute bottom-2 right-[9px] w-7 h-7 rounded-lg border-none cursor-pointer bg-accent-brand flex items-center justify-center opacity-70 transition-opacity hover:opacity-100 disabled:opacity-[.28] disabled:pointer-events-none"
                 >
-                  <Send size={13} className="text-white" />
+                  <PaperAirplaneIcon className="w-[13px] h-[13px] text-white" />
                 </button>
               </div>
             </div>

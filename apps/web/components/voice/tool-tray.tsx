@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronUp } from 'lucide-react'
+import { XMarkIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 
 interface ToolTrayProps {
@@ -26,7 +26,7 @@ export function ToolTray({ items, className }: ToolTrayProps) {
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-[12px] font-medium text-text-secondary hover:bg-bg-hover cursor-pointer transition-colors"
         >
-          <ChevronUp size={12} />
+          <ChevronUpIcon className="w-3 h-3" />
           {items.length} {items.length === 1 ? 'card' : 'cards'}
         </button>
       )}
@@ -50,7 +50,7 @@ export function ToolTray({ items, className }: ToolTrayProps) {
                 onClick={() => setIsOpen(false)}
                 className="w-5 h-5 rounded flex items-center justify-center bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer"
               >
-                <X size={12} />
+                <XMarkIcon className="w-3 h-3" />
               </button>
             </div>
 

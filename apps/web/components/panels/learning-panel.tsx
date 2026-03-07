@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useCallback, useState } from 'react'
-import { X, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { XMarkIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import type { UIMessage } from 'ai'
 import {
   type SessionPlan,
@@ -95,7 +95,7 @@ export function LearningPanel({ messages, plan, mode = 'conversation', onPlanUpd
           className="w-6 h-6 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
           onClick={panel.close}
         >
-          <X size={14} />
+          <XMarkIcon className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -108,7 +108,7 @@ export function LearningPanel({ messages, plan, mode = 'conversation', onPlanUpd
                 className="flex items-center gap-1.5 text-[12px] font-medium text-text-muted uppercase tracking-wide mb-2 hover:text-text-primary transition-colors"
                 onClick={() => setPlanCollapsed((v) => !v)}
               >
-                {planCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                {planCollapsed ? <ChevronRightIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />}
                 Plan
                 {progressLabel && (
                   <span className="text-text-placeholder ml-1">{progressLabel}</span>
@@ -249,7 +249,7 @@ function TutorPlanCard({ plan }: { plan: TutorPlan }) {
                       : 'border-border-strong'
                   )}
                 >
-                  {step.status === 'completed' && <Check size={10} className="text-white" />}
+                  {step.status === 'completed' && <CheckIcon className="w-2.5 h-2.5 text-white" />}
                   {step.status === 'active' && <div className="w-1.5 h-1.5 rounded-full bg-accent-brand" />}
                   {step.status === 'skipped' && <span className="text-[9px] text-text-muted">-</span>}
                 </span>
@@ -394,7 +394,7 @@ function BasePlanCard({
                   )}
                   onClick={() => onMilestoneToggle(i)}
                 >
-                  {m.completed && <Check size={10} className="text-white" />}
+                  {m.completed && <CheckIcon className="w-2.5 h-2.5 text-white" />}
                 </button>
                 <span
                   className={cn(

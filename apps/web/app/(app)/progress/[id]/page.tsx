@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeftIcon, ChevronRightIcon, LockClosedIcon } from '@heroicons/react/24/outline'
 import { api } from '@/lib/api'
 import { Spinner } from '@/components/spinner'
 import { MessageBlock } from '@/components/chat/message-block'
@@ -73,6 +73,7 @@ export default function SessionDetailPage() {
   const [analysis, setAnalysis] = useState<SessionAnalysis | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [requiresPro, setRequiresPro] = useState(false)
   const [sessionMeta, setSessionMeta] = useState<{ mode: string; sessionFocus: string } | null>(null)
 
   useEffect(() => {
@@ -93,6 +94,8 @@ export default function SessionDetailPage() {
       .then((data) => {
         if (data.status === 'ok' && data.analysis) {
           setAnalysis(data.analysis)
+        } else if (data.status === 'requires_pro') {
+          setRequiresPro(true)
         }
       })
       .catch(() => {})
@@ -139,7 +142,7 @@ export default function SessionDetailPage() {
             onClick={() => router.push('/progress')}
             className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text-primary bg-transparent border-none cursor-pointer mb-3 -ml-0.5 transition-colors"
           >
-            <ArrowLeft size={14} />
+            <ArrowLeftIcon className="w-3.5 h-3.5" />
             History
           </button>
           <h1 className="text-[20px] font-semibold text-text-primary leading-tight mb-1.5">
@@ -166,7 +169,7 @@ export default function SessionDetailPage() {
         </div>
 
         {/* Analysis summary banner */}
-        {analysis && (
+        {analysis && !requiresPro && (
           <div className="bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] p-4">
             <p className="text-[14px] text-text-secondary leading-relaxed">{analysis.summary}</p>
             <div className="flex items-center gap-4 mt-3">
@@ -209,6 +212,24 @@ export default function SessionDetailPage() {
                 <AnalysisSkeleton />
                 <AnalysisSkeleton />
               </>
+            ) : requiresPro ? (
+              <div className="bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] px-5 py-8 text-center">
+                <div className="w-10 h-10 rounded-full bg-bg-active border border-border flex items-center justify-center mx-auto mb-3">
+                  <LockClosedIcon className="w-[18px] h-[18px] text-text-muted" />
+                </div>
+                <h3 className="text-[15px] font-semibold text-text-primary mb-1.5">
+                  Upgrade to Pro
+                </h3>
+                <p className="text-[13px] text-text-secondary leading-relaxed mb-4">
+                  Get detailed analysis, suggestions, and breakdown for every session.
+                </p>
+                <button
+                  onClick={() => router.push('/upgrade')}
+                  className="px-5 py-2 rounded-lg bg-accent-brand text-white text-[13px] font-medium border-none cursor-pointer transition-colors hover:bg-accent-brand/90"
+                >
+                  Upgrade to Pro
+                </button>
+              </div>
             ) : analysis ? (
               <>
                 {/* Skill hexagon */}
@@ -252,7 +273,7 @@ export default function SessionDetailPage() {
                           </div>
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-red line-through">{e.original}</span>
-                            <ChevronRight size={10} className="text-text-muted" />
+                            <ChevronRightIcon className="w-2.5 h-2.5 text-text-muted" />
                             <span className="text-green font-medium">{e.corrected}</span>
                           </div>
                           <div className="text-text-muted text-[11px]">{e.explanation}</div>

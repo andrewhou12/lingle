@@ -149,7 +149,7 @@ class LingleApiClient {
     }>('/stats/analysis')
   statsSessionAnalysis = (sessionId: string) =>
     this.request<{
-      status: 'ok' | 'insufficient_data'
+      status: 'ok' | 'insufficient_data' | 'requires_pro'
       analysis?: {
         overallRating: 'excellent' | 'good' | 'developing' | 'needs_work'
         summary: string

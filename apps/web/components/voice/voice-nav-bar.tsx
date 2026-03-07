@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageSquare, Square, FileText, ChevronDown } from 'lucide-react'
+import { ChatBubbleLeftIcon, StopIcon, DocumentTextIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
 
@@ -48,9 +48,9 @@ export function VoiceNavBar({
             isPlanOpen && 'bg-bg-active border-border-strong text-text-primary',
           )}
         >
-          <FileText size={13} />
+          <DocumentTextIcon className="w-[13px] h-[13px]" />
           Session Plan
-          <ChevronDown size={10} className={cn('transition-transform', isPlanOpen && 'rotate-180')} />
+          <ChevronDownIcon className={cn('w-2.5 h-2.5 transition-transform', isPlanOpen && 'rotate-180')} />
         </button>
 
         <div className="w-px h-[18px] bg-border shrink-0" />
@@ -76,7 +76,7 @@ export function VoiceNavBar({
           onClick={onOpenTranscript}
           className="inline-flex items-center gap-[5px] text-[12.5px] font-medium text-text-secondary bg-bg-secondary border-[1.5px] border-border rounded-[10px] px-2.5 py-[5px] cursor-pointer transition-all font-sans hover:bg-bg-hover hover:border-border-strong hover:text-text-primary"
         >
-          <MessageSquare size={13} />
+          <ChatBubbleLeftIcon className="w-[13px] h-[13px]" />
           Transcript
           {transcriptCount > 0 && (
             <span className="inline-flex items-center justify-center min-w-[15px] h-[15px] px-[3px] bg-accent-warm text-white text-[9px] font-bold rounded-[8px]">
@@ -93,7 +93,7 @@ export function VoiceNavBar({
           onClick={onEnd}
           className="inline-flex items-center gap-[5px] text-[12px] font-medium text-white bg-red border-none rounded-[10px] px-3 py-1.5 cursor-pointer transition-all shadow-[0_1px_3px_rgba(220,53,69,.3)] hover:brightness-90 hover:-translate-y-px"
         >
-          <Square size={9} fill="currentColor" />
+          <StopIcon className="w-[9px] h-[9px] fill-current" />
           End
         </button>
       </div>

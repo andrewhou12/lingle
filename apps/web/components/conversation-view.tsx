@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Square, PanelRight, Volume2, VolumeX, Mic, MessageSquare, ChevronRight, ArrowUp, ArrowRight } from 'lucide-react'
 import {
   MapPinIcon, BuildingStorefrontIcon, FireIcon, HomeIcon, TruckIcon,
   PencilIcon, HashtagIcon, FlagIcon, SpeakerWaveIcon,
@@ -10,6 +9,8 @@ import {
   TvIcon, DocumentTextIcon, MicrophoneIcon,
   FolderOpenIcon, MagnifyingGlassIcon, GlobeAltIcon, LanguageIcon,
   ChartBarIcon, ClipboardDocumentListIcon, ShoppingCartIcon,
+  StopIcon, Bars3Icon, SpeakerXMarkIcon, ChevronRightIcon,
+  ArrowUpIcon, ArrowRightIcon,
 } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 import Markdown from 'react-markdown'
@@ -789,7 +790,7 @@ function ConversationViewInner() {
                             className="h-8 px-2 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0 hover:opacity-90"
                             onClick={handleFreePromptSubmit}
                           >
-                            <ArrowUp size={14} className="text-white" />
+                            <ArrowUpIcon className="w-3.5 h-3.5 text-white" />
                           </button>
                         ) : (
                           <button
@@ -798,7 +799,7 @@ function ConversationViewInner() {
                             style={{ fontFamily: 'inherit' }}
                           >
                             Just start
-                            <ArrowRight size={13} strokeWidth={2.2} />
+                            <ArrowRightIcon className="w-[13px] h-[13px]" />
                           </button>
                         )}
                     </div>
@@ -836,7 +837,7 @@ function ConversationViewInner() {
                       )}
                       onClick={() => setInputMode('chat')}
                     >
-                      <MessageSquare size={12} />
+                      <ChatBubbleLeftIcon className="w-3 h-3" />
                       Chat
                     </button>
                     <button
@@ -848,7 +849,7 @@ function ConversationViewInner() {
                       )}
                       onClick={() => setInputMode('voice')}
                     >
-                      <Mic size={12} />
+                      <MicrophoneIcon className="w-3 h-3" />
                       Voice
                     </button>
                   </div>
@@ -910,7 +911,7 @@ function ConversationViewInner() {
                               {modeLabel} · {time}{duration ? ` · ${duration}` : ''}
                             </div>
                           </div>
-                          <ChevronRight size={13} className="text-text-muted/50 shrink-0" />
+                          <ChevronRightIcon className="w-[13px] h-[13px] text-text-muted/50 shrink-0" />
                         </button>
                       )
                     })}
@@ -946,7 +947,7 @@ function ConversationViewInner() {
             onClick={streamingTts.toggleVoice}
             title={streamingTts.voiceEnabled ? 'Disable voice mode' : 'Enable voice mode'}
           >
-            {streamingTts.voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {streamingTts.voiceEnabled ? <SpeakerWaveIcon className="w-4 h-4" /> : <SpeakerXMarkIcon className="w-4 h-4" />}
           </button>
           <button
             className={cn(
@@ -958,14 +959,14 @@ function ConversationViewInner() {
             onClick={panel.toggle}
             title="Toggle session panel"
           >
-            <PanelRight size={16} />
+            <Bars3Icon className="w-4 h-4" />
           </button>
           <button
             className="inline-flex items-center gap-1.5 rounded-lg bg-bg-secondary px-3 py-1.5 text-[13px] font-medium text-text-secondary border border-border cursor-pointer transition-colors hover:border-accent-brand hover:text-accent-brand"
             onClick={() => router.push(`/conversation/voice?sessionId=${sessionId}`)}
             title="Switch to voice mode"
           >
-            <Mic size={12} />
+            <MicrophoneIcon className="w-3 h-3" />
             Voice
           </button>
           <button
@@ -976,7 +977,7 @@ function ConversationViewInner() {
             onClick={handleEndSession}
             disabled={isLoading}
           >
-            <Square size={12} />
+            <StopIcon className="w-3 h-3" />
             End Session
           </button>
         </div>

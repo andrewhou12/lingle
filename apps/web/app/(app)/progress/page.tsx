@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRightIcon, ChartBarIcon, ClockIcon, FireIcon, BoltIcon } from '@heroicons/react/24/outline'
 import { api } from '@/lib/api'
 import { Spinner } from '@/components/spinner'
 import { MODE_LABELS } from '@/lib/experience-scenarios'
@@ -79,19 +79,19 @@ export default function ProgressPage() {
         {/* Stats cards */}
         {stats && (
           <div className="grid grid-cols-4 gap-3">
-            <StatCard emoji="📊" label="Sessions" value={stats.totalSessions} />
+            <StatCard icon={<ChartBarIcon className="w-4 h-4 text-text-muted" />} label="Sessions" value={stats.totalSessions} />
             <StatCard
-              emoji="⏱️"
+              icon={<ClockIcon className="w-4 h-4 text-text-muted" />}
               label="Practice time"
               value={stats.totalMinutes > 60 ? `${Math.round(stats.totalMinutes / 60 * 10) / 10}h` : `${stats.totalMinutes}m`}
             />
             <StatCard
-              emoji="🔥"
+              icon={<FireIcon className="w-4 h-4 text-text-muted" />}
               label="Streak"
               value={`${stats.currentStreak}d`}
               sublabel={`best: ${stats.longestStreak}d`}
             />
-            <StatCard emoji="⚡" label="Avg session" value={`${stats.averageSessionMinutes}m`} />
+            <StatCard icon={<BoltIcon className="w-4 h-4 text-text-muted" />} label="Avg session" value={`${stats.averageSessionMinutes}m`} />
           </div>
         )}
 
@@ -127,7 +127,7 @@ export default function ProgressPage() {
                         </span>
                       </div>
                     </div>
-                    <ChevronRight size={14} className="text-text-muted shrink-0" />
+                    <ChevronRightIcon className="w-3.5 h-3.5 text-text-muted shrink-0" />
                   </Link>
                 )
               })}
@@ -140,12 +140,12 @@ export default function ProgressPage() {
 }
 
 function StatCard({
-  emoji,
+  icon,
   label,
   value,
   sublabel,
 }: {
-  emoji: string
+  icon: React.ReactNode
   label: string
   value: string | number
   sublabel?: string
@@ -153,7 +153,7 @@ function StatCard({
   return (
     <div className="bg-bg-pure border border-border-subtle rounded-xl shadow-[0_1px_2px_rgba(0,0,0,.04)] p-4">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[16px]">{emoji}</span>
+        {icon}
         <span className="text-[12px] text-text-muted font-medium">{label}</span>
       </div>
       <div className="text-[22px] font-bold text-text-primary leading-none">{value}</div>

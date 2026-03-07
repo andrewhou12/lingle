@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Send, X } from 'lucide-react'
+import { PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
@@ -74,13 +74,13 @@ export function VoiceFallbackInput({ isOpen, onClose, onSend, disabled }: VoiceF
                   : 'bg-bg-secondary text-text-muted',
               )}
             >
-              <Send size={14} />
+              <PaperAirplaneIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-lg flex items-center justify-center bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer transition-colors"
             >
-              <X size={14} />
+              <XMarkIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </motion.div>

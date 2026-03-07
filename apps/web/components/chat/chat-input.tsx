@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useCallback, useState, useEffect, useMemo } from 'react'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUpIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from './ime/ime-candidate-panel'
@@ -191,7 +191,7 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
             onClick={onSend}
             disabled={!canSend}
           >
-            <ArrowUp size={16} />
+            <ArrowUpIcon className="w-4 h-4" />
           </button>
         </div>
 

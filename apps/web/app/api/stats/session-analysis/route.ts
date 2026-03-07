@@ -51,11 +51,23 @@ export const POST = withAuth(async (request, { userId }) => {
     return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
   }
 
+  // Check if user is on Pro plan
+  const subscription = await prisma.subscription.findUnique({ where: { userId } })
+  const userPlan = subscription?.plan ?? 'free'
+  if (userPlan !== 'pro') {
+    return NextResponse.json({ status: 'requires_pro' })
+  }
+
   const session = await prisma.conversationSession.findFirst({
     where: { id: sessionId, userId },
   })
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+  }
+
+  // Return cached analysis if available
+  if (session.cachedAnalysis) {
+    return NextResponse.json({ status: 'ok', analysis: session.cachedAnalysis })
   }
 
   const transcript = session.transcript as { role: string; content: string }[] | null
@@ -97,6 +109,12 @@ Be encouraging but honest. Identify specific, actionable improvements.
 
 Transcript:
 ${messages.map((m) => `[${m.role}]: ${m.content}`).join('\n')}`,
+    })
+
+    // Cache the analysis result on the session
+    await prisma.conversationSession.update({
+      where: { id: sessionId },
+      data: { cachedAnalysis: JSON.parse(JSON.stringify(object)) },
     })
 
     return NextResponse.json({ status: 'ok', analysis: object })

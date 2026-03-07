@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { Mic, Loader2 } from 'lucide-react'
+import { MicrophoneIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { useVoice } from '@/hooks/use-voice'
 import { useLanguage } from '@/hooks/use-language'
 import { getSttCode } from '@/lib/languages'
@@ -36,7 +36,7 @@ export function VoiceControls({ onTranscript, disabled }: VoiceControlsProps) {
         disabled
         title="Transcribing..."
       >
-        <Loader2 size={13} className="animate-spin" />
+        <ArrowPathIcon className="w-[13px] h-[13px] animate-spin" />
       </button>
     )
   }
@@ -53,7 +53,7 @@ export function VoiceControls({ onTranscript, disabled }: VoiceControlsProps) {
       disabled={disabled}
       title={voice.isRecording ? 'Stop recording' : 'Start voice input'}
     >
-      <Mic size={13} />
+      <MicrophoneIcon className="w-[13px] h-[13px]" />
     </button>
   )
 }

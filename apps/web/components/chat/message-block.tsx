@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Volume2, Square } from 'lucide-react'
+import { SpeakerWaveIcon, StopIcon } from '@heroicons/react/24/outline'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
@@ -94,7 +94,7 @@ export function MessageBlock({ role, content, timestamp, isStreaming, userName, 
                 onClick={isPlayingAudio ? onStop : onPlay}
                 title={isPlayingAudio ? 'Stop' : 'Play aloud'}
               >
-                {isPlayingAudio ? <Square size={11} /> : <Volume2 size={13} />}
+                {isPlayingAudio ? <StopIcon className="w-[11px] h-[11px]" /> : <SpeakerWaveIcon className="w-[13px] h-[13px]" />}
               </button>
             )}
           </div>
