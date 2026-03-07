@@ -21,6 +21,12 @@ export interface UseVoiceTTSReturn {
   setSpeed: (speed: number) => void
   /** Current playback speed */
   speed: number
+  /** Sentences that have been fully spoken */
+  spokenSentences: string[]
+  /** The sentence currently being played (null if idle) */
+  currentSentence: string | null
+  /** Progress (0-1) within the currently-playing sentence */
+  currentProgress: number
 }
 
 interface QueueItem {
@@ -35,6 +41,9 @@ export function useVoiceTTS(
   const [isPlaying, setIsPlaying] = useState(false)
   const [isDone, setIsDone] = useState(true)
   const [speed, setSpeedState] = useState(1.0)
+  const [spokenSentences, setSpokenSentences] = useState<string[]>([])
+  const [currentSentence, setCurrentSentence] = useState<string | null>(null)
+  const [currentProgress, setCurrentProgress] = useState(0)
 
   const trackerRef = useRef(createSentenceBoundaryTracker())
   const queueRef = useRef<QueueItem[]>([])
@@ -48,22 +57,44 @@ export function useVoiceTTS(
   const onPlaybackEndRef = useRef(onPlaybackEnd)
   onPlaybackStartRef.current = onPlaybackStart
   onPlaybackEndRef.current = onPlaybackEnd
+  const spokenSentencesRef = useRef<string[]>([])
+  const progressAnimRef = useRef<number>(0)
 
-  const fetchAudio = useCallback((sentence: string, speed: number): Promise<Blob | null> => {
+  const fetchAudio = useCallback((sentence: string): Promise<Blob | null> => {
     return fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: sentence, speed }),
+      body: JSON.stringify({ text: sentence }),
     })
       .then((res) => (res.ok ? res.blob() : null))
       .catch(() => null)
   }, [])
+
+  const stopProgressTracking = useCallback(() => {
+    if (progressAnimRef.current) {
+      cancelAnimationFrame(progressAnimRef.current)
+      progressAnimRef.current = 0
+    }
+  }, [])
+
+  const startProgressTracking = useCallback(() => {
+    stopProgressTracking()
+    const tick = () => {
+      const audio = audioRef.current
+      if (audio && audio.duration && isFinite(audio.duration)) {
+        setCurrentProgress(Math.min(audio.currentTime / audio.duration, 1))
+      }
+      progressAnimRef.current = requestAnimationFrame(tick)
+    }
+    progressAnimRef.current = requestAnimationFrame(tick)
+  }, [stopProgressTracking])
 
   const cleanup = useCallback(() => {
     generationRef.current += 1
     stoppedRef.current = true
     playingRef.current = false
     setIsPlaying(false)
+    stopProgressTracking()
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
@@ -73,7 +104,7 @@ export function useVoiceTTS(
     }
     blobUrlsRef.current = []
     queueRef.current = []
-  }, [])
+  }, [stopProgressTracking])
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup])
@@ -85,6 +116,8 @@ export function useVoiceTTS(
       playingRef.current = false
       setIsPlaying(false)
       setIsDone(true)
+      setCurrentSentence(null)
+      stopProgressTracking()
       onPlaybackEndRef.current?.()
       return
     }
@@ -94,17 +127,20 @@ export function useVoiceTTS(
       playingRef.current = false
       setIsPlaying(false)
       setIsDone(true)
+      setCurrentSentence(null)
+      stopProgressTracking()
       onPlaybackEndRef.current?.()
       return
     }
 
     try {
-      // Audio was prefetched when the sentence was enqueued — just await the result
       const blob = await item.audioPromise
 
       if (gen !== generationRef.current) return
       if (!blob) {
-        // Skip failed fetches, try next
+        // Skip failed fetches — still mark sentence as spoken
+        spokenSentencesRef.current = [...spokenSentencesRef.current, item.sentence]
+        setSpokenSentences(spokenSentencesRef.current)
         playNext()
         return
       }
@@ -113,7 +149,13 @@ export function useVoiceTTS(
       blobUrlsRef.current.push(url)
 
       const audio = new Audio(url)
+      audio.playbackRate = speedRef.current
       audioRef.current = audio
+
+      // Track current sentence
+      setCurrentSentence(item.sentence)
+      setCurrentProgress(0)
+      startProgressTracking()
 
       await new Promise<void>((resolve) => {
         audio.onended = () => resolve()
@@ -122,6 +164,12 @@ export function useVoiceTTS(
       })
 
       if (gen === generationRef.current) {
+        stopProgressTracking()
+        // Mark sentence as fully spoken
+        spokenSentencesRef.current = [...spokenSentencesRef.current, item.sentence]
+        setSpokenSentences(spokenSentencesRef.current)
+        setCurrentProgress(1)
+        setCurrentSentence(null)
         playNext()
       }
     } catch {
@@ -129,10 +177,12 @@ export function useVoiceTTS(
         playingRef.current = false
         setIsPlaying(false)
         setIsDone(true)
+        setCurrentSentence(null)
+        stopProgressTracking()
         onPlaybackEndRef.current?.()
       }
     }
-  }, [])
+  }, [startProgressTracking, stopProgressTracking])
 
   const enqueueSentence = useCallback(
     (sentence: string) => {
@@ -140,8 +190,7 @@ export function useVoiceTTS(
       const clean = stripRubyAnnotations(sentence)
       if (!clean.trim()) return
 
-      // Start fetching audio immediately — don't wait for previous playback to finish
-      const audioPromise = fetchAudio(clean, speedRef.current)
+      const audioPromise = fetchAudio(clean)
       queueRef.current.push({ sentence: clean, audioPromise })
 
       if (!playingRef.current) {
@@ -187,6 +236,10 @@ export function useVoiceTTS(
     cleanup()
     trackerRef.current = createSentenceBoundaryTracker()
     stoppedRef.current = false
+    spokenSentencesRef.current = []
+    setSpokenSentences([])
+    setCurrentSentence(null)
+    setCurrentProgress(0)
     setIsDone(true)
   }, [cleanup])
 
@@ -194,6 +247,10 @@ export function useVoiceTTS(
     const clamped = Math.max(0.25, Math.min(4.0, s))
     speedRef.current = clamped
     setSpeedState(clamped)
+    // Apply to currently playing audio immediately
+    if (audioRef.current) {
+      audioRef.current.playbackRate = clamped
+    }
   }, [])
 
   return {
@@ -205,5 +262,8 @@ export function useVoiceTTS(
     reset,
     setSpeed,
     speed,
+    spokenSentences,
+    currentSentence,
+    currentProgress,
   }
 }

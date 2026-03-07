@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowPathIcon, BookOpenIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { VoiceState } from '@/hooks/use-voice-conversation'
@@ -10,6 +10,7 @@ interface VoiceControlsProps {
   isTalking: boolean
   onTalkStart: () => void
   onTalkEnd: () => void
+  onTalkCancel: () => void
   vocabCount: number
   onOpenVocab: () => void
   onReplay: () => void
@@ -20,13 +21,13 @@ const CIRC = 2 * Math.PI * 33 // ring circumference for r=33
 const SPEAK_DUR = 15000 // max ring fill duration
 
 export function VoiceControls({
-  voiceState, isTalking, onTalkStart, onTalkEnd,
+  voiceState, isTalking, onTalkStart, onTalkEnd, onTalkCancel,
   vocabCount, onOpenVocab, onReplay, className,
 }: VoiceControlsProps) {
   const ringRef = useRef<SVGCircleElement>(null)
   const startTimeRef = useRef<number>(0)
   const animRef = useRef<number>(0)
-  const canTalk = voiceState === 'IDLE' || voiceState === 'SPEAKING'
+  const canTalk = voiceState === 'IDLE' || voiceState === 'SPEAKING' || voiceState === 'THINKING'
   const isLocked = !canTalk && !isTalking
 
   // Ring fill animation while holding
@@ -50,14 +51,23 @@ export function VoiceControls({
     return () => cancelAnimationFrame(animRef.current)
   }, [isTalking])
 
-  // Spacebar push-to-talk
+  // Spacebar push-to-talk + Escape to cancel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || e.repeat) return
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
-      e.preventDefault()
-      if (canTalk) onTalkStart()
+
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault()
+        if (canTalk) onTalkStart()
+      }
+
+      // Escape while talking → cancel and discard
+      if (e.key === 'Escape' && isTalking) {
+        e.preventDefault()
+        e.stopPropagation() // Prevent the session-level Escape handler from closing
+        onTalkCancel()
+      }
     }
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return
@@ -72,17 +82,12 @@ export function VoiceControls({
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [canTalk, onTalkStart, onTalkEnd])
+  }, [canTalk, isTalking, onTalkStart, onTalkEnd, onTalkCancel])
 
-  const statusLabel = voiceState === 'SPEAKING' ? 'AI is speaking...'
-    : voiceState === 'THINKING' ? 'AI is thinking...'
-    : isTalking ? 'Release when done'
-    : 'Hold mic to speak'
-
-  const holdHint = voiceState === 'IDLE' ? 'Hold mic button and speak naturally'
-    : voiceState === 'THINKING' || voiceState === 'SPEAKING' ? ''
-    : isTalking ? 'Release when done'
-    : 'Hold mic to speak'
+  const holdHint = isTalking ? 'Esc to cancel · release to send'
+    : voiceState === 'IDLE' ? 'Hold space and speak · tap again to continue'
+    : voiceState === 'THINKING' || voiceState === 'SPEAKING' ? 'Space to interrupt'
+    : 'Hold space to speak'
 
   return (
     <div className={cn('flex flex-col items-center gap-2.5 px-6 py-3 bg-[rgba(255,255,255,.9)] backdrop-blur-[20px] border-t border-[rgba(228,224,217,.55)]', className)}>
@@ -172,10 +177,7 @@ export function VoiceControls({
 
       {/* Hold hint */}
       <div className="h-[18px] flex items-center justify-center">
-        <span className={cn(
-          'text-[11px] text-text-muted tracking-[.04em] italic transition-opacity',
-          (!holdHint || voiceState === 'THINKING' || voiceState === 'SPEAKING') && 'opacity-0',
-        )}>
+        <span className="text-[11px] text-text-muted tracking-[.04em] italic transition-opacity">
           {holdHint}
         </span>
       </div>

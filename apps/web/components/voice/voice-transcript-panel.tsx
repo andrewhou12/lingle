@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import type { TranscriptLine } from '@/hooks/use-voice-conversation'
 
 type FilterType = 'all' | 'corrections' | 'ai'
@@ -104,7 +105,7 @@ export function VoiceTranscriptPanel({ isOpen, entries, onClose }: VoiceTranscri
                     ? 'bg-bg-secondary border border-border rounded-bl-[3px]'
                     : 'bg-accent-brand text-white rounded-br-[3px]',
                 )}>
-                  {entry.text}
+                  {stripRubyAnnotations(entry.text)}
                 </div>
 
                 {/* Correction inline */}

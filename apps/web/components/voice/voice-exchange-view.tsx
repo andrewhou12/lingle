@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { TranscriptLine } from '@/hooks/use-voice-conversation'
+import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import { cn } from '@/lib/utils'
 
 interface CorrectionInfo {
@@ -13,21 +14,110 @@ interface CorrectionInfo {
 }
 
 interface VoiceExchangeViewProps {
-  /** The most recent AI line */
   aiLine: TranscriptLine | null
-  /** The most recent user line */
   userLine: TranscriptLine | null
-  /** Partial text from user speaking */
   partialText: string
-  /** Latest correction from tool output */
   correction: CorrectionInfo | null
-  /** AI translation (if available) */
   aiTranslation?: string
+  spokenSentences?: string[]
+  currentSentence?: string | null
+  currentProgress?: number
+  /** Whether TTS audio is actively playing */
+  ttsPlaying?: boolean
   className?: string
 }
 
+// ── Word segmentation ──
+
+/** Segment text into words using Intl.Segmenter (handles Japanese natively) */
+const segmenter =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl
+    ? new Intl.Segmenter('ja', { granularity: 'word' })
+    : null
+
+interface WordSegment {
+  text: string
+  /** Start index in the original string */
+  start: number
+  /** End index (exclusive) in the original string */
+  end: number
+}
+
+function segmentWords(text: string): WordSegment[] {
+  if (!segmenter) {
+    // Fallback: treat each character as a segment
+    return [...text].map((ch, i) => ({ text: ch, start: i, end: i + 1 }))
+  }
+  const segments: WordSegment[] = []
+  for (const seg of segmenter.segment(text)) {
+    segments.push({
+      text: seg.segment,
+      start: seg.index,
+      end: seg.index + seg.segment.length,
+    })
+  }
+  return segments
+}
+
+// ── Highlight position computation ──
+
+/**
+ * Compute the exact character position in `text` where karaoke highlighting should reach.
+ * Finds each spoken sentence by substring match and interpolates within the current sentence.
+ */
+function computeHighlightPosition(
+  text: string,
+  spokenSentences: string[],
+  currentSentence: string | null,
+  currentProgress: number,
+): number {
+  let pos = 0
+
+  for (const sentence of spokenSentences) {
+    const idx = text.indexOf(sentence, pos)
+    if (idx !== -1) {
+      pos = idx + sentence.length
+    } else {
+      pos += sentence.length
+    }
+  }
+
+  if (currentSentence && currentProgress > 0) {
+    const idx = text.indexOf(currentSentence, pos)
+    if (idx !== -1) {
+      const charsInto = Math.floor(currentSentence.length * currentProgress)
+      pos = idx + charsInto
+    } else {
+      pos += Math.floor(currentSentence.length * currentProgress)
+    }
+  }
+
+  return Math.min(pos, text.length)
+}
+
+/**
+ * Snap a character position to the nearest completed word boundary.
+ * This prevents the highlight from cutting mid-character in CJK text.
+ */
+function snapToWordBoundary(charPos: number, words: WordSegment[]): number {
+  if (words.length === 0) return charPos
+  for (const word of words) {
+    // If the position falls within this word, snap to either its start or end
+    if (charPos >= word.start && charPos < word.end) {
+      // If we're past the midpoint of the word, snap to end; otherwise snap to start
+      const mid = word.start + (word.end - word.start) / 2
+      return charPos >= mid ? word.end : word.start
+    }
+  }
+  return charPos
+}
+
+// ── Component ──
+
 export function VoiceExchangeView({
-  aiLine, userLine, partialText, correction, aiTranslation, className,
+  aiLine, userLine, partialText, correction, aiTranslation,
+  spokenSentences = [], currentSentence = null, currentProgress = 0,
+  ttsPlaying = false, className,
 }: VoiceExchangeViewProps) {
   const exchangeRef = useRef<HTMLDivElement>(null)
 
@@ -36,6 +126,22 @@ export function VoiceExchangeView({
       exchangeRef.current.scrollTop = exchangeRef.current.scrollHeight
     }
   }, [aiLine, userLine, partialText, correction])
+
+  const cleanAiText = useMemo(
+    () => (aiLine ? stripRubyAnnotations(aiLine.text) : ''),
+    [aiLine],
+  )
+
+  const words = useMemo(() => segmentWords(cleanAiText), [cleanAiText])
+
+  // Show karaoke when TTS is actively playing audio for this turn
+  const showKaraoke = ttsPlaying && cleanAiText.length > 0
+
+  const highlightChars = useMemo(() => {
+    if (!showKaraoke) return cleanAiText.length
+    const rawPos = computeHighlightPosition(cleanAiText, spokenSentences, currentSentence, currentProgress)
+    return snapToWordBoundary(rawPos, words)
+  }, [showKaraoke, cleanAiText, spokenSentences, currentSentence, currentProgress, words])
 
   return (
     <div ref={exchangeRef} className={cn('w-full max-w-[520px] mx-auto flex flex-col gap-[7px] px-4', className)}>
@@ -54,8 +160,12 @@ export function VoiceExchangeView({
             </div>
             <div className="max-w-[90%] flex flex-col gap-[5px]">
               <div className="px-[13px] py-[9px] text-[14px] leading-[1.72] rounded-xl rounded-bl-[3px] bg-[rgba(255,255,255,.9)] border border-border backdrop-blur-[8px] font-jp">
-                {aiLine.text}
-                {!aiLine.isFinal && (
+                {showKaraoke ? (
+                  <KaraokeText text={cleanAiText} highlightChars={highlightChars} />
+                ) : (
+                  cleanAiText
+                )}
+                {!aiLine.isFinal && !showKaraoke && (
                   <span className="inline-block w-[2px] h-[0.88em] bg-text-primary ml-px animate-[blink-cursor_0.65s_step-end_infinite] align-text-bottom" />
                 )}
               </div>
@@ -89,11 +199,7 @@ export function VoiceExchangeView({
               <div className="px-[13px] py-[9px] text-[13.5px] leading-[1.72] rounded-xl rounded-br-[3px] bg-accent-brand text-white font-jp">
                 {userLine.text}
               </div>
-
-              {/* Correction card */}
-              {correction && (
-                <CorrectionInline correction={correction} />
-              )}
+              {correction && <CorrectionInline correction={correction} />}
             </div>
           </motion.div>
         )}
@@ -121,6 +227,26 @@ export function VoiceExchangeView({
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+/** Renders text with word-level karaoke highlight */
+function KaraokeText({ text, highlightChars }: { text: string; highlightChars: number }) {
+  if (highlightChars >= text.length) {
+    return <>{text}</>
+  }
+  if (highlightChars <= 0) {
+    return <span className="text-text-muted/40">{text}</span>
+  }
+
+  const spoken = text.slice(0, highlightChars)
+  const unspoken = text.slice(highlightChars)
+
+  return (
+    <>
+      <span>{spoken}</span>
+      <span className="text-text-muted/40">{unspoken}</span>
+    </>
   )
 }
 

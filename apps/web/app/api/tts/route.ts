@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-helpers'
-import OpenAI from 'openai'
 import { parseMessage } from '@/lib/message-parser'
 
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'urE3OJfJRxJuk9kAMN0Y'
+
 export const POST = withAuth(async (request) => {
-  const openai = new OpenAI()
+  if (!ELEVENLABS_API_KEY) {
+    return NextResponse.json({ error: 'ELEVENLABS_API_KEY not configured' }, { status: 500 })
+  }
+
   const body = await request.json()
-  const { text, voice: voiceParam, speed: speedParam } = body
+  const { text, voice: voiceParam } = body
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -26,20 +31,43 @@ export const POST = withAuth(async (request) => {
     return NextResponse.json({ error: 'no speakable text' }, { status: 400 })
   }
 
-  const response = await openai.audio.speech.create({
-    model: 'tts-1',
-    voice: (voiceParam as 'shimmer' | 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova') || 'shimmer',
-    input: spoken,
-    response_format: 'mp3',
-    speed: typeof speedParam === 'number' ? Math.max(0.25, Math.min(4.0, speedParam)) : undefined,
-  })
+  const voiceId = voiceParam || ELEVENLABS_VOICE_ID
 
-  const buffer = Buffer.from(await response.arrayBuffer())
+  const response = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: spoken,
+        model_id: 'eleven_flash_v2_5',
+        output_format: 'mp3_44100_128',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.0,
+          use_speaker_boost: true,
+        },
+      }),
+    },
+  )
 
-  return new Response(buffer, {
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    console.error('ElevenLabs TTS error:', response.status, errorText)
+    return NextResponse.json(
+      { error: 'TTS generation failed' },
+      { status: response.status },
+    )
+  }
+
+  return new Response(response.body, {
     headers: {
       'Content-Type': 'audio/mpeg',
-      'Cache-Control': 'public, max-age=86400',
+      'Transfer-Encoding': 'chunked',
     },
   })
 })

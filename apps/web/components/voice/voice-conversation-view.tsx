@@ -165,7 +165,7 @@ export function VoiceConversationView() {
       <button
         onClick={handleStartVoice}
         disabled={false}
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent-brand text-white text-[15px] font-medium border-none cursor-pointer transition-colors hover:opacity-90 disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent-brand text-white text-[15px] font-medium border-none cursor-pointer transition-all duration-150 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] disabled:opacity-50"
       >
         Start Conversation
       </button>

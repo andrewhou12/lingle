@@ -3,7 +3,7 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
 import { withUsageCheck } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
-import { createConversationTools } from '@/lib/conversation-tools'
+import { createConversationTools, createVoiceModeTools } from '@/lib/conversation-tools'
 import { normalizePlan, formatPlanForPrompt } from '@/lib/session-plan'
 import type { ScenarioMode } from '@/lib/experience-scenarios'
 import type { ConversationMessage, ConversationToolCall } from '@lingle/shared/types'
@@ -45,19 +45,32 @@ export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
     : ''
   const voiceBlock = voiceMode
     ? `\n\n═══ VOICE MODE ═══
-This is a live voice conversation. The learner is speaking aloud and hearing your
-responses via text-to-speech.
+This is a live voice conversation via text-to-speech. The learner is waiting to hear you speak.
 
-1. Keep responses SHORT. 1-3 sentences max. No monologues.
-2. Do NOT use displayChoices or suggestActions. Present options conversationally.
-3. End sentences cleanly with 。！？ — the TTS needs clear boundaries.
-4. No markdown, no bullet points, no lists. Just natural speech.
-5. Corrections, vocabulary cards, and grammar notes still work as visual overlays.
-6. If the learner's speech was unclear, ask them to repeat naturally.`
+CRITICAL — BREVITY:
+- 1-2 sentences MAXIMUM. Never more. This is spoken aloud — long responses feel like a lecture.
+- Respond like a quick back-and-forth text exchange, not an essay.
+- You MUST ALWAYS produce spoken text. NEVER respond with only tool calls and no text. The learner is waiting to hear you speak.
+- Corrections, vocabulary cards, and grammar notes are handled separately via visual cards — do NOT explain errors in your spoken text. Just recast naturally.
+
+FORMATTING:
+- End sentences cleanly with 。！？ — the TTS needs clear sentence boundaries.
+- No markdown, no bullet points, no lists, no numbered items. Just natural speech.
+- Do NOT use {kanji|reading} ruby annotations in voice mode — just write the kanji directly.
+- NEVER include meta-commentary, stage directions, or reasoning about what you're doing. Your output is read aloud — only output words you'd actually say.
+- If the learner's speech was unclear, ask them to repeat naturally.
+
+LEARNER SIGNALS:
+- Messages may include a [Learner signals: ...] annotation at the end.
+- These are automatic observations about speech (hesitation, filler words, low confidence, L1 switching).
+- Adapt accordingly: simplify if hesitating, redirect if they switch to native language.
+- NEVER read signal annotations aloud or reference them directly.`
     : ''
   const system = session.systemPrompt + planBlock + voiceBlock
 
-  const tools = createConversationTools(userId, sessionId, sessionMode)
+  const tools = voiceMode
+    ? createVoiceModeTools(userId, sessionId)
+    : createConversationTools(userId, sessionId, sessionMode)
   const modelMessages = await convertToModelMessages(messages, { tools })
 
   console.log('[send] modelMessages count:', modelMessages.length)

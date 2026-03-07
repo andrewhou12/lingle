@@ -183,7 +183,7 @@ export function createConversationTools(_userId: string, _sessionId: string, mod
 
     showVocabularyCard: tool({
       description:
-        'Show a vocabulary card to teach or highlight a word. Use when introducing new vocabulary, when the learner asks about a word, or when a word comes up naturally that deserves attention.',
+        'Show a vocabulary card for a word. ONLY use when: (1) the learner explicitly asks what a word means, or (2) you intentionally use a word well above their level and want to teach it. Do NOT show cards for routine vocabulary — most words should just be used naturally without a card.',
       inputSchema: z.object({
         word: z.string().describe('The word in the target language'),
         reading: z.string().optional().describe('Reading/pronunciation (e.g. hiragana for kanji)'),
@@ -232,6 +232,13 @@ export function createConversationTools(_userId: string, _sessionId: string, mod
   }
 
   return filtered
+}
+
+/** Voice mode: only updateSessionPlan (teaching feedback handled by separate Track 2 analysis) */
+export function createVoiceModeTools(userId: string, sessionId: string) {
+  return {
+    updateSessionPlan: createConversationTools(userId, sessionId, 'conversation').updateSessionPlan,
+  }
 }
 
 export type ConversationTools = ReturnType<typeof createConversationTools>

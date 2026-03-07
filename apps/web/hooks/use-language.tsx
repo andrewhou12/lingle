@@ -5,20 +5,24 @@ import { api } from '@/lib/api'
 
 interface LanguageContextValue {
   targetLanguage: string
+  nativeLanguage: string
   setTargetLanguage: (language: string) => Promise<void>
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
   targetLanguage: 'Japanese',
+  nativeLanguage: 'English',
   setTargetLanguage: async () => {},
 })
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [targetLanguage, setLang] = useState('Japanese')
+  const [nativeLanguage, setNativeLang] = useState('English')
 
   useEffect(() => {
     api.profileGet().then((profile) => {
       if (profile?.targetLanguage) setLang(profile.targetLanguage)
+      if (profile?.nativeLanguage) setNativeLang(profile.nativeLanguage)
     }).catch(() => {})
   }, [])
 
@@ -33,7 +37,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <LanguageContext.Provider value={{ targetLanguage, setTargetLanguage }}>
+    <LanguageContext.Provider value={{ targetLanguage, nativeLanguage, setTargetLanguage }}>
       {children}
     </LanguageContext.Provider>
   )

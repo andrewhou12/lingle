@@ -140,8 +140,17 @@ function getModeSpecificPlanningInstructions(mode: string, targetLanguage: strin
 - dynamic: who leads, what's the conversational flow (optional)
 - tension: a conversational challenge or tension point (optional — e.g. "politely decline an invitation")
 
-IMPORTANT: This is a scene card, NOT a lesson plan. No learning objectives, no milestones, no grammar targets. The learning is implicit through natural conversation. Make the scene specific and interesting — the learner should want to talk.
-If the user prompt is generic like "Free conversation", create an engaging scene anyway.`
+IMPORTANT: This is a scene card, NOT a lesson plan. No learning objectives, no milestones, no grammar targets. The learning is implicit through natural conversation.
+
+If the user provided a specific topic or scenario, make the scene card match it — specific and interesting.
+
+If the user prompt is empty, generic, or just "Free conversation":
+- Do NOT invent elaborate scenarios, fictional locations, or detailed backstories
+- Set the topic to something simple and natural like "Casual chat" or "日常会話"
+- Use a simple persona: { relationship: "friend", personality: "friendly and relaxed" }
+- Register: "casual", tone: "lighthearted"
+- Leave setting, culturalContext, dynamic, and tension EMPTY (omit them)
+- The learner wants to just talk freely — don't impose a scene on them`
   }
 }
 

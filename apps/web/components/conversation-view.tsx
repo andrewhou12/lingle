@@ -787,14 +787,14 @@ function ConversationViewInner() {
                         </span>
                         {input.trim() ? (
                           <button
-                            className="h-8 px-2 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0 hover:opacity-90"
+                            className="h-8 px-2 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0 hover:scale-105 hover:shadow-sm active:scale-[0.97]"
                             onClick={handleFreePromptSubmit}
                           >
                             <ArrowUpIcon className="w-3.5 h-3.5 text-white" />
                           </button>
                         ) : (
                           <button
-                            className="h-8 px-3 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center gap-1.5 text-[12.5px] font-semibold text-white transition-all duration-150 shrink-0 hover:opacity-90 whitespace-nowrap"
+                            className="h-8 px-3 rounded-lg bg-accent-brand border-none cursor-pointer flex items-center gap-1.5 text-[12.5px] font-semibold text-white transition-all duration-150 shrink-0 hover:scale-105 hover:shadow-sm active:scale-[0.97] whitespace-nowrap"
                             onClick={handleFreePromptSubmit}
                             style={{ fontFamily: 'inherit' }}
                           >

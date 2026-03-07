@@ -1,73 +1,22 @@
 'use client'
 
-import { useState, useReducer, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { api } from '@/lib/api'
 import type { SessionPlan } from '@/lib/session-plan'
-import { useSoniox, type RealtimeUtterance } from './use-soniox'
+import { useSoniox, type EnrichedUtterance, type SonioxContext } from './use-soniox'
 import { useVoiceTTS } from './use-voice-tts'
 import { useLanguage } from './use-language'
-import { getSttCode } from '@/lib/languages'
+import { getSttCode, getNativeSttCode } from '@/lib/languages'
+import { computeTurnSignals, formatSignalsForLLM } from '@/lib/voice/turn-signals'
+import { isTutorPlan, isImmersionPlan, isConversationPlan } from '@/lib/session-plan'
+import { VoiceSessionFSM, type VoiceState, type TranscriptLine, type VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
 
-// ── State Machine ──
-
-export type VoiceState = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'INTERRUPTED'
-
-type VoiceAction =
-  | { type: 'SPEECH_DETECTED' }
-  | { type: 'ENDPOINT_FIRED' }
-  | { type: 'LLM_STREAMING' }
-  | { type: 'TTS_STARTED' }
-  | { type: 'TTS_ENDED' }
-  | { type: 'INTERRUPTED' }
-  | { type: 'INTERRUPT_EMPTY' }
-  | { type: 'RESET' }
-
-function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState {
-  switch (action.type) {
-    case 'SPEECH_DETECTED':
-      if (state === 'IDLE') return 'LISTENING'
-      if (state === 'SPEAKING') return 'INTERRUPTED'
-      return state
-    case 'ENDPOINT_FIRED':
-      if (state === 'LISTENING' || state === 'INTERRUPTED') return 'THINKING'
-      return state
-    case 'LLM_STREAMING':
-      if (state === 'THINKING') return 'SPEAKING'
-      return state
-    case 'TTS_STARTED':
-      if (state === 'THINKING') return 'SPEAKING'
-      return state
-    case 'TTS_ENDED':
-      if (state === 'SPEAKING' || state === 'THINKING') return 'IDLE'
-      return state
-    case 'INTERRUPTED':
-      if (state === 'SPEAKING') return 'INTERRUPTED'
-      return state
-    case 'INTERRUPT_EMPTY':
-      if (state === 'INTERRUPTED') return 'SPEAKING'
-      return state
-    case 'RESET':
-      return 'IDLE'
-    default:
-      return state
-  }
-}
-
-// ── Transcript ──
-
-export interface TranscriptLine {
-  role: 'user' | 'assistant'
-  text: string
-  isFinal: boolean
-  timestamp: number
-}
+export type { VoiceState, TranscriptLine, VoiceAnalysisResult }
 
 // ── Helpers ──
 
-/** Find the last assistant message that comes AFTER the last user message.
- *  Returns null if no such message exists (e.g. during 'submitted' before the new response arrives). */
 function findCurrentAssistantMessage(messages: UIMessage[]): UIMessage | null {
   let lastAssistantIdx = -1
   let lastUserIdx = -1
@@ -76,12 +25,10 @@ function findCurrentAssistantMessage(messages: UIMessage[]): UIMessage | null {
     if (messages[i].role === 'user' && lastUserIdx === -1) lastUserIdx = i
     if (lastAssistantIdx !== -1 && lastUserIdx !== -1) break
   }
-  // The assistant message must follow the most recent user message
   if (lastAssistantIdx === -1 || lastAssistantIdx < lastUserIdx) return null
   return messages[lastAssistantIdx]
 }
 
-/** Extract plain text from a message's parts. */
 function extractText(msg: UIMessage): string {
   return msg.parts
     .filter((p) => p.type === 'text')
@@ -117,24 +64,28 @@ export interface UseVoiceConversationReturn {
   messages: UIMessage[]
   isStreaming: boolean
   startNewSession: (prompt: string, mode: string) => Promise<void>
-  /** Start session with an already-generated plan (for begin overlay flow) */
   startWithExistingPlan: (sessionId: string, plan: SessionPlan, prompt: string, steeringNotes?: string[]) => Promise<void>
-  /** Push-to-talk: call on button press to start recording */
   startTalking: () => void
-  /** Push-to-talk: call on button release to finalize and send */
   stopTalking: () => void
-  /** Whether push-to-talk button is currently held */
+  cancelTalking: () => void
   isTalking: boolean
+  spokenSentences: string[]
+  currentSentence: string | null
+  currentProgress: number
+  ttsPlaying: boolean
+  analysisResults: Record<number, VoiceAnalysisResult>
 }
 
 export function useVoiceConversation(
   options: UseVoiceConversationOptions = {},
 ): UseVoiceConversationReturn {
   const { autoEndpoint = false, onPlanUpdate } = options
-  const { targetLanguage } = useLanguage()
+  const { targetLanguage, nativeLanguage } = useLanguage()
   const sttLanguageCode = getSttCode(targetLanguage)
+  const nativeSttCode = getNativeSttCode(nativeLanguage)
 
-  const [voiceState, dispatch] = useReducer(voiceReducer, 'IDLE')
+  // React state — FSM drives these via callbacks
+  const [voiceState, setVoiceState] = useState<VoiceState>('IDLE')
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [isMuted, setIsMuted] = useState(false)
   const [isActive, setIsActive] = useState(false)
@@ -143,16 +94,11 @@ export function useVoiceConversation(
   const [sessionId, setSessionId] = useState<string | null>(options.sessionId ?? null)
   const [sessionPlan, setSessionPlan] = useState<SessionPlan | null>(options.sessionPlan ?? null)
   const [isTalking, setIsTalking] = useState(false)
+  const [analysisResults, setAnalysisResults] = useState<Record<number, VoiceAnalysisResult>>({})
 
-  // Refs to avoid stale closures in callbacks
-  const voiceStateRef = useRef<VoiceState>('IDLE')
-  voiceStateRef.current = voiceState
+  // Refs for integration points
   const sessionIdRef = useRef<string | null>(sessionId)
   sessionIdRef.current = sessionId
-  const isActiveRef = useRef(false)
-  isActiveRef.current = isActive
-  const isMutedRef = useRef(false)
-  isMutedRef.current = isMuted
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const onPlanUpdateRef = useRef(onPlanUpdate)
   onPlanUpdateRef.current = onPlanUpdate
@@ -182,13 +128,16 @@ export function useVoiceConversation(
     onError: (err) => {
       console.error('[voice-conversation] useChat error:', err)
       setError(err.message)
+      fsmRef.current.updateDeps({ sendMessage: (text) => sendMessageRef.current({ text }) })
     },
   })
 
   sendMessageRef.current = sendMessage
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
   const isStreaming = chatStatus === 'streaming' || chatStatus === 'submitted'
 
-  // ── TTS (use refs for callbacks to avoid re-creating the hook) ──
+  // ── TTS ──
 
   const sonioxRef = useRef<{
     pause: () => void
@@ -198,21 +147,9 @@ export function useVoiceConversation(
     stop: () => Promise<void>
   }>({ pause: () => {}, resume: () => {}, finalize: () => {}, start: async () => {}, stop: async () => {} })
 
-  const autoEndpointRef = useRef(autoEndpoint)
-  autoEndpointRef.current = autoEndpoint
-
   const ttsCallbacksRef = useRef({
-    onPlaybackStart: () => {
-      dispatch({ type: 'TTS_STARTED' })
-    },
-    onPlaybackEnd: () => {
-      dispatch({ type: 'TTS_ENDED' })
-      // In auto-endpoint mode, resume mic after TTS finishes
-      // In PTT mode, mic stays paused until user holds the button
-      if (autoEndpointRef.current && isActiveRef.current && !isMutedRef.current) {
-        sonioxRef.current.resume()
-      }
-    },
+    onPlaybackStart: () => { fsmRef.current.onTTSStarted() },
+    onPlaybackEnd: () => { fsmRef.current.onTTSEnded() },
   })
 
   const tts = useVoiceTTS(
@@ -220,19 +157,56 @@ export function useVoiceConversation(
     ttsCallbacksRef.current.onPlaybackEnd,
   )
 
-  // Use refs for TTS methods to avoid dependency loops
   const ttsRef = useRef(tts)
   ttsRef.current = tts
 
-  // ── Feed streaming LLM text to TTS ──
+  // ── FSM ──
+
+  const fsmRef = useRef<VoiceSessionFSM>(null!)
+  if (!fsmRef.current) {
+    fsmRef.current = new VoiceSessionFSM({
+      soniox: sonioxRef.current,
+      tts: { reset: () => ttsRef.current.reset(), feedText: (t) => ttsRef.current.feedText(t), flushText: (t) => ttsRef.current.flushText(t), interrupt: () => ttsRef.current.interrupt(), get isDone() { return ttsRef.current.isDone } },
+      sendMessage: (text) => sendMessageRef.current({ text }),
+      onStateChange: setVoiceState,
+      onTranscriptUpdate: setTranscript,
+      onAnalysisResult: (turnIdx, result) => setAnalysisResults((prev) => ({ ...prev, [turnIdx]: result })),
+      onTalkingChange: setIsTalking,
+      getSessionId: () => sessionIdRef.current,
+      computeSignals: (utterance) => {
+        const signals = computeTurnSignals(utterance.tokens, {
+          targetLanguageCode: sttLanguageCode,
+          nativeLanguageCode: nativeSttCode !== sttLanguageCode ? nativeSttCode : undefined,
+        })
+        return { signals, annotation: formatSignalsForLLM(signals) }
+      },
+    })
+  }
+
+  // Keep FSM deps fresh
+  useEffect(() => {
+    fsmRef.current.updateDeps({
+      soniox: sonioxRef.current,
+      tts: { reset: () => ttsRef.current.reset(), feedText: (t) => ttsRef.current.feedText(t), flushText: (t) => ttsRef.current.flushText(t), interrupt: () => ttsRef.current.interrupt(), get isDone() { return ttsRef.current.isDone } },
+      sendMessage: (text) => sendMessageRef.current({ text }),
+      getSessionId: () => sessionIdRef.current,
+      computeSignals: (utterance) => {
+        const signals = computeTurnSignals(utterance.tokens, {
+          targetLanguageCode: sttLanguageCode,
+          nativeLanguageCode: nativeSttCode !== sttLanguageCode ? nativeSttCode : undefined,
+        })
+        return { signals, annotation: formatSignalsForLLM(signals) }
+      },
+    })
+  })
+
+  // ── Feed streaming LLM text to TTS via FSM ──
 
   const prevStreamingRef = useRef(false)
 
   useEffect(() => {
     if (!isStreaming || !isActive) return
 
-    // Only feed the assistant message that belongs to the CURRENT turn
-    // (i.e. it must come after the latest user message)
     const msg = findCurrentAssistantMessage(messages)
     if (!msg) return
 
@@ -240,53 +214,44 @@ export function useVoiceConversation(
     if (!text) return
 
     console.log('[voice] feeding TTS, len:', text.length, 'msgId:', msg.id)
-    ttsRef.current.feedText(text)
-
-    // Update transcript with latest assistant text
-    setTranscript((prev) => {
-      const last = prev[prev.length - 1]
-      if (last && last.role === 'assistant' && !last.isFinal) {
-        if (last.text === text) return prev
-        return [...prev.slice(0, -1), { ...last, text }]
-      }
-      return [...prev, { role: 'assistant', text, isFinal: false, timestamp: Date.now() }]
-    })
+    fsmRef.current.onStreamingText(text)
   }, [messages, isStreaming, isActive])
 
-  // When streaming stops, flush TTS and finalize transcript
+  // When streaming stops, delegate to FSM
   useEffect(() => {
     if (prevStreamingRef.current && !isStreaming && isActive) {
       const msg = findCurrentAssistantMessage(messages)
       if (msg) {
         const text = extractText(msg)
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
+        const userText = lastUserMsg ? extractText(lastUserMsg) : null
+
         if (text) {
-          console.log('[voice] flushing TTS, len:', text.length)
-          ttsRef.current.flushText(text)
-          setTranscript((prev) => {
-            const last = prev[prev.length - 1]
-            if (last && last.role === 'assistant') {
-              return [...prev.slice(0, -1), { ...last, text, isFinal: true }]
-            }
-            return prev
-          })
+          fsmRef.current.onStreamingEnd(text, userText)
         } else {
-          // Tool-calls-only response (no text) — nothing for TTS to play.
-          // Reset to IDLE so the conversation doesn't freeze.
-          console.log('[voice] tool-only response, resetting to IDLE')
-          dispatch({ type: 'TTS_ENDED' })
+          const hasToolCalls = msg.parts.some((p) => (p as { type: string }).type.startsWith('tool-'))
+          if (hasToolCalls) {
+            console.warn('[voice] tool-only response with no spoken text — LLM forgot to respond')
+          }
+          fsmRef.current.onStreamingEnd(null, null)
         }
       } else {
-        // No assistant message found — reset to IDLE
-        dispatch({ type: 'TTS_ENDED' })
-      }
-
-      // Pause Soniox during TTS playback (only if TTS has something to play)
-      if (!ttsRef.current.isDone) {
-        sonioxRef.current.pause()
+        fsmRef.current.onStreamingEnd(null, null)
       }
     }
     prevStreamingRef.current = isStreaming
   }, [isStreaming, isActive, messages])
+
+  // Watchdog: reset if stuck
+  useEffect(() => {
+    if (voiceState !== 'THINKING' && voiceState !== 'SPEAKING') return
+    const timeout = setTimeout(() => {
+      console.warn('[voice] watchdog: stuck in', voiceState, 'for 20s, resetting')
+      try { ttsRef.current.interrupt() } catch {}
+      setVoiceState('IDLE')
+    }, 20_000)
+    return () => clearTimeout(timeout)
+  }, [voiceState])
 
   // Extract session plan updates from messages
   useEffect(() => {
@@ -312,48 +277,60 @@ export function useVoiceConversation(
 
   // ── Soniox ──
 
-  // Memoize options to prevent re-renders
+  const sonioxContext = useMemo((): SonioxContext | undefined => {
+    if (!sessionPlan) return undefined
+
+    const general: { key: string; value: string }[] = [
+      { key: 'domain', value: 'language_learning' },
+    ]
+    const terms: string[] = []
+
+    if (isTutorPlan(sessionPlan)) {
+      if (sessionPlan.topic) general.push({ key: 'topic', value: sessionPlan.topic })
+      for (const concept of sessionPlan.concepts) {
+        terms.push(concept.label)
+      }
+    } else if (isImmersionPlan(sessionPlan)) {
+      if (sessionPlan.focus) general.push({ key: 'topic', value: sessionPlan.focus })
+      if (sessionPlan.targetVocabulary) {
+        terms.push(...sessionPlan.targetVocabulary)
+      }
+    } else if (isConversationPlan(sessionPlan)) {
+      if (sessionPlan.topic) general.push({ key: 'topic', value: sessionPlan.topic })
+    }
+
+    if (general.length <= 1 && terms.length === 0) return undefined
+    return { general, ...(terms.length > 0 ? { terms } : {}) }
+  }, [sessionPlan])
+
   const sonioxOptions = useMemo(
     () => ({
       endpointDetection: autoEndpoint,
       maxEndpointDelayMs: 1500,
       languageCode: sttLanguageCode,
+      nativeLanguageCode: nativeSttCode !== sttLanguageCode ? nativeSttCode : undefined,
+      context: sonioxContext,
     }),
-    [autoEndpoint, sttLanguageCode],
+    [autoEndpoint, sttLanguageCode, nativeSttCode, sonioxContext],
   )
 
-  // Track whether Soniox has been started (for PTT deferred start)
-  const sonioxStartedRef = useRef(false)
-
   const handleUtterance = useCallback(
-    (utterance: RealtimeUtterance) => {
-      const text = utterance.text.trim()
-      if (!text) return
-
-      console.log('[voice] user utterance:', text)
-      setTranscript((prev) => [...prev, { role: 'user', text, isFinal: true, timestamp: Date.now() }])
-      dispatch({ type: 'ENDPOINT_FIRED' })
-
-      if (voiceStateRef.current === 'INTERRUPTED' || voiceStateRef.current === 'SPEAKING') {
-        ttsRef.current.interrupt()
-      }
-
-      ttsRef.current.reset()
-      sendMessageRef.current({ text })
-      dispatch({ type: 'LLM_STREAMING' })
-      sonioxRef.current.pause()
+    (utterance: EnrichedUtterance) => {
+      console.log('[voice] user utterance:', utterance.text.trim(), 'tokens:', utterance.tokens.length)
+      fsmRef.current.handleUtterance(utterance)
     },
     [],
   )
 
-  const handleEndpoint = useCallback(() => {
-    // Endpoint event from Soniox — handled via utterance callback
-  }, [])
+  const handleEndpoint = useCallback(() => {}, [])
 
   const soniox = useSoniox(sonioxOptions, handleUtterance, handleEndpoint)
-
-  // Keep sonioxRef in sync
   sonioxRef.current = soniox
+
+  // Keep FSM soniox dep fresh after soniox hook initializes
+  useEffect(() => {
+    fsmRef.current.updateDeps({ soniox })
+  }, [soniox])
 
   // Track speech detection for state transitions
   const prevPartialRef = useRef('')
@@ -363,43 +340,23 @@ export function useVoiceConversation(
     prevPartialRef.current = soniox.partialText
 
     if (hasPartial && !hadPartial) {
-      if (voiceStateRef.current === 'IDLE') {
-        dispatch({ type: 'SPEECH_DETECTED' })
-      }
-      if (voiceStateRef.current === 'SPEAKING') {
-        dispatch({ type: 'INTERRUPTED' })
-        ttsRef.current.interrupt()
-      }
+      fsmRef.current.onSpeechDetected()
     }
   }, [soniox.partialText])
 
-  // ── Push-to-Talk ──
+  // ── Session Lifecycle (thin wrappers around FSM) ──
 
   const startTalking = useCallback(async () => {
-    if (!isActiveRef.current) return
-    // If AI is speaking, interrupt it
-    if (voiceStateRef.current === 'SPEAKING') {
-      ttsRef.current.interrupt()
-      dispatch({ type: 'INTERRUPTED' })
-    }
-    setIsTalking(true)
-    // Start Soniox on first PTT press (deferred start)
-    if (!sonioxStartedRef.current) {
-      sonioxStartedRef.current = true
-      await sonioxRef.current.start()
-    } else {
-      sonioxRef.current.resume()
-    }
-    dispatch({ type: 'SPEECH_DETECTED' })
+    await fsmRef.current.startTalking()
   }, [])
 
   const stopTalking = useCallback(() => {
-    setIsTalking(false)
-    sonioxRef.current.finalize()
-    // finalize triggers the 'finalized' event → handleUtterance → sends to LLM
+    fsmRef.current.stopTalking()
   }, [])
 
-  // ── Session Lifecycle ──
+  const cancelTalking = useCallback(() => {
+    fsmRef.current.cancelTalking()
+  }, [])
 
   const startNewSession = useCallback(
     async (prompt: string, mode: string) => {
@@ -412,21 +369,14 @@ export function useVoiceConversation(
         setTranscript([])
         setIsActive(true)
         setDuration(0)
+        setAnalysisResults({})
 
         durationIntervalRef.current = setInterval(() => {
           setDuration((d) => d + 1)
         }, 1000)
 
-        ttsRef.current.reset()
-        sonioxStartedRef.current = false
-        // Only start Soniox immediately in auto-endpoint mode
-        // In PTT mode, Soniox starts on first button press
-        if (autoEndpoint) {
-          await sonioxRef.current.start()
-          sonioxStartedRef.current = true
-        }
+        await fsmRef.current.startSession(autoEndpoint)
         sendMessageRef.current({ text: prompt })
-        dispatch({ type: 'LLM_STREAMING' })
       } catch (err) {
         console.error('[voice-conversation] Failed to start session:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -445,26 +395,20 @@ export function useVoiceConversation(
         setTranscript([])
         setIsActive(true)
         setDuration(0)
+        setAnalysisResults({})
 
         durationIntervalRef.current = setInterval(() => {
           setDuration((d) => d + 1)
         }, 1000)
 
-        ttsRef.current.reset()
-        sonioxStartedRef.current = false
-        if (autoEndpoint) {
-          await sonioxRef.current.start()
-          sonioxStartedRef.current = true
-        }
+        await fsmRef.current.startSession(autoEndpoint)
 
-        // Build message with steering context
         let messageText = prompt
         if (steeringNotes && steeringNotes.length > 0) {
           messageText += '\n\n[Learner instructions before session start:]\n' + steeringNotes.map(n => `- ${n}`).join('\n')
         }
 
         sendMessageRef.current({ text: messageText })
-        dispatch({ type: 'LLM_STREAMING' })
       } catch (err) {
         console.error('[voice-conversation] Failed to start with existing plan:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -477,16 +421,11 @@ export function useVoiceConversation(
     if (!sessionIdRef.current) return
     setIsActive(true)
     setDuration(0)
+    setAnalysisResults({})
     durationIntervalRef.current = setInterval(() => {
       setDuration((d) => d + 1)
     }, 1000)
-    ttsRef.current.reset()
-    sonioxStartedRef.current = false
-    if (autoEndpoint) {
-      await sonioxRef.current.start()
-      sonioxStartedRef.current = true
-    }
-    dispatch({ type: 'RESET' })
+    await fsmRef.current.startSession(autoEndpoint)
   }, [autoEndpoint])
 
   const endSession = useCallback(async () => {
@@ -496,10 +435,7 @@ export function useVoiceConversation(
       durationIntervalRef.current = null
     }
 
-    try { ttsRef.current.interrupt() } catch {}
-    try { await sonioxRef.current.stop() } catch {}
-    sonioxStartedRef.current = false
-    dispatch({ type: 'RESET' })
+    await fsmRef.current.endSession()
 
     if (sessionIdRef.current) {
       try {
@@ -511,29 +447,13 @@ export function useVoiceConversation(
   }, [])
 
   const toggleMute = useCallback(() => {
-    setIsMuted((prev) => {
-      if (prev) {
-        sonioxRef.current.resume()
-      } else {
-        sonioxRef.current.pause()
-      }
-      return !prev
-    })
+    const newMuted = fsmRef.current.toggleMute()
+    setIsMuted(newMuted)
   }, [])
 
-  const sendTextMessage = useCallback(
-    (text: string) => {
-      if (!text.trim() || !sessionIdRef.current) return
-      setTranscript((prev) => [
-        ...prev,
-        { role: 'user', text: text.trim(), isFinal: true, timestamp: Date.now() },
-      ])
-      ttsRef.current.reset()
-      sendMessageRef.current({ text: text.trim() })
-      dispatch({ type: 'LLM_STREAMING' })
-    },
-    [],
-  )
+  const sendTextMessage = useCallback((text: string) => {
+    fsmRef.current.sendTextMessage(text)
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -541,6 +461,7 @@ export function useVoiceConversation(
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current)
       }
+      fsmRef.current.dispose()
     }
   }, [])
 
@@ -566,6 +487,12 @@ export function useVoiceConversation(
     startWithExistingPlan,
     startTalking,
     stopTalking,
+    cancelTalking,
     isTalking,
+    spokenSentences: tts.spokenSentences,
+    currentSentence: tts.currentSentence,
+    currentProgress: tts.currentProgress,
+    ttsPlaying: tts.isPlaying,
+    analysisResults,
   }
 }

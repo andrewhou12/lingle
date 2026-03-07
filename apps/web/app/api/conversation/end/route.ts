@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { generateText } from 'ai'
+import { generateText, generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
+import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import type { Prisma } from '@prisma/client'
@@ -43,6 +44,56 @@ Title:`,
     console.error('[end] Failed to generate session title:', err)
   }
 
+  // Post-session analysis: extract targets hit, errors, avoidance
+  let errorsLogged: Prisma.InputJsonValue = dbSession.errorsLogged ?? []
+  let avoidanceEvents: Prisma.InputJsonValue = dbSession.avoidanceEvents ?? []
+  try {
+    const transcript = dbSession.transcript as Array<{ role: string; content: string }> | null
+    if (transcript && transcript.length >= 4) {
+      const fullTranscript = transcript
+        .map((m) => `${m.role}: ${m.content}`)
+        .join('\n')
+
+      const postSessionSchema = z.object({
+        targetsHit: z.array(z.string()).describe('Vocabulary/grammar successfully produced by the learner'),
+        errorsLogged: z.array(z.object({
+          errorType: z.string(),
+          contextQuote: z.string(),
+          explanation: z.string(),
+        })),
+        avoidanceEvents: z.array(z.object({
+          pattern: z.string(),
+          contextQuote: z.string(),
+        })),
+        overallAssessment: z.string(),
+        difficultyAppropriate: z.boolean(),
+      })
+
+      const { object: analysis } = await generateObject({
+        model: anthropic('claude-haiku-4-5-20251001'),
+        schema: postSessionSchema,
+        prompt: `Analyze this language learning conversation session. Identify what the learner produced correctly, errors they made, and patterns they may be avoiding.
+
+Session transcript:
+${fullTranscript}
+
+Be selective — only flag genuine errors and clear avoidance patterns. Most learner utterances are fine.`,
+      })
+
+      errorsLogged = analysis.errorsLogged as unknown as Prisma.InputJsonValue
+      avoidanceEvents = analysis.avoidanceEvents as unknown as Prisma.InputJsonValue
+
+      console.log('[end] post-session analysis:', {
+        targetsHit: analysis.targetsHit.length,
+        errors: analysis.errorsLogged.length,
+        avoidance: analysis.avoidanceEvents.length,
+        assessment: analysis.overallAssessment,
+      })
+    }
+  } catch (err) {
+    console.error('[end] Failed to run post-session analysis:', err)
+  }
+
   // Store the title in sessionPlan JSON
   const planData = (dbSession.sessionPlan ?? {}) as Record<string, unknown>
   if (generatedTitle) {
@@ -54,6 +105,8 @@ Title:`,
     data: {
       durationSeconds: duration,
       sessionPlan: planData as Prisma.InputJsonValue,
+      errorsLogged,
+      avoidanceEvents,
     },
   })
 

@@ -139,3 +139,55 @@ export function getGreetingForLanguage(languageId: string): { native: string; en
 export function getSttCode(languageId: string): string {
   return getLanguageById(languageId)?.sttCode ?? 'en'
 }
+
+/**
+ * Map a native language name (e.g. "English", "Thai", "Vietnamese") to an ISO 639-1 code.
+ * Checks SUPPORTED_LANGUAGES first, then falls back to a broader lookup. Defaults to 'en'.
+ */
+const NATIVE_LANGUAGE_CODES: Record<string, string> = {
+  english: 'en',
+  japanese: 'ja',
+  korean: 'ko',
+  'mandarin chinese': 'zh',
+  chinese: 'zh',
+  spanish: 'es',
+  french: 'fr',
+  german: 'de',
+  italian: 'it',
+  portuguese: 'pt',
+  thai: 'th',
+  vietnamese: 'vi',
+  hindi: 'hi',
+  arabic: 'ar',
+  russian: 'ru',
+  turkish: 'tr',
+  polish: 'pl',
+  dutch: 'nl',
+  indonesian: 'id',
+  malay: 'ms',
+  tagalog: 'tl',
+  swedish: 'sv',
+  norwegian: 'no',
+  danish: 'da',
+  finnish: 'fi',
+  czech: 'cs',
+  romanian: 'ro',
+  hungarian: 'hu',
+  greek: 'el',
+  hebrew: 'he',
+  persian: 'fa',
+  ukrainian: 'uk',
+  bengali: 'bn',
+  tamil: 'ta',
+  telugu: 'te',
+  cantonese: 'yue',
+}
+
+export function getNativeSttCode(nativeLanguage: string): string {
+  // Try supported languages first (exact id match)
+  const supported = getLanguageById(nativeLanguage)
+  if (supported) return supported.sttCode
+
+  // Broader lookup
+  return NATIVE_LANGUAGE_CODES[nativeLanguage.toLowerCase()] ?? 'en'
+}
