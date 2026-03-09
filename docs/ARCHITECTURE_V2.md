@@ -1,4 +1,4 @@
-# Lingle Architecture — V2 (March 2026)
+# Lingle Architecture — V2 (March 2026) (outdated)
 
 This document describes the current architecture after the Session Plans + Side Panel + Voice + Difficulty Validation update. For the original V1 architecture, see `CLAUDE.md`.
 
