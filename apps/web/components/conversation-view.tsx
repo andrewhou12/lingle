@@ -40,6 +40,7 @@ import { GrammarNote, GrammarNoteSkeleton } from '@/components/chat/grammar-note
 import { LearningPanel } from '@/components/panels/learning-panel'
 import { Spinner } from '@/components/spinner'
 import { VoiceSessionOverlay } from '@/components/voice/voice-session-overlay'
+import { getDefaultVoiceProvider } from '@/lib/voice/voice-provider-config'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from '@/components/chat/ime/ime-candidate-panel'
 import { cn } from '@/lib/utils'
@@ -616,6 +617,7 @@ function ConversationViewInner() {
       <VoiceSessionOverlay
         prompt={voiceSessionConfig.prompt}
         mode={voiceSessionConfig.mode}
+        voiceProvider={getDefaultVoiceProvider()}
         onEnd={() => setVoiceSessionConfig(null)}
       />
     )

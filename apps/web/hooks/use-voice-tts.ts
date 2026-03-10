@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createSentenceBoundaryTracker } from '@/lib/voice/sentence-boundary'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import { PCMStreamPlayer } from '@/lib/voice/pcm-stream-player'
+import { getTtsProvider } from '@/lib/voice/voice-provider-config'
 
 export interface UseVoiceTTSReturn {
   /** Feed streaming LLM text — extracts complete sentences and queues them for TTS */
@@ -75,7 +76,7 @@ export function useVoiceTTS(
       return fetch('/api/tts/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sentence, speed: speedRef.current }),
+        body: JSON.stringify({ text: sentence, speed: speedRef.current, ttsProvider: getTtsProvider() }),
         signal: abortRef.current.signal,
       })
         .then((res) => (res.ok && res.body ? res.body : null))
@@ -246,7 +247,7 @@ export function useVoiceTTS(
 
   const interrupt = useCallback(() => {
     // Fire-and-forget: cancel any in-flight server-side synthesis
-    fetch('/api/tts/interrupt', { method: 'POST' }).catch(() => {})
+    fetch('/api/tts/interrupt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ttsProvider: getTtsProvider() }) }).catch(() => {})
     cleanup()
   }, [cleanup])
 

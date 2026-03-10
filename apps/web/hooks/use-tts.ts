@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import { getTtsProvider } from '@/lib/voice/voice-provider-config'
 
 export function useTTS() {
   const [playingId, setPlayingId] = useState<string | null>(null)
@@ -27,7 +28,7 @@ export function useTTS() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ttsProvider: getTtsProvider() }),
       })
 
       if (!res.ok) {

@@ -8,11 +8,12 @@ const PAUSE_MARKER_REGEX = /<\d+>/g
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'urE3OJfJRxJuk9kAMN0Y'
-const TTS_PROVIDER = process.env.TTS_PROVIDER || 'elevenlabs'
+const TTS_PROVIDER_DEFAULT = process.env.TTS_PROVIDER || 'elevenlabs'
 
 export const POST = withAuth(async (request) => {
   const body = await request.json()
-  const { text, voice: voiceParam, speed } = body
+  const { text, voice: voiceParam, speed, ttsProvider: ttsProviderParam } = body
+  const ttsProvider = ttsProviderParam === 'rime' || ttsProviderParam === 'elevenlabs' ? ttsProviderParam : TTS_PROVIDER_DEFAULT
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -31,7 +32,7 @@ export const POST = withAuth(async (request) => {
     return NextResponse.json({ error: 'no speakable text' }, { status: 400 })
   }
 
-  if (TTS_PROVIDER === 'rime') {
+  if (ttsProvider === 'rime') {
     return synthesizeWithRime(spoken, speed)
   }
   return synthesizeWithElevenLabs(spoken, voiceParam)
@@ -80,7 +81,7 @@ async function synthesizeWithElevenLabs(text: string, voiceParam?: string): Prom
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_flash_v2_5',
+        model_id: 'eleven_v3',
         output_format: 'mp3_44100_128',
         voice_settings: {
           stability: 0.5,

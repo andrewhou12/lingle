@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { MODE_PLACEHOLDERS } from '@/lib/experience-scenarios'
 import { api } from '@/lib/api'
 import type { SessionPlan } from '@/lib/session-plan'
+import { type VoiceProviderType, getDefaultVoiceProvider } from '@/lib/voice/voice-provider-config'
 import { VoiceCentralOrb } from './voice-central-orb'
 import { VoiceBeginOverlay } from './voice-begin-overlay'
 import { VoiceSessionOverlay } from './voice-session-overlay'
@@ -22,8 +23,8 @@ type ViewState =
   | { type: 'prompt' }
   | { type: 'loading'; prompt: string }
   | { type: 'begin'; prompt: string; sessionId: string; plan: SessionPlan }
-  | { type: 'active'; prompt: string; sessionId: string; plan: SessionPlan; steeringNotes: string[] }
-  | { type: 'active-direct'; prompt: string; mode: string; sessionId?: string }
+  | { type: 'active'; prompt: string; sessionId: string; plan: SessionPlan; steeringNotes: string[]; voiceProvider: VoiceProviderType }
+  | { type: 'active-direct'; prompt: string; mode: string; sessionId?: string; voiceProvider: VoiceProviderType }
 
 export function VoiceConversationView() {
   const router = useRouter()
@@ -34,7 +35,7 @@ export function VoiceConversationView() {
   const [promptInput, setPromptInput] = useState('')
   const [viewState, setViewState] = useState<ViewState>(
     existingSessionId
-      ? { type: 'active-direct', prompt: '', mode, sessionId: existingSessionId }
+      ? { type: 'active-direct', prompt: '', mode, sessionId: existingSessionId, voiceProvider: getDefaultVoiceProvider() }
       : { type: 'prompt' }
   )
   const [error, setError] = useState<string | null>(null)
@@ -59,7 +60,7 @@ export function VoiceConversationView() {
     }
   }, [promptInput, mode])
 
-  const handleBegin = useCallback((steeringNotes: string[]) => {
+  const handleBegin = useCallback((steeringNotes: string[], provider: VoiceProviderType) => {
     if (viewState.type !== 'begin') return
     setViewState({
       type: 'active',
@@ -67,6 +68,7 @@ export function VoiceConversationView() {
       sessionId: viewState.sessionId,
       plan: viewState.plan,
       steeringNotes,
+      voiceProvider: provider,
     })
   }, [viewState])
 
@@ -85,6 +87,7 @@ export function VoiceConversationView() {
         sessionId={viewState.sessionId}
         plan={viewState.plan}
         steeringNotes={viewState.steeringNotes}
+        voiceProvider={viewState.voiceProvider}
         onEnd={handleEnd}
       />
     )
@@ -97,6 +100,7 @@ export function VoiceConversationView() {
         prompt={viewState.prompt}
         mode={viewState.mode}
         sessionId={viewState.sessionId}
+        voiceProvider={viewState.voiceProvider}
         onEnd={handleEnd}
       />
     )
@@ -109,6 +113,7 @@ export function VoiceConversationView() {
         plan={viewState.plan}
         mode={mode}
         prompt={viewState.prompt}
+        defaultProvider={getDefaultVoiceProvider()}
         onBegin={handleBegin}
         onBack={() => setViewState({ type: 'prompt' })}
       />

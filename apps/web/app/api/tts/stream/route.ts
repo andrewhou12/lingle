@@ -5,14 +5,15 @@ import { getRimeWs } from '@/lib/rime-ws'
 
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 const PAUSE_MARKER_REGEX = /<\d+>/g
-const TTS_PROVIDER = process.env.TTS_PROVIDER || 'elevenlabs'
+const TTS_PROVIDER_DEFAULT = process.env.TTS_PROVIDER || 'elevenlabs'
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'urE3OJfJRxJuk9kAMN0Y'
 
 export const POST = withAuth(async (request) => {
   const body = await request.json()
-  const { text, speed } = body
+  const { text, speed, ttsProvider: ttsProviderParam } = body
+  const ttsProvider = ttsProviderParam === 'rime' || ttsProviderParam === 'elevenlabs' ? ttsProviderParam : TTS_PROVIDER_DEFAULT
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -32,7 +33,7 @@ export const POST = withAuth(async (request) => {
   }
 
   try {
-    if (TTS_PROVIDER === 'rime') {
+    if (ttsProvider === 'rime') {
       const rime = getRimeWs()
       const { readable } = rime.synthesizeStream(spoken, speed)
 
@@ -60,7 +61,7 @@ export const POST = withAuth(async (request) => {
         },
         body: JSON.stringify({
           text: spoken,
-          model_id: 'eleven_flash_v2_5',
+          model_id: 'eleven_v3',
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,

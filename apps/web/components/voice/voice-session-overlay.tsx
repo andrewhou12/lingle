@@ -2,9 +2,12 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useVoiceConversation } from '@/hooks/use-voice-conversation'
+import { VoiceProvider } from '@humeai/voice-react'
+import { useVoiceConversation, type UseVoiceConversationReturn } from '@/hooks/use-voice-conversation'
+import { useHumeVoice } from '@/hooks/use-hume-voice'
 import { getVoiceToolZone } from '@/lib/voice/voice-tool-zones'
 import type { SessionPlan } from '@/lib/session-plan'
+import type { VoiceProviderType } from '@/lib/voice/voice-provider-config'
 import { VoiceCentralOrb } from './voice-central-orb'
 import { VoiceNavBar } from './voice-nav-bar'
 import { VoiceSessionPlanSidebar } from './voice-session-plan-sidebar'
@@ -27,13 +30,94 @@ interface VoiceSessionOverlayProps {
   sessionId?: string | null
   plan?: SessionPlan | null
   steeringNotes?: string[]
+  voiceProvider?: VoiceProviderType
   onEnd: () => void
 }
 
-export function VoiceSessionOverlay({
-  prompt, mode, sessionId: existingSessionId, plan: existingPlan,
-  steeringNotes, onEnd,
-}: VoiceSessionOverlayProps) {
+export function VoiceSessionOverlay(props: VoiceSessionOverlayProps) {
+  const { voiceProvider = 'soniox' } = props
+
+  if (voiceProvider === 'hume') {
+    return (
+      <VoiceProvider
+        onError={(err) => console.error('[hume-provider] error:', JSON.stringify(err, null, 2), err)}
+        onOpen={() => console.log('[hume-provider] connected')}
+        onClose={(ev) => console.log('[hume-provider] closed:', ev)}
+      >
+        <HumeSessionContent {...props} />
+      </VoiceProvider>
+    )
+  }
+
+  return <SonioxSessionContent {...props} />
+}
+
+/** Soniox pathway — uses useVoiceConversation */
+function SonioxSessionContent(props: VoiceSessionOverlayProps) {
+  const { prompt, mode, sessionId: existingSessionId, plan: existingPlan, steeringNotes, onEnd } = props
+
+  const voice = useVoiceConversation({
+    sessionId: existingSessionId,
+    autoEndpoint: false,
+  })
+
+  return (
+    <SessionOverlayInner
+      voice={voice}
+      prompt={prompt}
+      mode={mode}
+      existingSessionId={existingSessionId}
+      existingPlan={existingPlan}
+      steeringNotes={steeringNotes}
+      voiceProvider="soniox"
+      onEnd={onEnd}
+    />
+  )
+}
+
+/** Hume pathway — uses useHumeVoice (must be inside VoiceProvider) */
+function HumeSessionContent(props: VoiceSessionOverlayProps) {
+  const { prompt, mode, sessionId: existingSessionId, plan: existingPlan, steeringNotes, onEnd } = props
+
+  const voice = useHumeVoice({
+    sessionId: existingSessionId,
+    sessionPlan: existingPlan,
+  })
+
+  return (
+    <SessionOverlayInner
+      voice={voice}
+      prompt={prompt}
+      mode={mode}
+      existingSessionId={existingSessionId}
+      existingPlan={existingPlan}
+      steeringNotes={steeringNotes}
+      voiceProvider="hume"
+      onEnd={onEnd}
+    />
+  )
+}
+
+/** Shared session overlay content — provider-agnostic */
+function SessionOverlayInner({
+  voice,
+  prompt,
+  mode,
+  existingSessionId,
+  existingPlan,
+  steeringNotes,
+  voiceProvider,
+  onEnd,
+}: {
+  voice: UseVoiceConversationReturn
+  prompt: string
+  mode: string
+  existingSessionId?: string | null
+  existingPlan?: SessionPlan | null
+  steeringNotes?: string[]
+  voiceProvider: VoiceProviderType
+  onEnd: () => void
+}) {
   const [isStarting, setIsStarting] = useState(true)
   const [planOpen, setPlanOpen] = useState(true)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
@@ -41,15 +125,9 @@ export function VoiceSessionOverlay({
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [dismissedToasts, setDismissedToasts] = useState<Set<string>>(new Set())
   const [steeringMessages, setSteeringMessages] = useState<Array<{ text: string; time: string }>>(
-    // Carry over pre-session steering messages
     steeringNotes?.map(text => ({ text, time: '0:00' })) || []
   )
   const startedRef = useRef(false)
-
-  const voice = useVoiceConversation({
-    sessionId: existingSessionId,
-    autoEndpoint: false,
-  })
 
   // Start the session on mount
   useEffect(() => {
@@ -59,7 +137,6 @@ export function VoiceSessionOverlay({
     const init = async () => {
       try {
         if (existingPlan && existingSessionId) {
-          // Use pre-generated plan flow
           await voice.startWithExistingPlan(existingSessionId, existingPlan, prompt, steeringNotes)
         } else if (existingSessionId) {
           await voice.startSession()
@@ -206,7 +283,10 @@ export function VoiceSessionOverlay({
     setDismissedToasts(prev => new Set(prev).add(id))
   }, [])
 
+  const endingRef = useRef(false)
   const handleEnd = useCallback(async () => {
+    if (endingRef.current) return
+    endingRef.current = true
     try { await voice.endSession() } catch {}
     onEnd()
   }, [voice.endSession, onEnd])
@@ -270,6 +350,7 @@ export function VoiceSessionOverlay({
           duration={voice.duration}
           transcriptCount={voice.transcript.length}
           isPlanOpen={planOpen}
+          voiceProvider={voiceProvider}
           onTogglePlan={() => setPlanOpen(p => !p)}
           onOpenTranscript={() => setTranscriptOpen(true)}
           onEnd={handleEnd}
@@ -333,25 +414,33 @@ export function VoiceSessionOverlay({
               </div>
               {/* Contextual keyboard hint */}
               <div className="mt-1 flex items-center justify-center">
-                {voice.isTalking && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-warm/10 border border-accent-warm/20">
-                    <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-accent-warm/30 text-accent-warm shadow-[0_1px_0_rgba(200,87,42,.15)]">esc</kbd>
-                    <span className="text-[12px] text-accent-warm/80 font-medium">cancel</span>
-                    <span className="text-[10px] text-text-muted mx-0.5">·</span>
-                    <span className="text-[12px] text-text-secondary">release to send</span>
-                  </div>
-                )}
-                {!voice.isTalking && (voice.voiceState === 'SPEAKING' || voice.voiceState === 'THINKING') && (
+                {voiceProvider === 'hume' ? (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-secondary border border-border">
-                    <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-border-strong text-text-primary shadow-[0_1px_0_rgba(0,0,0,.08)]">space</kbd>
-                    <span className="text-[12px] text-text-secondary font-medium">to interrupt</span>
+                    <span className="text-[12px] text-text-secondary font-medium">Speak naturally — Hume handles turns</span>
                   </div>
-                )}
-                {!voice.isTalking && voice.voiceState === 'IDLE' && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-secondary border border-border">
-                    <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-border-strong text-text-primary shadow-[0_1px_0_rgba(0,0,0,.08)]">space</kbd>
-                    <span className="text-[12px] text-text-secondary font-medium">hold to speak</span>
-                  </div>
+                ) : (
+                  <>
+                    {voice.isTalking && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-warm/10 border border-accent-warm/20">
+                        <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-accent-warm/30 text-accent-warm shadow-[0_1px_0_rgba(200,87,42,.15)]">esc</kbd>
+                        <span className="text-[12px] text-accent-warm/80 font-medium">cancel</span>
+                        <span className="text-[10px] text-text-muted mx-0.5">·</span>
+                        <span className="text-[12px] text-text-secondary">release to send</span>
+                      </div>
+                    )}
+                    {!voice.isTalking && (voice.voiceState === 'SPEAKING' || voice.voiceState === 'THINKING') && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-secondary border border-border">
+                        <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-border-strong text-text-primary shadow-[0_1px_0_rgba(0,0,0,.08)]">space</kbd>
+                        <span className="text-[12px] text-text-secondary font-medium">to interrupt</span>
+                      </div>
+                    )}
+                    {!voice.isTalking && voice.voiceState === 'IDLE' && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-secondary border border-border">
+                        <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded bg-white border border-border-strong text-text-primary shadow-[0_1px_0_rgba(0,0,0,.08)]">space</kbd>
+                        <span className="text-[12px] text-text-secondary font-medium">hold to speak</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

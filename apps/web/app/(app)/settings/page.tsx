@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon, MicrophoneIcon, SpeakerWaveIcon } from '@heroicons/react/24/outline'
 import type { LearnerProfile } from '@lingle/shared/types'
 import { Spinner } from '@/components/spinner'
 import { api } from '@/lib/api'
 import { DIFFICULTY_LEVELS } from '@/lib/difficulty-levels'
 import { useLanguage } from '@/hooks/use-language'
+import { type VoiceProviderType, type TtsProviderType, getDefaultVoiceProvider, setVoiceProvider as persistVoiceProvider, getTtsProvider, setTtsProvider as persistTtsProvider } from '@/lib/voice/voice-provider-config'
 
 const DAILY_GOAL_OPTIONS = [
   { minutes: 10, label: '10 min', description: 'Light' },
@@ -22,6 +23,8 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<LearnerProfile | null>(() => api.peekCache<LearnerProfile>('/profile') ?? null)
   const [isLoading, setIsLoading] = useState(() => !api.peekCache('/profile'))
   const [isSaving, setIsSaving] = useState(false)
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProviderType>(getDefaultVoiceProvider())
+  const [ttsProvider, setTtsProvider] = useState<TtsProviderType>(getTtsProvider())
 
   useEffect(() => {
     setIsLoading(true)
@@ -139,7 +142,7 @@ export default function SettingsPage() {
         Daily Goal
       </span>
 
-      <div className="rounded-xl border border-border bg-bg">
+      <div className="rounded-xl border border-border bg-bg mb-6">
         <div className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
@@ -164,6 +167,67 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <span className="text-[11px] font-medium text-text-muted uppercase tracking-wide block mb-3">
+        Voice
+      </span>
+
+      <div className="rounded-xl border border-border bg-bg">
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+              <MicrophoneIcon className="w-4 h-4" />
+            </div>
+            <span className="text-[13px] font-medium">Voice provider</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'soniox' as const, label: 'Standard', description: 'Push-to-talk with inline corrections' },
+              { key: 'hume' as const, label: 'Hume EVI', description: 'Hands-free with automatic turn-taking' },
+            ]).map((option) => (
+              <button
+                key={option.key}
+                className={`px-3 py-2.5 rounded-lg border text-center cursor-pointer transition-all ${
+                  voiceProvider === option.key
+                    ? 'border-accent-brand bg-bg-hover'
+                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
+                }`}
+                onClick={() => { setVoiceProvider(option.key); persistVoiceProvider(option.key) }}
+              >
+                <div className="text-[15px] font-semibold text-text-primary">{option.label}</div>
+                <div className="text-[11px] text-text-muted">{option.description}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 mb-3 mt-5">
+            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+              <SpeakerWaveIcon className="w-4 h-4" />
+            </div>
+            <span className="text-[13px] font-medium">TTS engine</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'rime' as const, label: 'Rime', description: 'Low-latency, optimized for Japanese' },
+              { key: 'elevenlabs' as const, label: 'ElevenLabs', description: 'High-quality, natural sounding' },
+            ]).map((option) => (
+              <button
+                key={option.key}
+                className={`px-3 py-2.5 rounded-lg border text-center cursor-pointer transition-all ${
+                  ttsProvider === option.key
+                    ? 'border-accent-brand bg-bg-hover'
+                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
+                }`}
+                onClick={() => { setTtsProvider(option.key); persistTtsProvider(option.key) }}
+              >
+                <div className="text-[15px] font-semibold text-text-primary">{option.label}</div>
+                <div className="text-[11px] text-text-muted">{option.description}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-text-muted mt-2">Used with Standard voice mode. Hume EVI uses its own TTS.</p>
         </div>
       </div>
     </div>

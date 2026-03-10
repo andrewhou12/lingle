@@ -7,12 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan, isTutorPlan } from '@/lib/session-plan'
+import { type VoiceProviderType, getDefaultVoiceProvider } from '@/lib/voice/voice-provider-config'
 
 interface VoiceBeginOverlayProps {
   plan: SessionPlan
   mode: string
   prompt: string
-  onBegin: (steeringNotes: string[]) => void
+  defaultProvider?: VoiceProviderType
+  onBegin: (steeringNotes: string[], voiceProvider: VoiceProviderType) => void
   onBack: () => void
 }
 
@@ -80,10 +82,11 @@ function getDetailPills(plan: SessionPlan): Array<{ icon: string; label: string 
   return pills
 }
 
-export function VoiceBeginOverlay({ plan, mode, prompt, onBegin, onBack }: VoiceBeginOverlayProps) {
+export function VoiceBeginOverlay({ plan, mode, prompt, defaultProvider, onBegin, onBack }: VoiceBeginOverlayProps) {
   const [steerMessages, setSteerMessages] = useState<SteerMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isExiting, setIsExiting] = useState(false)
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProviderType>(defaultProvider ?? getDefaultVoiceProvider())
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -107,9 +110,9 @@ export function VoiceBeginOverlay({ plan, mode, prompt, onBegin, onBack }: Voice
   const handleBegin = useCallback(() => {
     setIsExiting(true)
     setTimeout(() => {
-      onBegin(steerMessages.map(m => m.text))
+      onBegin(steerMessages.map(m => m.text), voiceProvider)
     }, 400)
-  }, [onBegin, steerMessages])
+  }, [onBegin, steerMessages, voiceProvider])
 
   return createPortal(
     <motion.div
@@ -158,6 +161,32 @@ export function VoiceBeginOverlay({ plan, mode, prompt, onBegin, onBack }: Voice
 
           <div className="flex-1" />
 
+          {/* Voice provider toggle */}
+          <div className="flex items-center justify-center gap-0.5 bg-bg-secondary border border-border rounded-xl p-[3px] mb-3">
+            <button
+              onClick={() => setVoiceProvider('soniox')}
+              className={cn(
+                'flex-1 text-[11.5px] font-medium py-[5px] px-3 rounded-[9px] border-none cursor-pointer transition-all font-sans',
+                voiceProvider === 'soniox'
+                  ? 'bg-white text-text-primary shadow-[0_1px_3px_rgba(0,0,0,.1)]'
+                  : 'bg-transparent text-text-muted hover:text-text-secondary',
+              )}
+            >
+              Standard
+            </button>
+            <button
+              onClick={() => setVoiceProvider('hume')}
+              className={cn(
+                'flex-1 text-[11.5px] font-medium py-[5px] px-3 rounded-[9px] border-none cursor-pointer transition-all font-sans',
+                voiceProvider === 'hume'
+                  ? 'bg-white text-text-primary shadow-[0_1px_3px_rgba(0,0,0,.1)]'
+                  : 'bg-transparent text-text-muted hover:text-text-secondary',
+              )}
+            >
+              Hume EVI
+            </button>
+          </div>
+
           {/* Begin button */}
           <button
             onClick={handleBegin}
@@ -166,7 +195,9 @@ export function VoiceBeginOverlay({ plan, mode, prompt, onBegin, onBack }: Voice
             Begin conversation &rarr;
           </button>
           <p className="text-[10.5px] text-text-muted mt-[9px] leading-[1.55] text-center">
-            Hold mic to speak &middot; Corrections appear inline &middot; Plan editable mid-session
+            {voiceProvider === 'hume'
+              ? 'Speak freely — Hume handles turn-taking · Corrections appear inline'
+              : 'Hold mic to speak · Corrections appear inline · Plan editable mid-session'}
           </p>
         </div>
 

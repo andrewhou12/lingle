@@ -3,12 +3,14 @@
 import { ChatBubbleLeftIcon, StopIcon, DocumentTextIcon, ChevronDownIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
+import type { VoiceProviderType } from '@/lib/voice/voice-provider-config'
 
 interface VoiceNavBarProps {
   plan: SessionPlan | null
   duration: number
   transcriptCount: number
   isPlanOpen: boolean
+  voiceProvider?: VoiceProviderType
   onTogglePlan: () => void
   onOpenTranscript: () => void
   onEnd: () => void
@@ -33,7 +35,7 @@ function getScenarioInfo(plan: SessionPlan | null): { icon: string; name: string
 
 export function VoiceNavBar({
   plan, duration, transcriptCount,
-  isPlanOpen, onTogglePlan, onOpenTranscript, onEnd,
+  isPlanOpen, voiceProvider, onTogglePlan, onOpenTranscript, onEnd,
 }: VoiceNavBarProps) {
   const scenario = getScenarioInfo(plan)
 
@@ -63,11 +65,16 @@ export function VoiceNavBar({
       </div>
 
       {/* Center */}
-      <div className="absolute left-1/2 -translate-x-1/2">
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
         <div className="flex items-center gap-1.5 text-[11.5px] text-text-secondary bg-bg-secondary border border-border px-3 py-1 rounded-full">
           <div className="w-[7px] h-[7px] rounded-full bg-green" />
           {plan?.mode === 'tutor' ? 'Lesson' : 'Conversation'}
         </div>
+        {voiceProvider && (
+          <span className="text-[9.5px] font-medium text-text-muted bg-bg-secondary border border-border px-2 py-0.5 rounded-full tracking-[.02em]">
+            {voiceProvider === 'hume' ? 'Hume EVI' : 'Soniox'}
+          </span>
+        )}
       </div>
 
       {/* Right */}
