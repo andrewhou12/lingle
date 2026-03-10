@@ -677,7 +677,13 @@ export default function LandingPage() {
           <span className={s['nav-beta-badge']}>Beta</span>
         </Link>
         <div className={s['nav-right']}>
-          <Link href="/sign-in" className={s['btn-ghost']}>Sign in</Link>
+          <div className={s['nav-links']}>
+            <Link href="/faq" className={s['nav-link']}>FAQ</Link>
+            <Link href="/support" className={s['nav-link']}>Support</Link>
+            <a href="https://discord.gg/GetfucF4" target="_blank" rel="noopener noreferrer" className={s['nav-link']} aria-label="Discord">Discord</a>
+          </div>
+          <div className={s['nav-divider']} />
+          <Link href="/sign-in" className={s['btn-nav-secondary']}>Sign in</Link>
           <Link href="/sign-in" className={s['btn-nav-primary']}>Get started free</Link>
         </div>
       </nav>
