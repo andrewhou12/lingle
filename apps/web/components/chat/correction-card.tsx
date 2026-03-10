@@ -1,7 +1,5 @@
 'use client'
 
-import { cn } from '@/lib/utils'
-
 interface CorrectionCardProps {
   original: string
   corrected: string
@@ -11,39 +9,35 @@ interface CorrectionCardProps {
 
 export function CorrectionCard({ original, corrected, explanation, grammarPoint }: CorrectionCardProps) {
   return (
-    <div className="my-3 rounded-xl border border-warm-med bg-warm-soft px-4 py-3">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[12px] font-semibold text-accent-warm uppercase tracking-wide">Correction</span>
+    <div className="my-2 flex flex-col gap-1.5">
+      {/* Before → After on one visual line */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[13.5px] font-jp-clean text-text-muted line-through decoration-accent-warm/40">{original}</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" className="text-text-placeholder shrink-0">
+          <path d="M1 6h9M7 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-[13.5px] font-jp-clean font-medium text-text-primary">{corrected}</span>
+      </div>
+
+      {/* Explanation — compact */}
+      <div className="flex items-baseline gap-1.5">
         {grammarPoint && (
-          <span className="text-[11px] text-accent-warm/70 bg-warm-med rounded-full px-2 py-0.5">
-            {grammarPoint}
-          </span>
+          <span className="text-[10.5px] font-medium text-accent-warm bg-warm-soft rounded px-1.5 py-px shrink-0">{grammarPoint}</span>
         )}
+        <span className="text-[12px] text-text-secondary leading-[1.5]">{explanation}</span>
       </div>
-      <div className="flex flex-col gap-1.5 mb-2">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[12px] text-text-muted shrink-0">before</span>
-          <span className="text-[14px] font-jp text-text-secondary line-through">{original}</span>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[12px] text-text-muted shrink-0">after</span>
-          <span className="text-[14px] font-jp font-medium text-text-primary">{corrected}</span>
-        </div>
-      </div>
-      <p className="text-[13px] text-text-secondary leading-snug">{explanation}</p>
     </div>
   )
 }
 
 export function CorrectionCardSkeleton() {
   return (
-    <div className="my-3 rounded-xl border border-warm-med bg-warm-soft px-4 py-3 animate-pulse">
-      <div className="h-3 w-20 bg-warm-med rounded mb-3" />
-      <div className="flex flex-col gap-2 mb-2">
-        <div className="h-4 w-48 bg-warm-med rounded" />
-        <div className="h-4 w-52 bg-warm-med rounded" />
+    <div className="my-2 flex flex-col gap-1.5 animate-pulse">
+      <div className="flex items-center gap-2">
+        <div className="h-4 w-20 bg-bg-hover rounded" />
+        <div className="h-4 w-24 bg-bg-hover rounded" />
       </div>
-      <div className="h-3 w-64 bg-warm-med rounded" />
+      <div className="h-3 w-40 bg-bg-hover rounded" />
     </div>
   )
 }

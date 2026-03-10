@@ -5,11 +5,12 @@ import {
   MagnifyingGlassIcon,
   QuestionMarkCircleIcon,
   PencilSquareIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { VoiceState } from '@/hooks/use-voice-conversation'
 
-export type ActivePanel = 'lookup' | 'hint' | 'corrections' | null
+export type ActivePanel = 'transcript' | 'feedback' | 'help' | 'lookup' | null
 
 interface VoiceControlsProps {
   voiceState: VoiceState
@@ -20,6 +21,8 @@ interface VoiceControlsProps {
   correctionsCount: number
   activePanel: ActivePanel
   onTogglePanel: (panel: ActivePanel) => void
+  onRetry?: () => void
+  canRetry?: boolean
   className?: string
 }
 
@@ -35,6 +38,8 @@ export function VoiceControls({
   correctionsCount,
   activePanel,
   onTogglePanel,
+  onRetry,
+  canRetry,
   className,
 }: VoiceControlsProps) {
   const ringRef = useRef<SVGCircleElement>(null)
@@ -115,14 +120,14 @@ export function VoiceControls({
       icon: <MagnifyingGlassIcon className="w-3.5 h-3.5" />,
     },
     {
-      id: 'hint',
-      label: 'Hint',
+      id: 'help',
+      label: 'Stuck?',
       badge: null,
       icon: <QuestionMarkCircleIcon className="w-3.5 h-3.5" />,
     },
     {
-      id: 'corrections',
-      label: 'Corrections',
+      id: 'feedback',
+      label: 'Feedback',
       badge: correctionsCount || null,
       icon: <PencilSquareIcon className="w-3.5 h-3.5" />,
     },
@@ -196,6 +201,15 @@ export function VoiceControls({
 
       {/* Chip buttons — matches suggestion chip pattern from the app */}
       <div className="flex gap-1.5">
+        {canRetry && (
+          <button
+            onClick={onRetry}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong"
+          >
+            <ArrowPathIcon className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        )}
         {chips.map(({ id, label, badge, icon }) => {
           const isActive = activePanel === id
           return (

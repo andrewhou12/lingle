@@ -55,11 +55,11 @@ export function VoiceVocabPanel({ isOpen, words, onClose }: VoiceVocabPanelProps
             >
               <div className="font-jp-clean text-[15px]">{w.word}</div>
               {w.reading && (
-                <div className="font-mono text-[9.5px] text-text-muted mt-px">{w.reading}</div>
+                <div className="font-jp-clean text-[9.5px] text-text-muted mt-px">{w.reading}</div>
               )}
               <div className="text-[11.5px] text-text-secondary mt-[3px]">{w.meaning}</div>
               <span className={cn(
-                'inline-block text-[9px] font-semibold tracking-[.06em] uppercase px-1.5 py-0.5 rounded mt-[5px]',
+                'inline-block text-[9px] font-medium px-1.5 py-0.5 rounded mt-[5px]',
                 w.tag === 'new' ? 'bg-green-soft text-green' : 'bg-bg-active text-text-secondary',
               )}>
                 {w.tag === 'new' ? 'New' : 'Review'}

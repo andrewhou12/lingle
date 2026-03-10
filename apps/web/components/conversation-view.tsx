@@ -39,8 +39,6 @@ import { VocabularyCard, VocabularyCardSkeleton } from '@/components/chat/vocabu
 import { GrammarNote, GrammarNoteSkeleton } from '@/components/chat/grammar-note'
 import { LearningPanel } from '@/components/panels/learning-panel'
 import { Spinner } from '@/components/spinner'
-import { VoiceSessionOverlay } from '@/components/voice/voice-session-overlay'
-import { getDefaultVoiceProvider } from '@/lib/voice/voice-provider-config'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from '@/components/chat/ime/ime-candidate-panel'
 import { cn } from '@/lib/utils'
@@ -272,7 +270,6 @@ function ConversationViewInner() {
   const [selectedMode, setSelectedMode] = useState<ScenarioMode>('conversation')
   const [activeMode, setActiveMode] = useState<ScenarioMode>('conversation')
   const [inputMode, setInputMode] = useState<'chat' | 'voice'>('voice')
-  const [voiceSessionConfig, setVoiceSessionConfig] = useState<{ prompt: string; mode: ScenarioMode } | null>(null)
   const [chosenChoiceIds, setChosenChoiceIds] = useState<Set<string>>(new Set())
   const [difficultyLevel, setDifficultyLevel] = useState(3) // default intermediate
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
@@ -552,11 +549,13 @@ function ConversationViewInner() {
     const text = input.trim() || defaults[selectedMode] || defaults.conversation
     setInput('')
     if (inputMode === 'voice') {
-      setVoiceSessionConfig({ prompt: text, mode: selectedMode })
+      const params = new URLSearchParams({ mode: selectedMode })
+      if (text) params.set('prompt', text)
+      router.push(`/conversation/voice?${params.toString()}`)
     } else {
       await handleStartSession(text, selectedMode)
     }
-  }, [input, selectedMode, inputMode, targetLanguage, handleStartSession])
+  }, [input, selectedMode, inputMode, targetLanguage, handleStartSession, router])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isSending) return
@@ -611,17 +610,6 @@ function ConversationViewInner() {
     }
   }, [sessionId])
 
-  // Voice overlay
-  if (voiceSessionConfig) {
-    return (
-      <VoiceSessionOverlay
-        prompt={voiceSessionConfig.prompt}
-        mode={voiceSessionConfig.mode}
-        voiceProvider={getDefaultVoiceProvider()}
-        onEnd={() => setVoiceSessionConfig(null)}
-      />
-    )
-  }
 
   // Idle Phase — experience launcher
   if (phase === 'idle') {
@@ -675,8 +663,27 @@ function ConversationViewInner() {
                 ))}
               </div>
 
+              {/* Coming soon for non-conversation modes */}
+              {selectedMode !== 'conversation' && (
+                <div className="w-full idle-entrance flex flex-col items-center py-12" style={{ animationDelay: '0.13s', opacity: 0 }}>
+                  <div className="w-10 h-10 rounded-xl bg-bg-secondary border border-border flex items-center justify-center mb-4 text-text-muted">
+                    {selectedMode === 'tutor' && <BookOpenIcon className="w-[18px] h-[18px]" />}
+                    {selectedMode === 'immersion' && <MusicalNoteIcon className="w-[18px] h-[18px]" />}
+                    {selectedMode === 'reference' && <MagnifyingGlassIcon className="w-[18px] h-[18px]" />}
+                  </div>
+                  <h3 className="text-[16px] font-semibold text-text-primary tracking-[-0.02em] mb-1">
+                    Coming soon
+                  </h3>
+                  <p className="text-[13px] text-text-secondary text-center max-w-[320px] leading-[1.5]">
+                    {selectedMode === 'tutor' && 'Structured lessons with step-by-step grammar and vocabulary guidance are on the way.'}
+                    {selectedMode === 'immersion' && 'Immersive listening and reading exercises are being built. Stay tuned.'}
+                    {selectedMode === 'reference' && 'A quick-reference tool for grammar, vocabulary, and usage questions is in the works.'}
+                  </p>
+                </div>
+              )}
+
               {/* Input box */}
-              <div className="w-full idle-entrance" style={{ animationDelay: '0.13s', opacity: 0 }}>
+              {selectedMode === 'conversation' && <div className="w-full idle-entrance" style={{ animationDelay: '0.13s', opacity: 0 }}>
                 <div className="relative">
                   <div className="bg-bg-pure border border-border rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)] transition-[border-color,box-shadow] duration-150 focus-within:border-border-strong focus-within:shadow-[0_2px_8px_rgba(0,0,0,.06),0_1px_4px_rgba(0,0,0,.04)]">
                     <div className="relative">
@@ -856,9 +863,10 @@ function ConversationViewInner() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>}
 
               {/* Suggestions */}
+              {selectedMode === 'conversation' && <>
               <div className="w-full mt-8 idle-entrance" style={{ animationDelay: '0.19s', opacity: 0 }}>
                 <div className="flex justify-between items-center mb-2.5">
                   <span className="text-[11px] font-semibold tracking-[0.07em] uppercase text-text-muted">
@@ -906,6 +914,7 @@ function ConversationViewInner() {
                           key={session.id}
                           className="flex items-center gap-3 px-3.5 py-3 bg-bg-pure border border-border-subtle rounded-lg w-full cursor-pointer text-left transition-[box-shadow,border-color,transform] duration-150 hover:border-border-strong hover:shadow-[0_2px_8px_rgba(0,0,0,.06)] hover:-translate-y-px shadow-[0_1px_2px_rgba(0,0,0,.04)]"
                           style={{ fontFamily: 'inherit' }}
+                          onClick={() => router.push(`/progress/${session.id}`)}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="text-[13px] font-medium text-text-primary truncate leading-snug">{label}</div>
@@ -920,6 +929,7 @@ function ConversationViewInner() {
                   </div>
                 </div>
               )}
+              </>}
             </>
           )}
         </div>

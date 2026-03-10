@@ -15,6 +15,29 @@ const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 const PAUSE_MARKER_REGEX = /<\d+>/g
 const PUNCTUATION_ONLY = /^[。！？.!?\s…─—、,]+$/
 
+// Latin-character ratio check for filtering non-target-language content
+const LATIN_CHAR = /[a-zA-Z]/g
+const PAREN_LATIN = /\([^)]*[a-zA-Z][^)]*\)/g
+const BRACKET_LATIN = /\[[^\]]*[a-zA-Z][^\]]*\]/g
+
+function stripNonTargetLanguage(text: string): string {
+  // Strip (...) containing Latin characters (English parenthetical explanations)
+  let result = text.replace(PAREN_LATIN, '')
+  // Strip [...] containing Latin characters
+  result = result.replace(BRACKET_LATIN, '')
+  // Strip lines that are >50% Latin characters
+  result = result
+    .split('\n')
+    .filter(line => {
+      const stripped = line.trim()
+      if (!stripped) return true
+      const latinCount = (stripped.match(LATIN_CHAR) || []).length
+      return latinCount / stripped.length <= 0.5
+    })
+    .join('\n')
+  return result.replace(/\s{2,}/g, ' ').trim()
+}
+
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY
 const CARTESIA_VOICE_JA = process.env.CARTESIA_VOICE_JA
 
@@ -30,6 +53,7 @@ export const POST = withAuth(async (request, { userId }) => {
   const body = await request.json()
   const messages: Array<{ role: string; content: string }> = body.messages
   const sessionId: string | undefined = body.sessionId
+  const bustCache: boolean = body.bustCache ?? false
 
   if (!sessionId) {
     return new Response(JSON.stringify({ error: 'Missing sessionId' }), {
@@ -46,6 +70,9 @@ export const POST = withAuth(async (request, { userId }) => {
   }
 
   // Session lookup with caching
+  if (bustCache) {
+    sessionCache.delete(sessionId)
+  }
   let session = sessionCache.get(sessionId)
   const cacheHit = !!session
   if (!session) {
@@ -100,7 +127,7 @@ export const POST = withAuth(async (request, { userId }) => {
     let sentenceCount = 0
 
     const dispatchSentence = (sentence: string) => {
-      const cleaned = cleanForTTS(sentence)
+      const cleaned = stripNonTargetLanguage(cleanForTTS(sentence))
       if (!cleaned || PUNCTUATION_ONLY.test(cleaned)) return
 
       const idx = sentenceCount++

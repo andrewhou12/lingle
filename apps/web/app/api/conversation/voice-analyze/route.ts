@@ -8,11 +8,11 @@ import { prisma } from '@lingle/db'
 
 const voiceAnalysisSchema = z.object({
   corrections: z.array(z.object({
-    original: z.string().describe('What the learner said (incorrect form)'),
-    corrected: z.string().describe('The corrected form'),
-    explanation: z.string().describe('Brief explanation of the error'),
-    grammarPoint: z.string().optional().describe('Grammar point if applicable'),
-  })).describe('Genuine errors only — do not flag stylistic choices or natural speech variation'),
+    original: z.string().describe('The incorrect phrase only (not the full sentence)'),
+    corrected: z.string().describe('The corrected phrase'),
+    explanation: z.string().describe('One sentence max. No numbered lists.'),
+    grammarPoint: z.string().optional().describe('2-3 word grammar label, e.g. "particle を"'),
+  })).max(2).describe('Genuine grammar/vocab errors only. Never flag punctuation, formatting, or transcription artifacts.'),
   vocabularyCards: z.array(z.object({
     word: z.string().describe('Word in target language'),
     reading: z.string().optional().describe('Reading/pronunciation'),
@@ -31,6 +31,11 @@ const voiceAnalysisSchema = z.object({
     })).describe('1-2 examples'),
     level: z.string().optional().describe('JLPT level'),
   })).describe('Only if assistant used a notable grammar pattern — 0-1 notes max'),
+  naturalnessFeedback: z.array(z.object({
+    original: z.string().describe('What the learner said (grammatically correct but unnatural)'),
+    suggestion: z.string().describe('More natural way to say it'),
+    explanation: z.string().describe('One sentence. Why the suggestion sounds more natural.'),
+  })).max(1).describe('At most ONE naturalness suggestion per turn. Only flag clear cases.'),
 })
 
 export const POST = withAuth(withUsageCheck(async (request, { userId: _userId }) => {
@@ -73,17 +78,20 @@ Learner info:
 - Difficulty level: ${profile?.difficultyLevel ?? 3}
 
 Rules:
-- Only flag GENUINE errors in the learner's speech — not stylistic choices, casual speech, or natural variation
-- Vocabulary cards: ONLY if the learner explicitly asked what a word means (e.g. "what does X mean?", "Xって何?"). Never proactively. 0-2 max.
-- Grammar notes: ONLY if the learner explicitly asked about a grammar point (e.g. "how do I use X?", "what's the difference between X and Y?"). Never proactively. 0-1 max.
-- If the learner didn't ask about vocabulary or grammar, return empty arrays for vocabularyCards and grammarNotes. Do NOT generate cards just because the assistant used a word or pattern.
-- If everything looks fine, return empty arrays. Most turns should have 0 corrections and 0 cards.
-- Be selective — quality over quantity.`,
+- Only flag GENUINE grammar/vocabulary errors — not stylistic choices, casual speech, or natural variation.
+- IGNORE transcription artifacts: the learner's text comes from speech-to-text, so missing punctuation, wrong quote marks (「」vs『』), spacing issues, or minor formatting differences are NOT errors. Never correct punctuation or formatting.
+- IGNORE particle omission that is natural in casual spoken Japanese (e.g. dropping は, を, が in casual speech).
+- Keep explanations to ONE concise sentence. No multi-part explanations, no numbered lists.
+- Vocabulary cards: ONLY if the learner explicitly asked what a word means. Never proactively. 0-2 max.
+- Grammar notes: ONLY if the learner explicitly asked about a grammar point. Never proactively. 0-1 max.
+- Naturalness feedback: Only if the learner's sentence is grammatically correct but clearly textbook-ish. 0-1 items max.
+- If everything looks fine, return empty arrays. Most turns should have 0 corrections.
+- Be extremely selective. When in doubt, do NOT correct.`,
     })
 
     return NextResponse.json(object)
   } catch (err) {
     console.error('[voice-analyze] Analysis failed:', err)
-    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [] })
+    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [], naturalnessFeedback: [] })
   }
 }))

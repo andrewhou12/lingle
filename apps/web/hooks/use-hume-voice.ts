@@ -107,13 +107,12 @@ export function useHumeVoice(opts: {
               .then((res) => (res.ok ? res.json() : null))
               .then((result) => {
                 if (result) {
-                  const hasContent =
-                    result.corrections?.length ||
-                    result.vocabularyCards?.length ||
-                    result.grammarNotes?.length
-                  if (hasContent) {
-                    setAnalysisResults((prev) => ({ ...prev, [turnIdx]: result }))
-                  }
+                  setAnalysisResults((prev) => ({ ...prev, [turnIdx]: {
+                    corrections: result.corrections || [],
+                    vocabularyCards: result.vocabularyCards || [],
+                    grammarNotes: result.grammarNotes || [],
+                    naturalnessFeedback: result.naturalnessFeedback || [],
+                  }}))
                 }
               })
               .catch((err) => console.error('[hume-voice] Track 2 analysis failed:', err))
@@ -356,5 +355,14 @@ export function useHumeVoice(opts: {
     currentProgress: 0,
     ttsPlaying: isPlaying,
     analysisResults,
+    retryLast: () => {
+      // Remove last user+assistant pair from transcript
+      setTranscript(prev => {
+        const copy = [...prev]
+        while (copy.length > 0 && copy[copy.length - 1].role === 'assistant') copy.pop()
+        while (copy.length > 0 && copy[copy.length - 1].role === 'user') copy.pop()
+        return copy
+      })
+    },
   }
 }

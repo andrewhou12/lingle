@@ -13,6 +13,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   ChevronRightIcon,
   Bars3Icon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -52,6 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Practice',
     items: [
       { id: 'practice', href: '/conversation', icon: <ChatBubbleLeftRightIcon className={IC} />, label: 'Practice' },
+      { id: 'lessons', href: '/lessons', icon: <BookOpenIcon className={IC} />, label: 'Lessons' },
     ],
   },
   {
@@ -68,6 +70,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const BREADCRUMB_MAP: Record<string, string> = {
   '/conversation': 'Practice',
+  '/lessons': 'Lessons',
   '/progress': 'History',
   '/settings': 'Settings',
   '/upgrade': 'Plan',
@@ -353,6 +356,8 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
               {section.items.map((item) => {
                 const active = item.id === 'practice'
                   ? pathname === '/conversation'
+                  : item.id === 'lessons'
+                  ? pathname === '/lessons'
                   : item.id === 'progress'
                   ? pathname === '/progress' || pathname.startsWith('/progress/')
                   : item.id === 'plan'

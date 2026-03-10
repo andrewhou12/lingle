@@ -135,7 +135,7 @@ export function VoiceExchangeView({
   const words = useMemo(() => segmentWords(cleanAiText), [cleanAiText])
 
   // Show karaoke when TTS is actively playing audio for this turn
-  // Skip karaoke when no sentence progress info is available (e.g. Hume provider)
+  // Skip karaoke when no sentence progress info is available
   const hasSentenceProgress = spokenSentences.length > 0 || currentSentence !== null
   const showKaraoke = ttsPlaying && cleanAiText.length > 0 && hasSentenceProgress
 

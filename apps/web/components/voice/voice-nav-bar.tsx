@@ -1,14 +1,12 @@
 'use client'
 
 import {
-  ArrowLeftIcon,
+  StopIcon,
   DocumentTextIcon,
   ChatBubbleLeftIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import type { SessionPlan } from '@/lib/session-plan'
-import type { VoiceProviderType } from '@/lib/voice/voice-provider-config'
-
 interface VoiceNavBarProps {
   plan: SessionPlan | null
   duration: number
@@ -16,7 +14,6 @@ interface VoiceNavBarProps {
   isPlanOpen: boolean
   isTranscriptOpen: boolean
   isSubtitlesOn: boolean
-  voiceProvider?: VoiceProviderType
   onTogglePlan: () => void
   onToggleTranscript: () => void
   onToggleSubtitles: () => void
@@ -69,15 +66,15 @@ export function VoiceNavBar({
 }: VoiceNavBarProps) {
   return (
     <nav className="flex items-center px-5 h-[54px] z-20 relative shrink-0">
-      {/* Left — End session */}
-      <div className="flex-1">
-        <button
-          onClick={onEnd}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-pure border border-border text-[13px] font-medium text-text-secondary cursor-pointer transition-colors hover:bg-bg-hover hover:border-border-strong hover:text-text-primary"
-        >
-          <ArrowLeftIcon className="w-3.5 h-3.5" />
-          End
-        </button>
+      {/* Left — Mode + timer */}
+      <div className="flex-1 flex items-center gap-2.5">
+        <span className="px-2 py-0.5 rounded-md bg-[var(--toggle-bg)] text-[11px] font-medium text-text-muted capitalize">
+          {plan?.mode || 'voice'}
+        </span>
+        <div className="w-px h-[14px] bg-border shrink-0" />
+        <span className="font-sans text-[12px] text-text-muted tabular-nums">
+          {formatDuration(duration)}
+        </span>
       </div>
 
       {/* Center — Segmented toggle */}
@@ -109,15 +106,15 @@ export function VoiceNavBar({
         />
       </div>
 
-      {/* Right — Mode + timer */}
-      <div className="flex-1 flex justify-end items-center gap-2.5">
-        <span className="px-2 py-0.5 rounded-md bg-[var(--toggle-bg)] text-[11px] font-medium text-text-muted uppercase tracking-wide">
-          {plan?.mode || 'voice'}
-        </span>
-        <div className="w-px h-[14px] bg-border shrink-0" />
-        <span className="font-mono text-[12px] text-text-muted tabular-nums tracking-[.04em]">
-          {formatDuration(duration)}
-        </span>
+      {/* Right — End session */}
+      <div className="flex-1 flex justify-end">
+        <button
+          onClick={onEnd}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-warm-soft border border-warm-med text-[13px] font-medium text-accent-warm cursor-pointer transition-colors hover:bg-warm-med"
+        >
+          <StopIcon className="w-3.5 h-3.5" />
+          End
+        </button>
       </div>
     </nav>
   )

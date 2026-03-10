@@ -33,6 +33,11 @@ export interface VoiceAnalysisResult {
     examples: Array<{ japanese: string; english: string }>
     level?: string
   }>
+  naturalnessFeedback: Array<{
+    original: string
+    suggestion: string
+    explanation: string
+  }>
 }
 
 export interface EnrichedUtterance {
@@ -216,10 +221,10 @@ export class VoiceSessionFSM {
         return prev
       })
 
-      // Fire Track 2 analysis
+      // Fire Track 2 analysis (skip turn 0 — that's the AI's greeting before the user has spoken)
       const turnIdx = this._turnCounter++
       const sessionId = this._deps.getSessionId()
-      if (userText && sessionId) {
+      if (userText && sessionId && turnIdx > 0) {
         console.log('[voice] firing Track 2 analysis for turn', turnIdx)
         fetch('/api/conversation/voice-analyze', {
           method: 'POST',
@@ -234,11 +239,14 @@ export class VoiceSessionFSM {
           .then((res) => res.ok ? res.json() : null)
           .then((result) => {
             if (result) {
-              const hasContent = result.corrections?.length || result.vocabularyCards?.length || result.grammarNotes?.length
-              if (hasContent) {
-                console.log('[voice] analysis result for turn', turnIdx, result)
-                this._deps.onAnalysisResult(turnIdx, result)
-              }
+              // Always store — even empty results — so we can show "Good" grade
+              console.log('[voice] analysis result for turn', turnIdx, result)
+              this._deps.onAnalysisResult(turnIdx, {
+                corrections: result.corrections || [],
+                vocabularyCards: result.vocabularyCards || [],
+                grammarNotes: result.grammarNotes || [],
+                naturalnessFeedback: result.naturalnessFeedback || [],
+              })
             }
           })
           .catch((err) => console.error('[voice] Track 2 analysis failed:', err))
@@ -349,6 +357,11 @@ export class VoiceSessionFSM {
     this._deps.tts.reset()
     this._deps.sendMessage(text.trim())
     this.dispatch('LLM_STREAMING')
+  }
+
+  resetToIdle() {
+    this._sendInFlight = false
+    this.dispatch('RESET')
   }
 
   dispose() {

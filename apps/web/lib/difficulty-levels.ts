@@ -8,8 +8,8 @@ export interface DifficultyLevel {
 export const DIFFICULTY_LEVELS: DifficultyLevel[] = [
   {
     level: 1,
-    label: 'Beginner (N5)',
-    shortDescription: 'Hiragana/katakana, basic greetings, full English support',
+    label: 'Beginner (A1)',
+    shortDescription: 'Basic greetings, core vocabulary, full native-language support',
     behaviorBlock: `VOCABULARY: Use only the most basic ~800 words (N5 level). Greetings, numbers, colors, family, food, daily objects.
 GRAMMAR: Present tense です/ます forms only. Basic particles は、が、を、に、で、へ. Simple adjectives. No compound sentences.
 KANJI: Annotate ALL kanji with {kanji|reading} ruby. Prefer hiragana/katakana over kanji where possible.
@@ -20,8 +20,8 @@ COMPLEXITY: Short sentences (5-10 words). One idea per sentence. Avoid subordina
   },
   {
     level: 2,
-    label: 'Elementary (N4)',
-    shortDescription: 'Basic kanji, て-form, polite speech, English hints',
+    label: 'Elementary (A2)',
+    shortDescription: 'Simple sentences, everyday topics, native-language hints',
     behaviorBlock: `VOCABULARY: N5 + N4 vocabulary (~1,500 words). て-form verbs, たい-form, basic counters, time expressions, common adverbs.
 GRAMMAR: て-form, たい-form, ている (progressive), past tense, から/ので (because), が/けど (but), ないでください, potential form basics.
 KANJI: Annotate N4+ kanji with {kanji|reading} ruby. Common N5 kanji (食べる、飲む、見る、行く) can appear without ruby.
@@ -32,8 +32,8 @@ COMPLEXITY: Medium sentences. Two clauses connected with basic conjunctions. Sim
   },
   {
     level: 3,
-    label: 'Intermediate (N3)',
-    shortDescription: 'Mixed JP/EN, casual + polite, selective ruby',
+    label: 'Intermediate (B1)',
+    shortDescription: 'Mixed target/native language, varied register, selective annotations',
     behaviorBlock: `VOCABULARY: N5-N3 vocabulary (~3,500 words). Abstract concepts, opinions, descriptions, workplace basics.
 GRAMMAR: Passive, causative, conditional (たら、ば、なら), relative clauses, ようにする/なる, てしまう, そうだ/ようだ/らしい, のに/ために.
 KANJI: Ruby only for N3+ kanji. Common N4 kanji appear without annotation. Use {kanji|reading} selectively for words the learner likely hasn't encountered.
@@ -44,8 +44,8 @@ COMPLEXITY: Natural sentence length. Subordinate clauses, relative clauses, quot
   },
   {
     level: 4,
-    label: 'Upper-Intermediate (N2)',
-    shortDescription: 'Mostly Japanese, natural forms, dialect hints',
+    label: 'Upper-Intermediate (B2)',
+    shortDescription: 'Mostly target language, natural forms, idiomatic speech',
     behaviorBlock: `VOCABULARY: N5-N2 vocabulary (~6,000 words). Idiomatic expressions, set phrases, onomatopoeia, humble/honorific vocabulary.
 GRAMMAR: N2 grammar patterns. Complex conditionals, formal expressions, ～にとって、～に対して、～をはじめ、～つつ. Contracted spoken forms (ちゃう、てる、んだ).
 KANJI: Ruby only for N2+ kanji or rare readings. Most standard kanji appear without annotation.
@@ -56,8 +56,8 @@ COMPLEXITY: Native-like sentence structure. Complex nested clauses, ellipsis, to
   },
   {
     level: 5,
-    label: 'Advanced (N1)',
-    shortDescription: 'Full natural Japanese, rare kanji ruby only',
+    label: 'Advanced (C1)',
+    shortDescription: 'Full target language, complex topics, minimal annotations',
     behaviorBlock: `VOCABULARY: Unrestricted active vocabulary including literary, academic, and specialized terms. N1 grammar patterns, classical references, proverbs.
 GRAMMAR: All grammar patterns including N1. ～ざるを得ない、～に他ならない、～ものを、～とはいえ. Literary forms where appropriate.
 KANJI: Ruby only for rare kanji (outside standard 2,136 jouyou set) or unusual readings of common kanji.
@@ -68,7 +68,7 @@ COMPLEXITY: Full native complexity. Long compound sentences, literary devices, i
   },
   {
     level: 6,
-    label: 'Near-Native',
+    label: 'Near-Native (C2)',
     shortDescription: 'Unrestricted, literary, full native complexity',
     behaviorBlock: `VOCABULARY: Completely unrestricted. Use any word that fits the context, including archaic, dialectal, slang, jargon, and literary vocabulary.
 GRAMMAR: Unrestricted. Classical grammar forms, literary constructions, dialect-specific patterns all fair game.

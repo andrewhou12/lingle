@@ -76,6 +76,7 @@ export interface UseVoiceConversationReturn {
   currentProgress: number
   ttsPlaying: boolean
   analysisResults: Record<number, VoiceAnalysisResult>
+  retryLast: () => void
 }
 
 export function useVoiceConversation(
@@ -688,6 +689,31 @@ export function useVoiceConversation(
     fsmRef.current.sendTextMessage(text)
   }, [])
 
+  const retryLast = useCallback(() => {
+    // Remove last user+assistant pair from voice history
+    if (voiceHistoryRef.current.length >= 2) {
+      const lastTwo = voiceHistoryRef.current.slice(-2)
+      if (lastTwo[0]?.role === 'user' && lastTwo[1]?.role === 'assistant') {
+        voiceHistoryRef.current = voiceHistoryRef.current.slice(0, -2)
+      }
+    }
+
+    // Remove last user+assistant lines from transcript
+    setTranscript(prev => {
+      const copy = [...prev]
+      // Remove from the end: last assistant, then last user
+      while (copy.length > 0 && copy[copy.length - 1].role === 'assistant') copy.pop()
+      while (copy.length > 0 && copy[copy.length - 1].role === 'user') copy.pop()
+      return copy
+    })
+
+    // Interrupt any playing audio
+    voiceStreamInterrupt()
+
+    // Reset FSM to IDLE
+    fsmRef.current.resetToIdle()
+  }, [voiceStreamInterrupt])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -732,5 +758,6 @@ export function useVoiceConversation(
     currentProgress: 0, // Voice stream mode doesn't track per-sentence progress
     ttsPlaying: vsTtsPlaying,
     analysisResults,
+    retryLast,
   }
 }
