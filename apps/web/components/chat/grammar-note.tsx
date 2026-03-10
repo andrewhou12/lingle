@@ -1,18 +1,22 @@
 'use client'
 
+import { cn } from '@/lib/utils'
+import { getTargetFontClass } from '@/lib/languages'
+
 interface GrammarNoteProps {
   pattern: string
   meaning: string
   formation: string
   examples: { japanese: string; english: string }[]
   level?: string
+  targetLanguage?: string
 }
 
-export function GrammarNote({ pattern, meaning, formation, examples, level }: GrammarNoteProps) {
+export function GrammarNote({ pattern, meaning, formation, examples, level, targetLanguage }: GrammarNoteProps) {
   return (
     <div className="my-3 rounded-xl border border-purple-med bg-purple-soft px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[16px] font-jp font-semibold text-text-primary">{pattern}</span>
+        <span className={cn("text-[16px] font-semibold text-text-primary", getTargetFontClass(targetLanguage || ''))}>{pattern}</span>
         {level && (
           <span className="text-[11px] text-purple/70 bg-purple-med rounded-full px-2 py-0.5">
             {level}
@@ -24,7 +28,7 @@ export function GrammarNote({ pattern, meaning, formation, examples, level }: Gr
       <div className="flex flex-col gap-1.5">
         {examples.map((ex, i) => (
           <div key={i} className="pl-3 border-l-2 border-purple-med">
-            <p className="text-[13px] font-jp text-text-primary leading-snug">{ex.japanese}</p>
+            <p className={cn("text-[13px] text-text-primary leading-snug", getTargetFontClass(targetLanguage || ''))}>{ex.japanese}</p>
             <p className="text-[12px] text-text-muted">{ex.english}</p>
           </div>
         ))}

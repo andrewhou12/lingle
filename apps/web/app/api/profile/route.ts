@@ -41,7 +41,7 @@ export const POST = withAuth(async (request, { userId }) => {
     prisma.learnerProfile.create({
       data: {
         userId,
-        targetLanguage: body.targetLanguage || 'Japanese',
+        targetLanguage: body.targetLanguage,
         nativeLanguage: body.nativeLanguage || 'English',
         selfReportedLevel: body.selfReportedLevel || 'beginner',
         difficultyLevel: body.difficultyLevel || 2,

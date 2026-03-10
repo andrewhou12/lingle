@@ -186,7 +186,7 @@ model ConversationSession {
   userId          String
   user            User     @relation(fields: [userId], references: [id])
   mode            String   @default("conversation")
-  targetLanguage  String   @default("Japanese")
+  targetLanguage  String
   timestamp       DateTime @default(now())
   durationSeconds Int?
   transcript      Json

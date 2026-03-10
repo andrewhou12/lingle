@@ -4,7 +4,11 @@ import { useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LanguageIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
+import { useOnboarding } from '@/hooks/use-onboarding'
+import { CoachMark } from '@/components/onboarding/coach-mark'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
+import { getTargetFontCleanClass } from '@/lib/languages'
+import { useLanguage } from '@/hooks/use-language'
 import type { TranscriptLine } from '@/hooks/use-voice-conversation'
 
 const PAREN_LATIN = /\([^)]*[a-zA-Z][^)]*\)/g
@@ -58,6 +62,7 @@ interface VoiceLiveSubtitlesProps {
   /** Callback to trigger x-ray */
   onXray?: () => void
   className?: string
+  targetLanguage?: string
 }
 
 function parseSegments(text: string, corrections: CorrectionInfo[]): CorrectionSegment[] {
@@ -100,7 +105,15 @@ export function VoiceLiveSubtitles({
   xrayLoading,
   onXray,
   className,
+  targetLanguage,
 }: VoiceLiveSubtitlesProps) {
+  const { targetLanguage: ctxLang } = useLanguage()
+  const lang = targetLanguage || ctxLang || 'Japanese'
+  const fontClean = getTargetFontCleanClass(lang)
+
+  // ── Onboarding hints ──
+  const { isDismissed, dismiss } = useOnboarding()
+
   const hasCorrection = !!correction
 
   // User text: partial (live) while talking, finalized line otherwise
@@ -150,7 +163,7 @@ export function VoiceLiveSubtitles({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.25 }}
-            className="text-[15px] leading-[1.8] text-text-primary font-jp-clean"
+            className={cn("text-[15px] leading-[1.8] text-text-primary", fontClean)}
           >
             {hasCorrection && segments.length > 0
               ? segments.map((s, i) => (
@@ -190,7 +203,8 @@ export function VoiceLiveSubtitles({
             <div
               onMouseUp={isLookupActive ? handleMouseUp : undefined}
               className={cn(
-                'text-[14.5px] leading-[1.7] text-text-secondary font-jp-clean italic',
+                `text-[14.5px] leading-[1.7] text-text-secondary italic`,
+                fontClean,
                 isLookupActive && 'cursor-text select-text lookup-select',
               )}
             >
@@ -201,6 +215,13 @@ export function VoiceLiveSubtitles({
             </div>
 
             {/* Action buttons */}
+            <CoachMark
+              hintId="hint_voice_subtitles"
+              content="Tap Translate for English or X-ray to break down each word."
+              side="bottom"
+              show={isDismissed('hint_voice_feedback') && !isDismissed('hint_voice_subtitles') && !!cleanAiText}
+              onDismiss={() => dismiss('hint_voice_subtitles')}
+            >
             <div className="flex flex-col items-center gap-1.5 mt-1 pointer-events-auto">
               <div className="flex items-center gap-1.5">
                 <button
@@ -262,9 +283,9 @@ export function VoiceLiveSubtitles({
                           key={i}
                           className="inline-flex flex-col items-center bg-bg-secondary rounded-lg px-2 py-1.5"
                         >
-                          <span className="text-[13px] font-jp-clean font-medium text-text-primary leading-tight">{t.surface}</span>
+                          <span className={cn("text-[13px] font-medium text-text-primary leading-tight", fontClean)}>{t.surface}</span>
                           {t.reading && t.reading !== t.surface && (
-                            <span className="text-[10px] font-jp-clean text-text-muted leading-tight">{t.reading}</span>
+                            <span className={cn("text-[10px] text-text-muted leading-tight", fontClean)}>{t.reading}</span>
                           )}
                           <span className="text-[10px] font-sans text-text-secondary leading-tight mt-px">{t.meaning}</span>
                         </div>
@@ -274,6 +295,7 @@ export function VoiceLiveSubtitles({
                 )}
               </AnimatePresence>
             </div>
+            </CoachMark>
           </motion.div>
         )}
       </AnimatePresence>

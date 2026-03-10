@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import {
   type ScenarioMode,
   MODE_LABELS,
-  MODE_PLACEHOLDERS,
+  getModePlaceholders,
   getAllModes,
 } from '@/lib/experience-scenarios'
 import { getGreetingForLanguage } from '@/lib/languages'
@@ -273,6 +273,7 @@ export function PromptScreen({ targetLanguage, error, isLoading, onStart }: Prom
         {/* Greeting / Welcome Card */}
         {onboarding.isFirstVisit && !onboarding.isDismissed('welcome_card') ? (
           <WelcomeCard
+            targetLanguage={targetLanguage}
             onDismiss={() => onboarding.dismiss('welcome_card')}
             onStart={handleSubmit}
           />
@@ -382,7 +383,7 @@ export function PromptScreen({ targetLanguage, error, isLoading, onStart }: Prom
                         ta.style.height = 'auto'
                         ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
                       }}
-                      placeholder={idleIme.imeActive ? "Type romaji to write Japanese... (e.g., 'taberu' \u2192 \u98DF\u3079\u308B)" : MODE_PLACEHOLDERS[selectedMode]}
+                      placeholder={idleIme.imeActive ? "Type romaji to write Japanese... (e.g., 'taberu' \u2192 \u98DF\u3079\u308B)" : getModePlaceholders(targetLanguage)[selectedMode]}
                       onKeyDown={(e) => {
                         const consumed = idleIme.handleKeyDown(e)
                         if (consumed) return

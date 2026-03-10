@@ -94,7 +94,7 @@ function WordCycle() {
 }
 
 /* ── Animated Placeholder ── */
-function AnimatedPlaceholder({ items }: { items: string[] }) {
+function AnimatedPlaceholder() {
   const innerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -102,11 +102,11 @@ function AnimatedPlaceholder({ items }: { items: string[] }) {
     if (!inner) return
     const itemH = 26.4
     let idx = 0
-    const els = inner.querySelectorAll(`.${s['placeholder-item']}`)
+    const items = inner.querySelectorAll(`.${s['placeholder-item']}`)
 
     const interval = setInterval(() => {
       idx++
-      if (idx >= els.length - 1) {
+      if (idx >= items.length - 1) {
         inner.style.transition = 'transform .4s cubic-bezier(.76,0,.24,1)'
         inner.style.transform = `translateY(-${idx * itemH}px)`
         setTimeout(() => {
@@ -126,37 +126,12 @@ function AnimatedPlaceholder({ items }: { items: string[] }) {
   return (
     <div className={s['placeholder-line']}>
       <div className={s['placeholder-inner']} ref={innerRef}>
-        {items.map((text, i) => (
-          <span key={i} className={s['placeholder-item']}>{text}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* ── Greeting Marquee ── */
-const MARQUEE_GREETINGS = [
-  { flag: '\uD83C\uDDEF\uD83C\uDDF5', text: '\u3053\u3093\u306B\u3061\u306F' },
-  { flag: '\uD83C\uDDF0\uD83C\uDDF7', text: '\uC548\uB155\uD558\uC138\uC694' },
-  { flag: '\uD83C\uDDE8\uD83C\uDDF3', text: '\u4F60\u597D' },
-  { flag: '\uD83C\uDDEA\uD83C\uDDF8', text: '\u00A1Hola!' },
-  { flag: '\uD83C\uDDEB\uD83C\uDDF7', text: 'Bonjour !' },
-  { flag: '\uD83C\uDDE9\uD83C\uDDEA', text: 'Hallo!' },
-  { flag: '\uD83C\uDDEE\uD83C\uDDF9', text: 'Ciao!' },
-  { flag: '\uD83C\uDDE7\uD83C\uDDF7', text: 'Ol\u00E1!' },
-]
-
-function GreetingMarquee() {
-  const items = [...MARQUEE_GREETINGS, ...MARQUEE_GREETINGS]
-  return (
-    <div className={s['marquee-wrap']} aria-hidden="true">
-      <div className={s['marquee-track']}>
-        {items.map((g, i) => (
-          <span key={i} className={s['marquee-item']}>
-            <span className={s['marquee-flag']}>{g.flag}</span>
-            <span className={s['marquee-text']}>{g.text}</span>
-          </span>
-        ))}
+        <span className={s['placeholder-item']}>I want to practice ordering at a ramen shop in Osaka...</span>
+        <span className={s['placeholder-item']}>Teach me how to use て-form naturally in conversation...</span>
+        <span className={s['placeholder-item']}>Show me what a job interview sounds like in keigo...</span>
+        <span className={s['placeholder-item']}>I want to practice small talk with a coworker...</span>
+        <span className={s['placeholder-item']}>Let&apos;s just chat casually about weekend plans...</span>
+        <span className={s['placeholder-item']}>I want to practice ordering at a ramen shop in Osaka...</span>
       </div>
     </div>
   )
@@ -219,7 +194,7 @@ function ModeSwitcher({ activeMode, onModeChange }: { activeMode: string, onMode
 /* ── Kanji Grid with shimmer effect ── */
 function KanjiGrid() {
   const gridRef = useRef<HTMLDivElement>(null)
-  const kanji = ['学','한','你','語','Hola','話','문','好','力','Café','聞','법','世','Ciao','界']
+  const kanji = ['学','話','文','読','聞','書','語','字','法','音','練','習','知','識','力']
 
   useEffect(() => {
     const grid = gridRef.current
@@ -306,251 +281,22 @@ function useReveal() {
 }
 
 /* ── Level Preview Data ── */
-const levelData: { num: number; width: string; name: string; tag: string; preview: string }[] = [
-  { num: 1, width: '17%', name: 'Beginner', tag: 'Basic', preview: 'Simple phrases with full translation support. One sentence at a time.' },
-  { num: 2, width: '33%', name: 'Elementary', tag: 'Guided', preview: 'Short sentences with key vocabulary highlighted. Annotations for complex words.' },
-  { num: 3, width: '50%', name: 'Intermediate', tag: 'Mixed', preview: 'Natural sentences mixing familiar and new patterns. Less English scaffolding.' },
-  { num: 4, width: '67%', name: 'Upper-Int.', tag: 'Natural', preview: 'Fluid conversation at natural speed. Colloquial expressions and contractions.' },
-  { num: 5, width: '83%', name: 'Advanced', tag: 'Fluent', preview: 'Complex topics, nuanced vocabulary, idiomatic speech. Minimal English.' },
-  { num: 6, width: '100%', name: 'Near-Native', tag: 'Native', preview: 'Unrestricted vocabulary and grammar. Regional expressions and slang.' },
+const levelData: { num: number; width: string; name: string; jp: string; preview: string; html?: string }[] = [
+  { num: 1, width: '17%', name: 'Beginner', jp: 'ひらがな', preview: 'きょうは　てんきが　いいですね。どこかに　いきますか？' },
+  { num: 2, width: '33%', name: 'Elementary', jp: '基本漢字', preview: '', html: '<ruby>今日<rt>きょう</rt></ruby>は<ruby>天気<rt>てんき</rt></ruby>がいいですね。どこかに<ruby>行<rt>い</rt></ruby>きますか？' },
+  { num: 3, width: '50%', name: 'Intermediate', jp: '混合', preview: '今日は天気がいいね。どっかに行く？' },
+  { num: 4, width: '67%', name: 'Upper-Int.', jp: '自然体', preview: '今日ほんと天気いいね〜。どっか出かけんの？' },
+  { num: 5, width: '83%', name: 'Advanced', jp: '上級', preview: '今日めちゃくちゃ天気いいな。どっか出かける気でもあんの？' },
+  { num: 6, width: '100%', name: 'Near-Native', jp: '無制限', preview: '今日ほんまええ天気やなあ。どっか出かけるん？' },
 ]
 
-/* ── Language Pills ── */
-const LANG_PILLS = [
-  { id: 'Japanese', flag: '\uD83C\uDDEF\uD83C\uDDF5', label: 'Japanese' },
-  { id: 'Korean', flag: '\uD83C\uDDF0\uD83C\uDDF7', label: 'Korean' },
-  { id: 'Mandarin Chinese', flag: '\uD83C\uDDE8\uD83C\uDDF3', label: 'Chinese' },
-  { id: 'Spanish', flag: '\uD83C\uDDEA\uD83C\uDDF8', label: 'Spanish' },
-  { id: 'French', flag: '\uD83C\uDDEB\uD83C\uDDF7', label: 'French' },
-  { id: 'German', flag: '\uD83C\uDDE9\uD83C\uDDEA', label: 'German' },
-  { id: 'Italian', flag: '\uD83C\uDDEE\uD83C\uDDF9', label: 'Italian' },
-  { id: 'Portuguese', flag: '\uD83C\uDDE7\uD83C\uDDF7', label: 'Portuguese' },
-]
-
-/* ── Default content (no language selected) ── */
-const DEFAULT_CHIPS = [
-  { emoji: '\uD83C\uDF7D\uFE0F', label: 'Ordering food' },
-  { emoji: '\uD83D\uDCBC', label: 'Job interview' },
-  { emoji: '\uD83D\uDE89', label: 'Asking for directions' },
-  { emoji: '\u2615', label: 'Caf\u00E9 small talk' },
-  { emoji: '\uD83D\uDCDA', label: 'Grammar lesson' },
-]
-
-const DEFAULT_PLACEHOLDERS = [
-  'I want to practice ordering food at a restaurant...',
-  'Teach me common grammar patterns for everyday conversation...',
-  'Show me what a formal job interview sounds like...',
-  'I want to practice small talk with a coworker...',
-  'Let\u2019s just chat casually about weekend plans...',
-  'I want to practice ordering food at a restaurant...',
-]
-
-const DEFAULT_PROMPT_MAP: Record<string, string> = {
-  'Ordering food': 'I want to practice ordering food at a restaurant. Keep it at my level.',
-  'Job interview': 'Let\'s practice a job interview. I\'m applying for an office position.',
+/* ── Prompt Fill Map ── */
+const promptMap: Record<string, string> = {
+  'Ordering ramen': 'I want to practice ordering at a ramen shop. I\'m N4 level.',
+  'Job interview (keigo)': 'Let\'s practice a job interview in keigo. I\'m applying for an office position.',
   'Asking for directions': 'I need to practice asking for directions at a train station.',
-  'Caf\u00E9 small talk': 'Let\'s just chat casually over coffee. Keep it natural and friendly.',
-  'Grammar lesson': 'Teach me a useful grammar pattern for everyday conversation.',
-}
-
-/* ── Per-language content ── */
-const LANGUAGE_CONTENT: Record<string, {
-  chips: { emoji: string; label: string }[]
-  placeholders: string[]
-  promptMap: Record<string, string>
-}> = {
-  Japanese: {
-    chips: [
-      { emoji: '\uD83C\uDF5C', label: 'Ordering ramen' },
-      { emoji: '\uD83D\uDCBC', label: 'Job interview' },
-      { emoji: '\uD83D\uDE89', label: 'At the station' },
-      { emoji: '\u2615', label: 'Caf\u00E9 chat' },
-      { emoji: '\uD83D\uDCDA', label: 'Keigo basics' },
-    ],
-    placeholders: [
-      'I want to practice ordering ramen at a restaurant...',
-      'Help me prepare for a job interview in Japanese...',
-      'Let\u2019s practice asking for directions at a train station...',
-      'I want to have a casual chat with a coworker...',
-      'Teach me the basics of keigo for work situations...',
-      'I want to practice ordering ramen at a restaurant...',
-    ],
-    promptMap: {
-      'Ordering ramen': 'I want to practice ordering ramen at a Japanese restaurant. Keep it at my level.',
-      'Job interview': 'Let\'s practice a job interview in Japanese. I\'m applying for an office position.',
-      'At the station': 'I need to practice asking for directions at a Japanese train station.',
-      'Caf\u00E9 chat': 'Let\'s have a casual chat over coffee in Japanese.',
-      'Keigo basics': 'Teach me the basics of keigo (honorific speech) in Japanese.',
-    },
-  },
-  Korean: {
-    chips: [
-      { emoji: '\uD83C\uDF72', label: 'Korean BBQ' },
-      { emoji: '\uD83C\uDFE2', label: 'Office Korean' },
-      { emoji: '\uD83D\uDED2', label: 'Market shopping' },
-      { emoji: '\u2615', label: 'Caf\u00E9 date' },
-      { emoji: '\uD83D\uDCDA', label: 'Honorifics' },
-    ],
-    placeholders: [
-      'I want to practice ordering at a Korean BBQ restaurant...',
-      'Help me with formal Korean for office meetings...',
-      'Let\u2019s practice shopping at a traditional market...',
-      'I want to practice casual Korean at a caf\u00E9...',
-      'Teach me Korean honorific levels and when to use them...',
-      'I want to practice ordering at a Korean BBQ restaurant...',
-    ],
-    promptMap: {
-      'Korean BBQ': 'I want to practice ordering at a Korean BBQ restaurant. Keep it at my level.',
-      'Office Korean': 'Help me practice formal Korean for a business meeting.',
-      'Market shopping': 'Let\'s practice shopping at a traditional Korean market.',
-      'Caf\u00E9 date': 'I want to have a casual caf\u00E9 conversation in Korean.',
-      'Honorifics': 'Teach me Korean honorific levels and when to use each one.',
-    },
-  },
-  'Mandarin Chinese': {
-    chips: [
-      { emoji: '\uD83E\uDD5F', label: 'Dim sum' },
-      { emoji: '\uD83C\uDFE2', label: 'Business meeting' },
-      { emoji: '\uD83D\uDE95', label: 'Taking a taxi' },
-      { emoji: '\uD83C\uDF75', label: 'Tea house chat' },
-      { emoji: '\uD83D\uDCDA', label: 'Tones practice' },
-    ],
-    placeholders: [
-      'I want to practice ordering dim sum at a restaurant...',
-      'Help me prepare for a business meeting in Mandarin...',
-      'Let\u2019s practice giving directions to a taxi driver...',
-      'I want to have a casual conversation at a tea house...',
-      'Help me practice Mandarin tones with common phrases...',
-      'I want to practice ordering dim sum at a restaurant...',
-    ],
-    promptMap: {
-      'Dim sum': 'I want to practice ordering dim sum at a Chinese restaurant. Keep it at my level.',
-      'Business meeting': 'Help me practice formal Mandarin for a business meeting.',
-      'Taking a taxi': 'Let\'s practice giving directions to a taxi driver in Chinese.',
-      'Tea house chat': 'I want to have a casual chat at a tea house in Mandarin.',
-      'Tones practice': 'Help me practice Mandarin tones with common words and phrases.',
-    },
-  },
-  Spanish: {
-    chips: [
-      { emoji: '\uD83C\uDF77', label: 'Ordering tapas' },
-      { emoji: '\uD83C\uDFD6\uFE0F', label: 'Beach vacation' },
-      { emoji: '\uD83C\uDFE5', label: 'At the pharmacy' },
-      { emoji: '\uD83D\uDC83', label: 'Nightlife chat' },
-      { emoji: '\uD83D\uDCDA', label: 'Subjunctive mood' },
-    ],
-    placeholders: [
-      'I want to practice ordering tapas at a bar in Madrid...',
-      'Help me with Spanish for a beach vacation...',
-      'Let\u2019s practice asking for medicine at a pharmacy...',
-      'I want to practice casual nightlife conversation...',
-      'Teach me the Spanish subjunctive with examples...',
-      'I want to practice ordering tapas at a bar in Madrid...',
-    ],
-    promptMap: {
-      'Ordering tapas': 'I want to practice ordering tapas and drinks at a bar in Spain. Keep it at my level.',
-      'Beach vacation': 'Help me practice Spanish for a beach vacation in Barcelona.',
-      'At the pharmacy': 'Let\'s practice asking for medicine at a Spanish pharmacy.',
-      'Nightlife chat': 'I want to practice casual Spanish for going out in Madrid.',
-      'Subjunctive mood': 'Teach me the Spanish subjunctive with practical examples.',
-    },
-  },
-  French: {
-    chips: [
-      { emoji: '\uD83E\uDD50', label: 'At the boulangerie' },
-      { emoji: '\uD83C\uDFDB\uFE0F', label: 'Museum visit' },
-      { emoji: '\uD83D\uDE87', label: 'M\u00E9tro directions' },
-      { emoji: '\uD83C\uDF77', label: 'Wine tasting' },
-      { emoji: '\uD83D\uDCDA', label: 'Pass\u00E9 compos\u00E9' },
-    ],
-    placeholders: [
-      'I want to practice ordering at a Parisian boulangerie...',
-      'Help me discuss art at a French museum...',
-      'Let\u2019s practice asking for directions in the m\u00E9tro...',
-      'I want to practice wine tasting vocabulary...',
-      'Teach me pass\u00E9 compos\u00E9 vs imparfait...',
-      'I want to practice ordering at a Parisian boulangerie...',
-    ],
-    promptMap: {
-      'At the boulangerie': 'I want to practice ordering bread and pastries at a French boulangerie. Keep it at my level.',
-      'Museum visit': 'Help me practice talking about art at a museum in Paris.',
-      'M\u00E9tro directions': 'Let\'s practice asking for directions in the Paris m\u00E9tro.',
-      'Wine tasting': 'I want to practice wine tasting vocabulary and conversation in French.',
-      'Pass\u00E9 compos\u00E9': 'Teach me the French pass\u00E9 compos\u00E9 vs imparfait with examples.',
-    },
-  },
-  German: {
-    chips: [
-      { emoji: '\uD83C\uDF7A', label: 'Beer garden' },
-      { emoji: '\uD83D\uDE82', label: 'Train station' },
-      { emoji: '\uD83C\uDFEB', label: 'University life' },
-      { emoji: '\uD83E\uDD68', label: 'At the bakery' },
-      { emoji: '\uD83D\uDCDA', label: 'Cases & articles' },
-    ],
-    placeholders: [
-      'I want to practice ordering at a German beer garden...',
-      'Help me navigate a German train station...',
-      'Let\u2019s practice university German for seminars...',
-      'I want to practice ordering at a German bakery...',
-      'Teach me German cases with practical examples...',
-      'I want to practice ordering at a German beer garden...',
-    ],
-    promptMap: {
-      'Beer garden': 'I want to practice ordering food and beer at a Biergarten. Keep it at my level.',
-      'Train station': 'Help me practice buying tickets at a German train station.',
-      'University life': 'Let\'s practice German for university seminars and student life.',
-      'At the bakery': 'I want to practice ordering bread at a German B\u00E4ckerei.',
-      'Cases & articles': 'Teach me German cases with practical examples.',
-    },
-  },
-  Italian: {
-    chips: [
-      { emoji: '\uD83C\uDF5D', label: 'Trattoria dinner' },
-      { emoji: '\uD83C\uDF66', label: 'Gelato shop' },
-      { emoji: '\uD83D\uDDFA\uFE0F', label: 'Asking directions' },
-      { emoji: '\uD83D\uDC57', label: 'Fashion shopping' },
-      { emoji: '\uD83D\uDCDA', label: 'Verb conjugation' },
-    ],
-    placeholders: [
-      'I want to practice ordering at an Italian trattoria...',
-      'Help me order gelato and chat with the shop owner...',
-      'Let\u2019s practice asking for directions in Italian...',
-      'I want to practice shopping for clothes in Milan...',
-      'Teach me Italian verb conjugation patterns...',
-      'I want to practice ordering at an Italian trattoria...',
-    ],
-    promptMap: {
-      'Trattoria dinner': 'I want to practice ordering dinner at a trattoria in Rome. Keep it at my level.',
-      'Gelato shop': 'Help me practice ordering gelato and chatting with the shop owner.',
-      'Asking directions': 'Let\'s practice asking for directions to landmarks in Italian.',
-      'Fashion shopping': 'I want to practice shopping for clothes in a Milan boutique.',
-      'Verb conjugation': 'Teach me Italian verb conjugation patterns with practical examples.',
-    },
-  },
-  Portuguese: {
-    chips: [
-      { emoji: '\uD83C\uDFD6\uFE0F', label: 'Beach bar chat' },
-      { emoji: '\u26BD', label: 'Football talk' },
-      { emoji: '\uD83C\uDF7D\uFE0F', label: 'Restaurant order' },
-      { emoji: '\uD83C\uDFB6', label: 'Music & culture' },
-      { emoji: '\uD83D\uDCDA', label: 'Verb tenses' },
-    ],
-    placeholders: [
-      'I want to practice ordering at a beach bar in Rio...',
-      'Help me talk about football with a Brazilian fan...',
-      'Let\u2019s practice ordering a traditional meal...',
-      'I want to discuss Brazilian music and culture...',
-      'Teach me Portuguese verb tenses with examples...',
-      'I want to practice ordering at a beach bar in Rio...',
-    ],
-    promptMap: {
-      'Beach bar chat': 'I want to practice casual conversation at a beach bar in Brazil. Keep it at my level.',
-      'Football talk': 'Help me practice talking about football with Brazilians.',
-      'Restaurant order': 'Let\'s practice ordering a traditional meal at a Brazilian restaurant.',
-      'Music & culture': 'I want to discuss Brazilian music, bossa nova, and cultural traditions.',
-      'Verb tenses': 'Teach me Portuguese verb tenses with practical examples.',
-    },
-  },
+  'Café small talk': 'Let\'s just chat casually over coffee. Keep it natural and friendly.',
+  'て-form lesson': 'Teach me how to use て-form naturally in everyday conversation.',
 }
 
 /* ── Subtitle Map ── */
@@ -572,17 +318,10 @@ export default function LandingPage() {
   const [heroSub, setHeroSub] = useState(subtitles.conversation)
   const [activeLevel, setActiveLevel] = useState(2)
   const [lvFading, setLvFading] = useState(false)
-  const [activeLang, setActiveLang] = useState<string | null>(null)
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const levelRowsRef = useRef<HTMLDivElement>(null)
   const userPausedRef = useRef(false)
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  /* ── Language-aware content ── */
-  const langContent = activeLang ? LANGUAGE_CONTENT[activeLang] : null
-  const currentChips = langContent?.chips ?? DEFAULT_CHIPS
-  const currentPlaceholders = langContent?.placeholders ?? DEFAULT_PLACEHOLDERS
-  const currentPromptMap = langContent?.promptMap ?? DEFAULT_PROMPT_MAP
 
   /* ── Auto-cycle levels when in view ── */
   useEffect(() => {
@@ -650,7 +389,7 @@ export default function LandingPage() {
   }, [])
 
   const fillPrompt = useCallback((label: string) => {
-    const text = currentPromptMap[label] || label
+    const text = promptMap[label] || label
     setPromptValue(text)
     setPlaceholderVisible(false)
     if (promptRef.current) {
@@ -662,7 +401,7 @@ export default function LandingPage() {
         }
       })
     }
-  }, [currentPromptMap])
+  }, [])
 
   return (
     <div ref={revealRef}>
@@ -695,10 +434,11 @@ export default function LandingPage() {
         </div>
 
         <div className={s['hero-title-wrap']}>
-          <span className={s['hero-title-top']}>Your language learning</span>
+          <span className={s['hero-title-top']}>Meet your Japanese</span>
           <div className={s['hero-title-bottom']}>
             <WordCycle />
           </div>
+          <span className={s['hero-title-jp']}>あなただけの日本語パートナー</span>
         </div>
 
         <p className={`${s['hero-sub']} ${heroSubSwitching ? s['hero-sub-switching'] : ''}`}>
@@ -738,7 +478,7 @@ export default function LandingPage() {
                 }}
               />
               <div className={s['prompt-placeholder']} style={{ opacity: placeholderVisible ? 1 : 0 }}>
-                <AnimatedPlaceholder key={activeLang || 'default'} items={currentPlaceholders} />
+                <AnimatedPlaceholder />
               </div>
             </div>
             <div className={s['prompt-footer']}>
@@ -750,25 +490,17 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* LANGUAGE PILLS */}
-          <div className={s['lang-pills']}>
-            {LANG_PILLS.map((lp) => (
-              <button
-                key={lp.id}
-                className={`${s['lang-pill']} ${activeLang === lp.id ? s['lang-pill-active'] : ''}`}
-                onClick={() => setActiveLang(activeLang === lp.id ? null : lp.id)}
-              >
-                <span className={s['lang-pill-flag']}>{lp.flag}</span>
-                {lp.label}
-              </button>
-            ))}
-          </div>
-
           {/* EXAMPLE CHIPS */}
           <div className={s['example-chips']}>
-            {currentChips.map((chip) => (
+            {[
+              { emoji: '🍜', label: 'Ordering ramen', jp: 'ラーメン屋' },
+              { emoji: '💼', label: 'Job interview (keigo)', jp: '面接練習' },
+              { emoji: '🚉', label: 'Asking for directions', jp: '道案内' },
+              { emoji: '☕', label: 'Café small talk', jp: '雑談' },
+              { emoji: '📚', label: 'て-form lesson', jp: 'て形' },
+            ].map((chip) => (
               <button key={chip.label} className={s['example-chip']} onClick={() => fillPrompt(chip.label)}>
-                {chip.emoji} <span>{chip.label}</span>
+                {chip.emoji} <span>{chip.label}</span> <span className={s['example-chip-jp']}>{chip.jp}</span>
               </button>
             ))}
           </div>
@@ -804,10 +536,10 @@ export default function LandingPage() {
                   </div>
                   <div className={`${s['sm-body']} ${s['sm-body-pad']}`}>
                     <div className={s['sm-input-row']}>
-                      <div className={s['sm-input-text']}>Practice ordering food at a restaurant&hellip;<span className={s['sm-cursor-blink']}>|</span></div>
+                      <div className={s['sm-input-text']}>Practice ordering ramen in Japanese&hellip;<span className={s['sm-cursor-blink']}>|</span></div>
                     </div>
                     <div className={s['sm-chiprow']}>
-                      <span className={s['sm-chip']}>My level</span>
+                      <span className={s['sm-chip']}>N4 level</span>
                       <span className={s['sm-chip']}>Casual</span>
                       <span className={s['sm-chip']}>Restaurant</span>
                     </div>
@@ -832,7 +564,7 @@ export default function LandingPage() {
                       <div className={s['sm-voice-orb']}>
                         <div className={`${s['sm-orb-ring']} ${s['sm-orb-ring-1']}`} />
                         <div className={`${s['sm-orb-ring']} ${s['sm-orb-ring-2']}`} />
-                        <div className={s['sm-orb-center']}>AI</div>
+                        <div className={s['sm-orb-center']}>林</div>
                       </div>
                       <div className={s['sm-voice-wave-col']}>
                         {[8,14,20,12,18,10,16].map((h, i) => (
@@ -840,7 +572,7 @@ export default function LandingPage() {
                         ))}
                       </div>
                     </div>
-                    <div className={s['sm-voice-transcript']}>Listening and responding in real time...</div>
+                    <div className={s['sm-voice-transcript']} dangerouslySetInnerHTML={{ __html: 'いらっしゃいませ！ご<ruby>注文<rt>ちゅうもん</rt></ruby>は？' }} />
                     <div className={s['sm-mic-row']}>
                       <div className={s['sm-mic-btn']}>
                         <svg width="9" height="12" viewBox="0 0 9 12" fill="none"><rect x="2.5" y="0" width="4" height="7" rx="2" fill="currentColor"/><path d="M1 5.5C1 7.7 2.6 9.5 4.5 9.5S8 7.7 8 5.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/><line x1="4.5" y1="9.5" x2="4.5" y2="11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
@@ -909,23 +641,23 @@ export default function LandingPage() {
                   </div>
                   <div className={s['bm-voice-body']}>
                     <div className={s['bm-scene-bar']}>
-                      <span className={s['bm-scene-label']}>🍽️ Restaurant</span>
+                      <span className={s['bm-scene-label']}>🍜 Ramen shop</span>
                       <span className={s['bm-scene-sep']}>&middot;</span>
-                      <span className={s['bm-scene-level']}>B1</span>
+                      <span className={s['bm-scene-level']}>N3</span>
                     </div>
                     <div className={s['bm-orb-area']}>
                       <div className={`${s['bm-orb-ring']} ${s['bm-orb-r1']}`} />
                       <div className={`${s['bm-orb-ring']} ${s['bm-orb-r2']}`} />
                       <div className={`${s['bm-orb-ring']} ${s['bm-orb-r3']}`} />
-                      <div className={s['bm-orb']}>AI</div>
+                      <div className={s['bm-orb']}>林</div>
                     </div>
-                    <div className={s['bm-speaking-label']}>Your AI partner <span className={s['bm-speaking-dot-wrap']}><span className={s['bm-sdot']} /><span className={s['bm-sdot']} style={{ animationDelay: '.2s' }} /><span className={s['bm-sdot']} style={{ animationDelay: '.4s' }} /></span></div>
+                    <div className={s['bm-speaking-label']}>Hayashi-san <span className={s['bm-speaking-dot-wrap']}><span className={s['bm-sdot']} /><span className={s['bm-sdot']} style={{ animationDelay: '.2s' }} /><span className={s['bm-sdot']} style={{ animationDelay: '.4s' }} /></span></div>
                     <div className={s['bm-center-wave']}>
                       {[8,18,28,38,22,34,44,30,40,24,16,32,20].map((h, i) => (
                         <div key={i} className={s['bm-cwbar']} style={{ '--cwh': h + 'px', animationDelay: (i * 0.06).toFixed(2) + 's' } as React.CSSProperties} />
                       ))}
                     </div>
-                    <div className={s['bm-live-line']}>Welcome! How many in your party?</div>
+                    <div className={s['bm-live-line']} dangerouslySetInnerHTML={{ __html: 'いらっしゃいませ！<ruby>何名様<rt>なんめいさま</rt></ruby>ですか？' }} />
                     <div className={s['bm-user-row']}>
                       <div className={s['bm-user-mic']}>
                         <svg width="11" height="14" viewBox="0 0 11 14" fill="none"><rect x="3" y="0" width="5" height="8.5" rx="2.5" fill="currentColor"/><path d="M1 7C1 9.8 3 12 5.5 12S10 9.8 10 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/><line x1="5.5" y1="12" x2="5.5" y2="13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
@@ -951,12 +683,12 @@ export default function LandingPage() {
                     <div className={`${s['bm-title-text']} ${s['bm-title-dark']}`}>Lingle &middot; Lesson</div>
                   </div>
                   <div className={s['bm-lesson-body']}>
-                    <div className={s['bm-lesson-tag']}>Grammar</div>
-                    <div className={s['bm-lesson-jp']}>Connecting actions in sequence</div>
-                    <div className={s['bm-lesson-rule']}>Eat, drink, and talk — learn to chain verbs naturally</div>
+                    <div className={s['bm-lesson-tag']}>て-form</div>
+                    <div className={s['bm-lesson-jp']} dangerouslySetInnerHTML={{ __html: '<ruby>食べ<rt>たべ</rt></ruby>て、<ruby>飲ん<rt>のん</rt></ruby>で、<ruby>話<rt>はな</rt></ruby>して' }} />
+                    <div className={s['bm-lesson-rule']}>Connect two actions: eat, drink, and talk</div>
                     <div className={s['bm-lesson-divider']} />
                     <div className={s['bm-lesson-practice-label']}>Try it</div>
-                    <div className={s['bm-lesson-blank']}><span className={s['bm-blank-text']}>Complete the pattern...</span><span className={s['bm-cursor-dark']}>|</span></div>
+                    <div className={s['bm-lesson-blank']}><span className={s['bm-blank-text']}>食べ___</span><span className={s['bm-cursor-dark']}>|</span></div>
                   </div>
                 </div>
               </div>
@@ -1020,11 +752,11 @@ export default function LandingPage() {
                     </div>
                     <div className={s['bm-ref-grid']}>
                       {[
-                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2h3.5v8H2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M6.5 2H10v8H6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>, text: 'Core vocabulary deck' },
-                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="7" width="9" height="3" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="1.5" y="2" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>, text: 'Grammar cheat sheet' },
+                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 2h3.5v8H2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M6.5 2H10v8H6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>, text: 'JLPT N3 vocab deck' },
+                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="7" width="9" height="3" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="1.5" y="2" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>, text: 'Particle cheat sheet' },
                         { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 10V3l4-1.5L10 3v7" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M4.5 10V7h3v3" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>, text: 'Verb conjugations' },
                         { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5.5h4M4 7.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, text: 'Common set phrases' },
-                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M2 6h6M2 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, text: 'Writing system guide' },
+                        { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M2 6h6M2 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, text: 'Kanji by radicals' },
                         { icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/><path d="M6 4v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, text: 'Cultural etiquette' },
                       ].map((item) => (
                         <div key={item.text} className={s['bm-ref-item']}>
@@ -1052,7 +784,7 @@ export default function LandingPage() {
           <div className={s.reveal}>
             <span className={s['adapt-label']}>Six levels</span>
             <h2 className={s['adapt-title']}>Set it once.<br/>Everything <span className={s['adapt-title-em']}>adapts.</span></h2>
-            <p className={s['adapt-body']}>Vocabulary, grammar complexity, script annotations, register — all controlled by a single level setting. You never have to think about it again.</p>
+            <p className={s['adapt-body']}>Vocabulary, grammar complexity, kanji density, furigana, register — all controlled by a single level setting. You never have to think about it again.</p>
           </div>
           <div className={`${s['adapt-visual']} ${s.reveal}`} ref={levelRowsRef}>
             {levelData.map((lv) => (
@@ -1064,10 +796,12 @@ export default function LandingPage() {
                   <span className={s['lv-num']}>{lv.num}</span>
                   <div className={s['lv-track']}><div className={s['lv-fill']} style={{ width: lv.width }} /></div>
                   <span className={s['lv-name']}>{lv.name}</span>
-                  <span className={s['lv-jp']}>{lv.tag}</span>
+                  <span className={s['lv-jp']}>{lv.jp}</span>
                 </div>
                 {activeLevel === lv.num && (
-                  <div className={`${s['lv-preview-jp']} ${lvFading ? s['lv-preview-fading'] : ''}`}>{lv.preview}</div>
+                  lv.html
+                    ? <div className={`${s['lv-preview-jp']} ${lvFading ? s['lv-preview-fading'] : ''}`} dangerouslySetInnerHTML={{ __html: lv.html }} />
+                    : <div className={`${s['lv-preview-jp']} ${lvFading ? s['lv-preview-fading'] : ''}`}>{lv.preview}</div>
                 )}
               </div>
             ))}
@@ -1131,14 +865,14 @@ export default function LandingPage() {
           </div>
           <div className={s['quotes-grid']}>
             <div className={`${s['quote-card']} ${s['quote-card-featured']} ${s.reveal}`}>
-              <p className={s['quote-text']}>&ldquo;For the first time I feel like I&apos;m having a real conversation — not completing exercises. After 20 minutes I was genuinely tired from thinking in my target language.&rdquo;</p>
+              <p className={s['quote-text']}>&ldquo;For the first time I feel like I&apos;m having a real conversation — not completing exercises. After 20 minutes I was genuinely tired from thinking in Japanese.&rdquo;</p>
               <div className={s['quote-footer']}>
                 <div className={s['quote-avatar']}>KS</div>
                 <div>
                   <div className={s['quote-name']}>Kenji S.</div>
-                  <div className={s['quote-meta']}>Intermediate · 8 months</div>
+                  <div className={s['quote-meta']}>N4 · 8 months</div>
                 </div>
-
+                <span className={s['quote-jp']}>本物の会話</span>
               </div>
             </div>
             <div className={`${s['quote-card']} ${s['quote-card-regular']} ${s.reveal}`}>
@@ -1147,7 +881,7 @@ export default function LandingPage() {
                 <div className={s['quote-avatar']}>MR</div>
                 <div>
                   <div className={s['quote-name']}>Maya R.</div>
-                  <div className={s['quote-meta']}>Beginner → Intermediate in 4 months</div>
+                  <div className={s['quote-meta']}>N5 → N4 in 4 months</div>
                 </div>
               </div>
             </div>

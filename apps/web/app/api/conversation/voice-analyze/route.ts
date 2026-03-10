@@ -12,7 +12,7 @@ const voiceAnalysisSchema = z.object({
     corrected: z.string().describe('The corrected phrase'),
     explanation: z.string().describe('One sentence max. No numbered lists.'),
     grammarPoint: z.string().optional().describe('2-3 word grammar label, e.g. "particle を"'),
-  })).max(2).describe('Genuine grammar/vocab errors only. Never flag punctuation, formatting, or transcription artifacts.'),
+  })).describe('Genuine grammar/vocab errors only. Never flag punctuation, formatting, or transcription artifacts. 0-2 items max.'),
   vocabularyCards: z.array(z.object({
     word: z.string().describe('Word in target language'),
     reading: z.string().optional().describe('Reading/pronunciation'),
@@ -29,13 +29,13 @@ const voiceAnalysisSchema = z.object({
       japanese: z.string(),
       english: z.string(),
     })).describe('1-2 examples'),
-    level: z.string().optional().describe('JLPT level'),
+    level: z.string().optional().describe('Proficiency level'),
   })).describe('Only if assistant used a notable grammar pattern — 0-1 notes max'),
   naturalnessFeedback: z.array(z.object({
     original: z.string().describe('What the learner said (grammatically correct but unnatural)'),
     suggestion: z.string().describe('More natural way to say it'),
     explanation: z.string().describe('One sentence. Why the suggestion sounds more natural.'),
-  })).max(1).describe('At most ONE naturalness suggestion per turn. Only flag clear cases.'),
+  })).describe('At most ONE naturalness suggestion per turn. Only flag clear cases. 0-1 items max.'),
   sectionTracking: z.object({
     currentSectionId: z.string().describe('ID of the section currently being discussed'),
     completedSectionIds: z.array(z.string()).describe('IDs of sections that have been fully covered'),
@@ -73,6 +73,12 @@ export const POST = withAuth(withUsageCheck(async (request, { userId: _userId })
     ? `\nConversation sections to track:\n${sections.map(s => `- ${s.id}: ${s.label} — ${s.description}`).join('\n')}\n`
     : ''
 
+  const SPOKEN_LANGUAGE_RULES: Record<string, string> = {
+    Japanese: 'IGNORE particle omission that is natural in casual spoken Japanese (e.g. dropping は, を, が in casual speech).',
+    Korean: 'IGNORE marker omission that is natural in casual spoken Korean (e.g. dropping 은/는, 이/가, 을/를).',
+  }
+  const spokenRule = SPOKEN_LANGUAGE_RULES[profile?.targetLanguage ?? session.targetLanguage ?? ''] || ''
+
   try {
     const { object } = await generateObject({
       model: anthropic('claude-haiku-4-5-20251001'),
@@ -90,9 +96,8 @@ Learner info:
 ${sectionsBlock}
 Rules:
 - Only flag GENUINE grammar/vocabulary errors — not stylistic choices, casual speech, or natural variation.
-- IGNORE transcription artifacts: the learner's text comes from speech-to-text, so missing punctuation, wrong quote marks (「」vs『』), spacing issues, or minor formatting differences are NOT errors. Never correct punctuation or formatting.
-- IGNORE particle omission that is natural in casual spoken Japanese (e.g. dropping は, を, が in casual speech).
-- Keep explanations to ONE concise sentence. No multi-part explanations, no numbered lists.
+- IGNORE transcription artifacts: the learner's text comes from speech-to-text, so missing punctuation, wrong quote marks, spacing issues, or minor formatting differences are NOT errors. Never correct punctuation or formatting.
+${spokenRule ? `- ${spokenRule}\n` : ''}- Keep explanations to ONE concise sentence. No multi-part explanations, no numbered lists.
 - Vocabulary cards: ONLY if the learner explicitly asked what a word means. Never proactively. 0-2 max.
 - Grammar notes: ONLY if the learner explicitly asked about a grammar point. Never proactively. 0-1 max.
 - Naturalness feedback: Only if the learner's sentence is grammatically correct but clearly textbook-ish. 0-1 items max.

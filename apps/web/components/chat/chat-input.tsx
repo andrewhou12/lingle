@@ -1,42 +1,32 @@
 'use client'
 
-import { useRef, useCallback, useState, useEffect, useMemo } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
 import { ArrowUpIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import { useJapaneseIME } from '@/hooks/use-japanese-ime'
 import { IMECandidatePanel } from './ime/ime-candidate-panel'
-import { VoiceControls } from './voice-controls'
 
 interface ChatInputProps {
   value: string
   onChange: (value: string) => void
   onSend: () => void
-  onVoiceTranscript?: (text: string) => void
   disabled?: boolean
   placeholder?: string
-  showRomaji?: boolean
-  onToggleRomaji?: () => void
   minRows?: number
   allowEmpty?: boolean
+  targetLanguage?: string
 }
 
 const IME_TOOLTIP_KEY = 'lingle-ime-tooltip-dismissed'
 
-function useIsMac() {
-  const [isMac, setIsMac] = useState(false)
-  useEffect(() => {
-    setIsMac(/Mac/.test(navigator.userAgent))
-  }, [])
-  return isMac
-}
 
-export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled, placeholder, showRomaji, onToggleRomaji, minRows = 1, allowEmpty }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, disabled, placeholder, minRows = 1, allowEmpty, targetLanguage }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [showTooltip, setShowTooltip] = useState(false)
-  const isMac = useIsMac()
-  const toggleKeyLabel = useMemo(() => isMac ? '⌘Space' : 'Ctrl+Space', [isMac])
+  const toggleKeyLabel = 'Ctrl+J'
 
-  const ime = useJapaneseIME(value, onChange, { initialActive: true })
+  const isJapanese = !targetLanguage || targetLanguage === 'Japanese'
+  const ime = useJapaneseIME(value, onChange, { initialActive: isJapanese })
 
   // First-time tooltip
   useEffect(() => {
@@ -70,8 +60,8 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
       const consumed = ime.handleKeyDown(e)
       if (consumed) return
 
-      // Ctrl+Space / Cmd+Space toggle (catch if IME is off)
-      if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+      // Ctrl+J toggle (catch if IME is off)
+      if (e.key === 'j' && e.ctrlKey) {
         e.preventDefault()
         ime.toggleIME()
         return
@@ -107,7 +97,7 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
 
   // Dynamic placeholder
   const dynamicPlaceholder = ime.imeActive
-    ? "Type romaji to write Japanese... (e.g., 'taberu' → 食べる)"
+    ? "Type to write Japanese... (e.g., 'taberu' → 食べる)"
     : placeholder ?? `Type in English — press ${toggleKeyLabel} for Japanese input`
 
   // Composition highlight: split value into pre / composed / post
@@ -144,22 +134,6 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
                   {highlightText}
                 </span>
                 <span style={{ color: 'transparent' }}>{postText}</span>
-              </div>
-            )}
-
-            {/* Suggestion overlay — kanji shown above kana (no overflow-hidden so chip floats above) */}
-            {isComposing && ime.suggestion && (
-              <div
-                className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words py-1.5 text-left"
-                style={{ font: 'inherit', fontSize: '14.5px', lineHeight: 'normal' }}
-                aria-hidden="true"
-              >
-                <span style={{ visibility: 'hidden' }}>{preText}</span>
-                <span className="relative inline-block">
-                  <span className="absolute bottom-full left-0 mb-1 whitespace-nowrap bg-bg-secondary border border-border rounded-md px-2 py-0.5 text-[14px] font-jp text-text-primary shadow-sm z-20">
-                    {ime.suggestion}
-                  </span>
-                </span>
               </div>
             )}
 
@@ -253,34 +227,6 @@ export function ChatInput({ value, onChange, onSend, onVoiceTranscript, disabled
             </button>
           )}
 
-          {/* Romaji toggle */}
-          {onToggleRomaji && (
-            <button
-              className={cn(
-                'h-7 rounded-full border px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors',
-                showRomaji
-                  ? 'border-accent-brand/30 bg-accent-brand/10 text-accent-brand'
-                  : 'border-border bg-bg-pure text-text-muted hover:bg-bg-hover'
-              )}
-              onClick={onToggleRomaji}
-              title={showRomaji ? 'Hide romaji' : 'Show romaji above all text'}
-            >
-              <span className="text-[13px] leading-none">👓</span>
-            </button>
-          )}
-          <VoiceControls
-            onTranscript={(text) => {
-              if (onVoiceTranscript) {
-                onVoiceTranscript(text)
-              } else {
-                onChange(value ? value + ' ' + text : text)
-              }
-            }}
-            disabled={disabled}
-          />
-          <button className="w-7 h-7 rounded-full border border-border bg-bg-pure flex items-center justify-center text-text-muted text-[15px] leading-none cursor-default hover:bg-bg-hover transition-colors" title="Attach">
-            +
-          </button>
         </div>
         <span className="text-[11px] text-text-placeholder select-none">
           {ime.imeActive

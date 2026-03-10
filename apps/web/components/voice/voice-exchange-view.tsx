@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { TranscriptLine } from '@/hooks/use-voice-conversation'
 import { stripRubyAnnotations } from '@/lib/ruby-annotator'
 import { cn } from '@/lib/utils'
+import { getTargetFontCleanClass, getLanguageById } from '@/lib/languages'
+import { useLanguage } from '@/hooks/use-language'
 
 interface CorrectionInfo {
   original: string
@@ -25,15 +27,16 @@ interface VoiceExchangeViewProps {
   /** Whether TTS audio is actively playing */
   ttsPlaying?: boolean
   className?: string
+  targetLanguage?: string
 }
 
 // ── Word segmentation ──
 
-/** Segment text into words using Intl.Segmenter (handles Japanese natively) */
-const segmenter =
-  typeof Intl !== 'undefined' && 'Segmenter' in Intl
-    ? new Intl.Segmenter('ja', { granularity: 'word' })
-    : null
+/** Create an Intl.Segmenter for the given locale (falls back to null if unavailable) */
+function getSegmenter(langCode: string): Intl.Segmenter | null {
+  if (typeof Intl === 'undefined' || !('Segmenter' in Intl)) return null
+  return new Intl.Segmenter(langCode, { granularity: 'word' })
+}
 
 interface WordSegment {
   text: string
@@ -43,7 +46,7 @@ interface WordSegment {
   end: number
 }
 
-function segmentWords(text: string): WordSegment[] {
+function segmentWords(text: string, segmenter: Intl.Segmenter | null): WordSegment[] {
   if (!segmenter) {
     // Fallback: treat each character as a segment
     return [...text].map((ch, i) => ({ text: ch, start: i, end: i + 1 }))
@@ -117,8 +120,15 @@ function snapToWordBoundary(charPos: number, words: WordSegment[]): number {
 export function VoiceExchangeView({
   aiLine, userLine, partialText, correction, aiTranslation,
   spokenSentences = [], currentSentence = null, currentProgress = 0,
-  ttsPlaying = false, className,
+  ttsPlaying = false, className, targetLanguage,
 }: VoiceExchangeViewProps) {
+  const { targetLanguage: ctxLang } = useLanguage()
+  const lang = targetLanguage || ctxLang || 'Japanese'
+  const fontClean = getTargetFontCleanClass(lang)
+  const segmenterLocale = getLanguageById(lang)?.sttCode || 'ja'
+
+  const segmenter = useMemo(() => getSegmenter(segmenterLocale), [segmenterLocale])
+
   const exchangeRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -132,7 +142,7 @@ export function VoiceExchangeView({
     [aiLine],
   )
 
-  const words = useMemo(() => segmentWords(cleanAiText), [cleanAiText])
+  const words = useMemo(() => segmentWords(cleanAiText, segmenter), [cleanAiText, segmenter])
 
   // Show karaoke when TTS is actively playing audio for this turn
   // Skip karaoke when no sentence progress info is available
@@ -157,11 +167,11 @@ export function VoiceExchangeView({
             transition={{ duration: 0.3 }}
             className="flex gap-[9px] items-start"
           >
-            <div className="w-[27px] h-[27px] rounded-lg shrink-0 flex items-center justify-center text-[13px] font-jp-clean bg-bg-hover border border-border">
+            <div className={cn("w-[27px] h-[27px] rounded-lg shrink-0 flex items-center justify-center text-[13px] bg-bg-hover border border-border", fontClean)}>
               花
             </div>
             <div className="max-w-[90%] flex flex-col gap-[5px]">
-              <div className="px-[13px] py-[9px] text-[14px] leading-[1.72] rounded-xl rounded-bl-[3px] bg-[rgba(255,255,255,.9)] border border-border backdrop-blur-[8px] font-jp-clean">
+              <div className={cn("px-[13px] py-[9px] text-[14px] leading-[1.72] rounded-xl rounded-bl-[3px] bg-[rgba(255,255,255,.9)] border border-border backdrop-blur-[8px]", fontClean)}>
                 {showKaraoke ? (
                   <KaraokeText text={cleanAiText} highlightChars={highlightChars} />
                 ) : (
@@ -198,7 +208,7 @@ export function VoiceExchangeView({
               YOU
             </div>
             <div className="max-w-[90%] flex flex-col gap-[5px]">
-              <div className="px-[13px] py-[9px] text-[13.5px] leading-[1.72] rounded-xl rounded-br-[3px] bg-accent-brand text-white font-jp-clean">
+              <div className={cn("px-[13px] py-[9px] text-[13.5px] leading-[1.72] rounded-xl rounded-br-[3px] bg-accent-brand text-white", fontClean)}>
                 {userLine.text}
               </div>
               {correction && <CorrectionInline correction={correction} />}
@@ -220,7 +230,7 @@ export function VoiceExchangeView({
               YOU
             </div>
             <div className="max-w-[90%]">
-              <div className="px-[13px] py-[9px] text-[13.5px] leading-[1.72] rounded-xl rounded-br-[3px] bg-accent-brand/80 text-white/80 font-jp-clean">
+              <div className={cn("px-[13px] py-[9px] text-[13.5px] leading-[1.72] rounded-xl rounded-br-[3px] bg-accent-brand/80 text-white/80", fontClean)}>
                 {partialText}
                 <span className="inline-block w-[2px] h-[0.88em] bg-white/60 ml-px animate-pulse align-text-bottom" />
               </div>

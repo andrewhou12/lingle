@@ -10,13 +10,13 @@ interface LanguageContextValue {
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
-  targetLanguage: 'Japanese',
+  targetLanguage: '',
   nativeLanguage: 'English',
   setTargetLanguage: async () => {},
 })
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [targetLanguage, setLang] = useState('Japanese')
+  const [targetLanguage, setLang] = useState('')
   const [nativeLanguage, setNativeLang] = useState('English')
 
   useEffect(() => {

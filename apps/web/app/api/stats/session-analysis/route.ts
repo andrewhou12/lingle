@@ -81,7 +81,7 @@ export const POST = withAuth(async (request, { userId }) => {
   }
 
   const profile = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } })
-  const level = getDifficultyLevel(profile.difficultyLevel)
+  const level = getDifficultyLevel(profile.difficultyLevel, profile.targetLanguage)
   const plan = session.sessionPlan as Record<string, unknown> | null
   const topic = (plan?.topic as string) || (plan?.focus as string) || 'Free conversation'
 

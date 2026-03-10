@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { SUPPORTED_LANGUAGES } from '@/lib/languages'
+import { SUPPORTED_LANGUAGES, getLanguageById } from '@/lib/languages'
 import { cn } from '@/lib/utils'
 
 /* ── Step data ── */
@@ -17,14 +17,25 @@ const LEARNING_GOALS = [
 ]
 
 const LEVELS = [
-  { id: 'complete_beginner', label: 'Complete Beginner', desc: 'I\'m just starting — no prior knowledge', cefr: 'Pre-A1', tag: 'New' },
-  { id: 'beginner', label: 'Beginner', desc: 'I know basic greetings and simple phrases', cefr: 'A1', tag: 'N5' },
-  { id: 'elementary', label: 'Elementary', desc: 'I can handle simple daily conversations', cefr: 'A2', tag: 'N4' },
-  { id: 'intermediate', label: 'Intermediate', desc: 'I can express opinions on familiar topics', cefr: 'B1', tag: 'N3' },
-  { id: 'upper_intermediate', label: 'Upper Intermediate', desc: 'I understand most native content with effort', cefr: 'B2', tag: 'N2' },
-  { id: 'advanced', label: 'Advanced', desc: 'I can follow complex arguments and express nuance', cefr: 'C1', tag: 'N1' },
-  { id: 'near_native', label: 'Near-Native', desc: 'I\'m fluent and want to master subtlety and register', cefr: 'C2', tag: 'C2' },
+  { id: 'complete_beginner', label: 'Complete Beginner', desc: 'I\'m just starting — no prior knowledge', cefr: 'Pre-A1', levelIdx: -1 },
+  { id: 'beginner', label: 'Beginner', desc: 'I know basic greetings and simple phrases', cefr: 'A1', levelIdx: 0 },
+  { id: 'elementary', label: 'Elementary', desc: 'I can handle simple daily conversations', cefr: 'A2', levelIdx: 1 },
+  { id: 'intermediate', label: 'Intermediate', desc: 'I can express opinions on familiar topics', cefr: 'B1', levelIdx: 2 },
+  { id: 'upper_intermediate', label: 'Upper Intermediate', desc: 'I understand most native content with effort', cefr: 'B2', levelIdx: 3 },
+  { id: 'advanced', label: 'Advanced', desc: 'I can follow complex arguments and express nuance', cefr: 'C1', levelIdx: 4 },
+  { id: 'near_native', label: 'Near-Native', desc: 'I\'m fluent and want to master subtlety and register', cefr: 'C2', levelIdx: 5 },
 ]
+
+function getLevelTag(levelIdx: number, languageId: string): string {
+  if (levelIdx < 0) return 'New'
+  const lang = getLanguageById(languageId)
+  if (lang && levelIdx < lang.proficiencyLevels.length) {
+    return lang.proficiencyLevels[levelIdx]
+  }
+  // Fallback to CEFR
+  const cefrLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+  return cefrLevels[Math.min(levelIdx, cefrLevels.length - 1)]
+}
 
 const LEVEL_TO_DIFFICULTY: Record<string, number> = {
   complete_beginner: 1,
@@ -62,7 +73,7 @@ function StepLanguage({ selected, onSelect }: { selected: string; onSelect: (id:
             <span className="text-[28px]">{lang.flag}</span>
             <div>
               <div className="text-[15px] font-semibold text-text-primary">{lang.label}</div>
-              <div className="text-[13px] text-text-muted font-jp">{lang.nativeLabel}</div>
+              <div className={cn("text-[13px] text-text-muted", lang.fontClass || '')}>{lang.nativeLabel}</div>
             </div>
             {selected === lang.id && (
               <div className="ml-auto w-[22px] h-[22px] rounded-full bg-accent-brand flex items-center justify-center text-white text-[12px] font-bold">
@@ -117,7 +128,7 @@ function StepGoals({ selected, onToggle }: { selected: string[]; onToggle: (id: 
   )
 }
 
-function StepLevel({ selected, onSelect }: { selected: string; onSelect: (id: string) => void }) {
+function StepLevel({ selected, onSelect, language }: { selected: string; onSelect: (id: string) => void; language: string }) {
   return (
     <div className="w-full max-w-[560px]">
       <h2 className="text-[28px] font-bold text-text-primary tracking-[-0.03em] mb-1.5">
@@ -146,7 +157,7 @@ function StepLevel({ selected, onSelect }: { selected: string; onSelect: (id: st
                   ? "bg-accent-brand border-accent-brand text-white"
                   : "bg-bg-secondary border-border-subtle text-text-muted"
               )}>
-                {level.tag}
+                {getLevelTag(level.levelIdx, language)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -360,7 +371,7 @@ export default function OnboardingPage() {
       >
         {step === 0 && <StepLanguage selected={language} onSelect={setLanguage} />}
         {step === 1 && <StepGoals selected={goals} onToggle={toggleGoal} />}
-        {step === 2 && <StepLevel selected={level} onSelect={setLevel} />}
+        {step === 2 && <StepLevel selected={level} onSelect={setLevel} language={language} />}
         {step === 3 && <StepPreparing language={language} />}
       </div>
 

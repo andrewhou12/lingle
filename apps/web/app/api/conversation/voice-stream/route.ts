@@ -10,10 +10,11 @@ import type { Prisma } from '@prisma/client'
 import { createSentenceBoundaryTracker } from '@/lib/voice/sentence-boundary'
 import { parseCartesiaSSE } from '@/lib/cartesia-sse'
 import { FRAME, encodeFrame } from '@/lib/voice/voice-stream-protocol'
+import { getLanguageById } from '@/lib/languages'
 
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 const PAUSE_MARKER_REGEX = /<\d+>/g
-const PUNCTUATION_ONLY = /^[。！？.!?\s…─—、,]+$/
+const PUNCTUATION_ONLY = /^[\u3002\uFF01\uFF1F.!?\s\u2026\u2500\u2014\u3001,]+$/
 
 // Latin-character ratio check for filtering non-target-language content
 const LATIN_CHAR = /[a-zA-Z]/g
@@ -39,22 +40,26 @@ function stripNonTargetLanguage(text: string): string {
 }
 
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY
-const CARTESIA_VOICE_JA = process.env.CARTESIA_VOICE_JA
-const CARTESIA_VOICE_EN = process.env.CARTESIA_VOICE_EN
 
-// Detect if a sentence is predominantly English (Latin-script) vs Japanese (CJK)
-const CJK_RANGE = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/g
-function detectSentenceLanguage(text: string): 'ja' | 'en' {
+/** Map language sttCode to Cartesia voice env var */
+function getCartesiaVoice(langCode: string): string | undefined {
+  const envKey = `CARTESIA_VOICE_${langCode.toUpperCase()}`
+  return process.env[envKey]
+}
+
+// Detect if a sentence is predominantly English vs CJK-based target language
+const CJK_RANGE = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f\uac00-\ud7af\u1100-\u11ff]/g
+function detectSentenceLanguage(text: string, targetLangCode: string): string {
   const cjkCount = (text.match(CJK_RANGE) || []).length
   const latinCount = (text.match(LATIN_CHAR) || []).length
   // If more Latin chars than CJK, treat as English
   if (latinCount > 0 && cjkCount === 0) return 'en'
   if (latinCount > cjkCount * 2) return 'en'
-  return 'ja'
+  return targetLangCode
 }
 
-// Same session cache as send route — systemPrompt/sessionPlan/mode never change mid-session
-const sessionCache = new Map<string, { systemPrompt: string; sessionPlan: unknown; mode: string | null }>()
+// Same session cache as send route — systemPrompt/sessionPlan/mode/targetLanguage never change mid-session
+const sessionCache = new Map<string, { systemPrompt: string; sessionPlan: unknown; mode: string | null; targetLanguage: string }>()
 
 function cleanForTTS(text: string): string {
   return text.replace(RUBY_REGEX, '$1').replace(PAUSE_MARKER_REGEX, '').trim()
@@ -74,7 +79,7 @@ export const POST = withAuth(async (request, { userId }) => {
     })
   }
 
-  if (!CARTESIA_API_KEY || !CARTESIA_VOICE_JA) {
+  if (!CARTESIA_API_KEY) {
     return new Response(JSON.stringify({ error: 'Cartesia not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -90,11 +95,30 @@ export const POST = withAuth(async (request, { userId }) => {
   if (!session) {
     const dbSession = await prisma.conversationSession.findUniqueOrThrow({
       where: { id: sessionId },
-      select: { systemPrompt: true, sessionPlan: true, mode: true },
+      select: { systemPrompt: true, sessionPlan: true, mode: true, targetLanguage: true },
     })
     if (!dbSession.systemPrompt) throw new Error('Session has no system prompt')
-    session = { systemPrompt: dbSession.systemPrompt, sessionPlan: dbSession.sessionPlan, mode: dbSession.mode }
+    session = {
+      systemPrompt: dbSession.systemPrompt,
+      sessionPlan: dbSession.sessionPlan,
+      mode: dbSession.mode,
+      targetLanguage: dbSession.targetLanguage,
+    }
     sessionCache.set(sessionId, session)
+  }
+
+  const targetLanguage = session.targetLanguage
+  const langConfig = getLanguageById(targetLanguage)
+  const targetLangCode = langConfig?.ttsLanguageCode || langConfig?.sttCode || 'ja'
+  const isCJK = langConfig?.isCJK ?? true
+
+  // Get voice for target language, falling back to JA
+  const voiceId = getCartesiaVoice(targetLangCode) || getCartesiaVoice('ja')
+  if (!voiceId) {
+    return new Response(JSON.stringify({ error: 'No Cartesia voice configured for ' + targetLanguage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   const sessionMode = (session.mode || 'conversation') as ScenarioMode
@@ -102,6 +126,7 @@ export const POST = withAuth(async (request, { userId }) => {
     sessionPlan: session.sessionPlan,
     sessionMode,
     voiceMode: true,
+    targetLanguage,
   })
 
   const tools = createVoiceModeTools(userId, sessionId)
@@ -124,7 +149,7 @@ export const POST = withAuth(async (request, { userId }) => {
   }
 
   const tPrep = performance.now()
-  console.log(`[voice-stream:timing] session=${cacheHit ? 'cached' : 'db'}:${(tPrep - t0).toFixed(0)}ms msgs:${inputMessages.length} sysLen:${system.length}`)
+  console.log(`[voice-stream:timing] session=${cacheHit ? 'cached' : 'db'}:${(tPrep - t0).toFixed(0)}ms msgs:${inputMessages.length} sysLen:${system.length} lang:${targetLanguage}`)
 
   // Process in background — return the readable stream immediately
   ;(async () => {
@@ -139,17 +164,14 @@ export const POST = withAuth(async (request, { userId }) => {
     let sentenceCount = 0
 
     const dispatchSentence = (sentence: string) => {
-      // Don't strip English when the assistant is intentionally speaking it
-      const sentenceLang = detectSentenceLanguage(sentence)
+      const sentenceLang = detectSentenceLanguage(sentence, targetLangCode)
+      // Only strip non-target-language content for CJK languages where Latin chars reliably indicate English
       const cleaned = sentenceLang === 'en'
         ? cleanForTTS(sentence)
-        : stripNonTargetLanguage(cleanForTTS(sentence))
+        : isCJK
+          ? stripNonTargetLanguage(cleanForTTS(sentence))
+          : cleanForTTS(sentence)
       if (!cleaned || PUNCTUATION_ONLY.test(cleaned)) return
-
-      // Use same voice for both languages — switching voices mid-response sounds
-      // like two different people. The multilingual model handles English with
-      // the Japanese voice (slight accent, but consistent speaker identity).
-      const voiceId = CARTESIA_VOICE_JA!
 
       const idx = sentenceCount++
       audioChain = audioChain.then(async () => {

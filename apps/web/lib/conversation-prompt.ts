@@ -1,5 +1,8 @@
 import { normalizePlan, formatPlanForPrompt } from '@/lib/session-plan'
 import type { ScenarioMode } from '@/lib/experience-scenarios'
+import { getLanguageById, getSttCode } from '@/lib/languages'
+import { getFillerWords } from '@/lib/voice/filler-words'
+import { getReactionWords } from '@/lib/voice/filler-words'
 
 /**
  * Build the full system prompt for a voice conversation session.
@@ -11,9 +14,10 @@ export function buildVoiceSystemPrompt(
     sessionPlan: unknown
     sessionMode: ScenarioMode
     voiceMode: boolean
+    targetLanguage?: string
   },
 ): string {
-  const { sessionPlan, sessionMode, voiceMode } = opts
+  const { sessionPlan, sessionMode, voiceMode, targetLanguage } = opts
 
   const plan = sessionPlan ? normalizePlan(sessionPlan, sessionMode) : null
   const planInstruction =
@@ -27,6 +31,15 @@ export function buildVoiceSystemPrompt(
   const planBlock = plan
     ? `\n\n═══ SESSION PLAN ═══\n${formatPlanForPrompt(plan)}\n\n${planInstruction}`
     : ''
+
+  const langConfig = targetLanguage ? getLanguageById(targetLanguage) : null
+  const langName = targetLanguage || 'the target language'
+  const sttCode = targetLanguage ? getSttCode(targetLanguage) : 'ja'
+  const fillers = getFillerWords(sttCode)
+  const reactions = getReactionWords(sttCode)
+  const sentenceBoundaryChars = langConfig?.sentenceBoundaryChars || '.!?'
+  const hasAnnotations = langConfig?.hasAnnotations ?? false
+
   const voiceBlock = voiceMode
     ? `\n\n═══ VOICE MODE ═══
 This is a live voice conversation via text-to-speech. The learner is waiting to hear you speak.
@@ -40,17 +53,14 @@ CRITICAL — BREVITY:
 - Default to 100% target language. The ONLY exception is when redirecting a learner who switched to English (see LANGUAGE SWITCHING below).
 
 SPEECH NATURALNESS:
-- Speak like a real person talking off the top of their head, NOT reading a script.
-- Use filler words naturally in the target language: えーっと、うーん、そうですね、あのー
-- Trail off sometimes... don't always end sentences perfectly.
-- React before responding: あー！、へー、うんうん、ああ
+- Speak like a real person talking off the top of their head, NOT reading a script.${fillers.length > 0 ? `\n- Use filler words naturally in the target language: ${fillers.slice(0, 4).join('\u3001')}` : ''}
+- Trail off sometimes... don't always end sentences perfectly.${reactions.length > 0 ? `\n- React before responding: ${reactions.slice(0, 4).join('\u3001')}` : ''}
 - Vary sentence length: one-word answers mixed with fuller thoughts.
 - NEVER overuse pauses or fillers — sprinkle them naturally, not every sentence.
 
 FORMATTING:
-- End sentences cleanly with 。！？ — the TTS needs clear sentence boundaries.
-- No markdown, no bullet points, no lists, no numbered items. Just natural speech.
-- Do NOT use {kanji|reading} ruby annotations in voice mode — just write the kanji directly.
+- End sentences cleanly with ${sentenceBoundaryChars} — the TTS needs clear sentence boundaries.
+- No markdown, no bullet points, no lists, no numbered items. Just natural speech.${hasAnnotations ? '\n- Do NOT use annotation markup in voice mode — just write characters directly.' : ''}
 - NEVER include meta-commentary, stage directions, or reasoning about what you're doing. Your output is read aloud — only output words you'd actually say.
 - If the learner's speech was unclear, ask them to repeat naturally.
 
@@ -61,12 +71,11 @@ FIRST MESSAGE:
 - Keep it to 1-2 sentences. End with a simple question to get the conversation started.
 
 LANGUAGE SWITCHING:
-- If the learner switches to English (their native language), respond with ONE short sentence in English acknowledging what they said, then switch back to Japanese.
-- Example pattern: "Oh I see! じゃあ、日本語で続けましょう。今の話だけど…"
-- Keep the English part brief and warm — just enough so they don't feel ignored. Then immediately redirect the conversation back to Japanese.
-- If they keep speaking English, gently encourage them: "Let's practice in Japanese! 日本語で言ってみて。"
-- Do NOT lecture them about using Japanese. Keep it light and natural.
-- If they seem stuck or frustrated, simplify your Japanese significantly rather than switching to English.
+- If the learner switches to English (their native language), respond with ONE short sentence in English acknowledging what they said, then switch back to ${langName}.
+- Keep the English part brief and warm — just enough so they don't feel ignored. Then immediately redirect the conversation back to ${langName}.
+- If they keep speaking English, gently encourage them to practice in ${langName}.
+- Do NOT lecture them about using ${langName}. Keep it light and natural.
+- If they seem stuck or frustrated, simplify your ${langName} significantly rather than switching to English.
 
 LEARNER SIGNALS:
 - Messages may include a [Learner signals: ...] annotation at the end.

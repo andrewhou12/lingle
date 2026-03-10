@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const FLOATING_CHARS = [
-  '\u3042', '\u304B', '\u3055', '\u305F', '\u306A', '\u306F', '\u307E', '\u3084', '\u3089', '\u308F',
-  '\u30A2', '\u30AB', '\u30B5', '\u30BF', '\u30CA', '\u30CF', '\u30DE', '\u30E4', '\u30E9', '\u30EF',
-  '\u8A71', '\u8AAD', '\u66F8', '\u805E', '\u5B66', '\u8A00', '\u8449', '\u97F3', '\u58F0', '\u9053',
+  '\u3042', '\uD55C', '\u4F60', 'Hola', '\u304B', '\uBB38', '\u597D', 'Bonjour',
+  '\u8A71', '\uD559', '\u4E16', '\u00F1', '\u30A2', '\uBC95', '\u754C', '\u00FC',
+  '\u5B66', 'Ciao', '\u8A00', '\uC5B4', '\u97F3', 'Ol\u00E1', '\u8AAD', '\u00E7',
+  '\u66F8', '\uC0AC', '\u58F0', 'Gr\u00FC\u00DF', '\u805E', '\u611B',
 ]
 
 function FloatingCharacters() {

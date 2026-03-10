@@ -3,11 +3,12 @@
 import { XMarkIcon } from '@heroicons/react/24/outline'
 
 interface WelcomeCardProps {
+  targetLanguage: string
   onDismiss: () => void
   onStart: () => void
 }
 
-export function WelcomeCard({ onDismiss, onStart }: WelcomeCardProps) {
+export function WelcomeCard({ targetLanguage, onDismiss, onStart }: WelcomeCardProps) {
   return (
     <div className="w-full idle-entrance mb-8">
       <div className="relative bg-bg-pure border border-border rounded-xl p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)]">
@@ -38,7 +39,11 @@ export function WelcomeCard({ onDismiss, onStart }: WelcomeCardProps) {
           </li>
           <li className="flex items-start gap-2.5 text-[13.5px] text-text-secondary leading-[1.5]">
             <span className="mt-[2px] w-5 h-5 rounded-full bg-accent-brand/10 flex items-center justify-center shrink-0 text-[11px] font-bold text-accent-brand">3</span>
-            <span>Tap <strong className="text-text-primary font-medium font-jp">あ</strong> to type in Japanese with the built-in keyboard</span>
+            {targetLanguage === 'Japanese' ? (
+              <span>Tap <strong className="text-text-primary font-medium font-jp">あ</strong> to type in Japanese with the built-in keyboard</span>
+            ) : (
+              <span>Switch your keyboard to <strong className="text-text-primary font-medium">{targetLanguage}</strong> when typing in the target language</span>
+            )}
           </li>
         </ul>
 

@@ -4,7 +4,8 @@ import { prisma } from '@lingle/db'
 
 export const GET = withAuth(async (_request, { userId }) => {
   const profile = await prisma.learnerProfile.findUnique({ where: { userId } })
-  const targetLanguage = profile?.targetLanguage ?? 'Japanese'
+  const targetLanguage = profile?.targetLanguage
+  if (!targetLanguage) return NextResponse.json({ minutesToday: 0 })
 
   const now = new Date()
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())

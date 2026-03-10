@@ -8,6 +8,8 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
+import { useOnboarding } from '@/hooks/use-onboarding'
+import { CoachMark } from '@/components/onboarding/coach-mark'
 import type { VoiceState } from '@/hooks/use-voice-conversation'
 
 export type ActivePanel = 'transcript' | 'feedback' | 'help' | 'lookup' | null
@@ -48,6 +50,9 @@ export function VoiceControls({
   const cancelledRef = useRef(false)
   const canTalk = voiceState === 'IDLE' || voiceState === 'SPEAKING' || voiceState === 'THINKING'
   const isLocked = !canTalk && !isTalking
+
+  // ── Onboarding hints ──
+  const { isDismissed, dismiss } = useOnboarding()
 
   // Ring fill animation while holding
   useEffect(() => {
@@ -134,6 +139,14 @@ export function VoiceControls({
   ]
 
   return (
+    <CoachMark
+      hintId="hint_voice_spacebar"
+      content="Hold spacebar or press the mic button to speak. Release to send."
+      side="top"
+      autoDismissMs={10000}
+      show={voiceState === 'IDLE' && !isDismissed('hint_voice_spacebar')}
+      onDismiss={() => dismiss('hint_voice_spacebar')}
+    >
     <div className={cn('flex flex-col items-center gap-3 px-6 pb-6 pt-3 shrink-0', className)}>
       {/* Keyboard hints — uses app's standard text sizing */}
       <div className="h-5 flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -200,6 +213,13 @@ export function VoiceControls({
       </button>
 
       {/* Chip buttons — matches suggestion chip pattern from the app */}
+      <CoachMark
+        hintId="hint_voice_feedback"
+        content="Look up words, ask for help, or check your feedback here."
+        side="top"
+        show={isDismissed('hint_voice_spacebar') && !isDismissed('hint_voice_feedback')}
+        onDismiss={() => dismiss('hint_voice_feedback')}
+      >
       <div className="flex gap-1.5">
         {canRetry && (
           <button
@@ -241,6 +261,8 @@ export function VoiceControls({
           )
         })}
       </div>
+      </CoachMark>
     </div>
+    </CoachMark>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { useState, useRef } from 'react'
+import { XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { Spinner } from '@/components/spinner'
 import { cn } from '@/lib/utils'
 
@@ -18,9 +19,12 @@ interface VoiceLookupPanelProps {
   result: LookupResult | null
   loading: boolean
   onClose: () => void
+  onLookup?: (word: string) => void
 }
 
-export function VoiceLookupPanel({ isOpen, result, loading, onClose }: VoiceLookupPanelProps) {
+export function VoiceLookupPanel({ isOpen, result, loading, onClose, onLookup }: VoiceLookupPanelProps) {
+  const [searchInput, setSearchInput] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div
       className={cn(
@@ -34,7 +38,7 @@ export function VoiceLookupPanel({ isOpen, result, loading, onClose }: VoiceLook
         <div>
           <div className="text-[15px] font-semibold text-text-primary tracking-[-0.02em]">Look up</div>
           <div className="text-[13px] text-text-muted mt-0.5">
-            Select text in subtitles
+            {onLookup ? 'Type a word to look up' : 'Select text in subtitles'}
           </div>
         </div>
         <button
@@ -44,6 +48,29 @@ export function VoiceLookupPanel({ isOpen, result, loading, onClose }: VoiceLook
           <XMarkIcon className="w-[18px] h-[18px]" />
         </button>
       </div>
+
+      {/* Search input (when onLookup is provided) */}
+      {onLookup && (
+        <div className="px-5 py-3 border-b border-border shrink-0">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && searchInput.trim()) {
+                  onLookup(searchInput.trim())
+                  setSearchInput('')
+                }
+              }}
+              placeholder="Type a word..."
+              className="w-full pl-9 pr-3 py-2 text-[14px] text-text-primary bg-bg-secondary border border-border rounded-lg outline-none placeholder:text-text-muted focus:border-border-strong transition-colors font-jp-clean"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-5 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-border-strong [&::-webkit-scrollbar-thumb]:rounded-sm">
@@ -73,7 +100,7 @@ export function VoiceLookupPanel({ isOpen, result, loading, onClose }: VoiceLook
           </div>
         ) : (
           <div className="text-center py-10 px-4 text-text-muted text-[14px] leading-[1.7]">
-            Select text in the subtitles to look it up.
+            {onLookup ? 'Type a word above to look it up.' : 'Select text in the subtitles to look it up.'}
           </div>
         )}
       </div>

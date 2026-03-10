@@ -34,7 +34,7 @@ export type LearnerAnalysis = z.infer<typeof analysisSchema>
 
 export const GET = withAuth(async (_request, { userId }) => {
   const profile = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } })
-  const level = getDifficultyLevel(profile.difficultyLevel)
+  const level = getDifficultyLevel(profile.difficultyLevel, profile.targetLanguage)
 
   // Fetch last 20 sessions with duration >= 60s
   const sessions = await prisma.conversationSession.findMany({

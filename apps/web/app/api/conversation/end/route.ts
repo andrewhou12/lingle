@@ -30,7 +30,7 @@ export const POST = withAuth(async (request, { userId }) => {
 
       const { text } = await generateText({
         model: anthropic('claude-haiku-4-5-20251001'),
-        prompt: `Given this Japanese language learning conversation, generate a very short title (3-7 words, English) that captures what was practiced. Be specific and descriptive. Do NOT use quotes. Examples: "Ordering ramen in Osaka", "て-form conjugation drill", "Job interview keigo practice", "NHK news article breakdown".
+        prompt: `Given this language learning conversation, generate a very short title (3-7 words, English) that captures what was practiced. Be specific and descriptive. Do NOT use quotes. Examples: "Ordering food at a restaurant", "Grammar conjugation drill", "Formal speech practice", "News article breakdown".
 
 Conversation (last messages):
 ${recentMessages}

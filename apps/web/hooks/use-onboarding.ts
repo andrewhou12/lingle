@@ -9,6 +9,11 @@ const HINT_IDS = [
   'hint_suggestions',
   'hint_voice_toggle',
   'hint_sidebar',
+  'hint_chat_tools',
+  'hint_chat_suggestions',
+  'hint_voice_spacebar',
+  'hint_voice_subtitles',
+  'hint_voice_feedback',
 ] as const
 
 export type HintId = (typeof HINT_IDS)[number]
@@ -36,7 +41,15 @@ function getServerSnapshot() {
 
 export function useOnboarding() {
   // Subscribe to changes across components
-  useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+
+  // Derive isFirstVisit from the snapshot so server and client agree during hydration.
+  // Server snapshot is all empty strings → isFirstVisit = true (same as a first-visit client).
+  const isFirstVisit = useMemo(() => {
+    const values = snapshot.split(',')
+    const idx = HINT_IDS.indexOf('welcome_card')
+    return !values[idx]
+  }, [snapshot])
 
   const isDismissed = useCallback((id: HintId): boolean => {
     if (typeof window === 'undefined') return false
@@ -53,11 +66,6 @@ export function useOnboarding() {
       localStorage.setItem(PREFIX + id, '1')
     }
     emitChange()
-  }, [])
-
-  const isFirstVisit = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return !localStorage.getItem(PREFIX + 'welcome_card')
   }, [])
 
   return { isDismissed, dismiss, dismissAll, isFirstVisit }

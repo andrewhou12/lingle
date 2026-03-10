@@ -32,8 +32,11 @@ function difficultyToMaxJLPT(difficulty: number): number {
  */
 export async function validateDifficulty(
   text: string,
-  difficulty: number
+  difficulty: number,
+  targetLanguage?: string
 ): Promise<DifficultyViolation[]> {
+  // JLPT-based validation only works for Japanese — skip for other languages
+  if (targetLanguage && targetLanguage !== 'Japanese') return []
   if (difficulty >= 6) return [] // No restrictions at near-native level
 
   const maxJLPT = difficultyToMaxJLPT(difficulty)

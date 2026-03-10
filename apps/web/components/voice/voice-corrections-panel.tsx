@@ -3,17 +3,17 @@
 import { useRef, useEffect } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
-import type { VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
+import type { TurnAnalysisResult } from '@/lib/session-types'
 
 interface VoiceCorrectionsPanelProps {
   isOpen: boolean
-  turnResults: Record<number, VoiceAnalysisResult>
+  turnResults: Record<number, TurnAnalysisResult>
   onClose: () => void
 }
 
 type Grade = 'good' | 'ok' | 'fix'
 
-function gradeForResult(r: VoiceAnalysisResult): Grade {
+function gradeForResult(r: TurnAnalysisResult): Grade {
   if (r.corrections.length > 0) return 'fix'
   if (r.naturalnessFeedback.length > 0) return 'ok'
   return 'good'

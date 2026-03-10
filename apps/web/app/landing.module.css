@@ -163,6 +163,68 @@
   opacity: 0; transform: translateY(6px);
 }
 
+/* ── GREETING MARQUEE ── */
+.marquee-wrap {
+  width: 100vw; margin-left: calc(-50vw + 50%);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  padding: 6px 0;
+  margin-bottom: 28px;
+  animation: introUp .7s cubic-bezier(.16,1,.3,1) .95s both;
+}
+.marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 44px;
+  animation: marqueeScroll 28s linear infinite;
+  width: max-content;
+}
+.marquee-track:hover { animation-play-state: paused; }
+.marquee-item {
+  display: flex; align-items: center; gap: 10px;
+  white-space: nowrap;
+}
+.marquee-flag { font-size: 18px; line-height: 1; }
+.marquee-text {
+  font-size: 16px; color: var(--text-muted); font-weight: 400;
+  letter-spacing: -.01em;
+}
+.marquee-sep {
+  color: var(--border-strong); font-size: 10px; opacity: .5;
+  user-select: none;
+}
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ── LANGUAGE PILLS ── */
+.lang-pills {
+  display: flex; gap: 7px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 14px;
+  animation: introUp .7s cubic-bezier(.16,1,.3,1) 1.35s both;
+}
+.lang-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; font-family: var(--font-sans);
+  font-size: 12px; font-weight: 450; color: var(--text-muted);
+  background: transparent; border: 1px solid transparent;
+  border-radius: 100px; cursor: pointer;
+  transition: all .18s ease; user-select: none;
+}
+.lang-pill:hover {
+  color: var(--text-secondary); background: rgba(255,255,255,.6);
+  border-color: var(--border-subtle);
+}
+.lang-pill-active {
+  color: var(--text-primary); background: white;
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  transform: translateY(-1px);
+}
+.lang-pill-flag { font-size: 13px; line-height: 1; }
+
 /* ── MODE SWITCHER ── */
 .mode-switcher {
   display: flex; align-items: center;

@@ -49,7 +49,7 @@ export function CoachMark({
       <PopoverContent
         side={side}
         sideOffset={8}
-        className="coach-mark-in w-auto max-w-[260px] bg-text-primary text-bg-pure border-none rounded-lg px-3.5 py-2.5 shadow-pop z-[60]"
+        className="coach-mark-in w-auto max-w-[260px] bg-text-primary text-bg-pure border-none rounded-lg px-3.5 py-2.5 shadow-pop z-[100000]"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >

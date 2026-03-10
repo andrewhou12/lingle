@@ -7,7 +7,6 @@ import type { UIMessage } from 'ai'
 import { rubyToHtml } from '@/lib/ruby-annotator'
 import { getToolZone } from '@/lib/tool-zones'
 import type { DifficultyViolation } from '@/lib/difficulty-validator'
-import { RomajiText } from '@/components/romaji-text'
 import { MessageBlock } from '@/components/chat/message-block'
 import { ChoiceButtons, ChoiceButtonsSkeleton } from '@/components/chat/choice-buttons'
 import type { Choice } from '@/components/chat/choice-buttons'
@@ -18,8 +17,6 @@ import { cn } from '@/lib/utils'
 
 export function UIMessageRenderer({
   message,
-  showRomaji,
-  getAnnotated,
   chosenChoiceIds,
   onChoiceSelect,
   onPlay,
@@ -30,8 +27,6 @@ export function UIMessageRenderer({
   violations,
 }: {
   message: UIMessage
-  showRomaji: boolean
-  getAnnotated: (text: string) => string
   chosenChoiceIds: Set<string>
   onChoiceSelect: (text: string, blockId: string) => void
   onPlay?: () => void
@@ -59,7 +54,6 @@ export function UIMessageRenderer({
     <MessageBlock
       role="assistant"
       content=""
-      showRomaji={showRomaji}
       onPlay={onPlay}
       onStop={onStop}
       isPlayingAudio={isPlayingAudio}
@@ -72,8 +66,6 @@ export function UIMessageRenderer({
           <PartRenderer
             key={i}
             part={part}
-            showRomaji={showRomaji}
-            getAnnotated={getAnnotated}
             isStreaming={isLastTextPart || false}
             messageId={message.id}
             chosenChoiceIds={chosenChoiceIds}
@@ -102,8 +94,6 @@ export function UIMessageRenderer({
 
 function PartRenderer({
   part,
-  showRomaji,
-  getAnnotated,
   isStreaming,
   messageId,
   chosenChoiceIds,
@@ -111,8 +101,6 @@ function PartRenderer({
   panelOpen,
 }: {
   part: UIMessage['parts'][number]
-  showRomaji: boolean
-  getAnnotated: (text: string) => string
   isStreaming?: boolean
   messageId: string
   chosenChoiceIds: Set<string>
@@ -123,17 +111,7 @@ function PartRenderer({
     const text = (part as { type: 'text'; text: string }).text
     if (!text.trim()) return null
 
-    const displayText = showRomaji ? getAnnotated(text) : text
-    if (showRomaji) {
-      return (
-        <RomajiText
-          text={displayText}
-          className="chat-markdown text-text-primary leading-[1.7] text-[14.5px]"
-        />
-      )
-    }
-
-    const htmlText = rubyToHtml(displayText)
+    const htmlText = rubyToHtml(text)
 
     return (
       <div className={cn(

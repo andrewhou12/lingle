@@ -2,39 +2,46 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { SpeakerWaveIcon, SpeakerXMarkIcon, Bars3Icon, MicrophoneIcon } from '@heroicons/react/24/outline'
-import { useRouter } from 'next/navigation'
+import {
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
+  MagnifyingGlassIcon,
+  QuestionMarkCircleIcon,
+  PencilSquareIcon,
+  LanguageIcon,
+} from '@heroicons/react/24/outline'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { api } from '@/lib/api'
-import { getToolZone } from '@/lib/tool-zones'
 import { validateDifficulty, type DifficultyViolation } from '@/lib/difficulty-validator'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan } from '@/lib/session-plan'
 import type { TurnAnalysisResult, SessionEndData } from '@/lib/session-types'
-import { useRomaji, useAnnotatedTexts } from '@/hooks/use-romaji'
 import { useTTS } from '@/hooks/use-tts'
 import { useStreamingTTS } from '@/hooks/use-streaming-tts'
-import { PanelProvider, usePanel } from '@/hooks/use-panel'
 import { UIMessageRenderer } from '@/components/chat/ui-message-renderer'
 import { ChatInput } from '@/components/chat/chat-input'
-import { EscapeHatch } from '@/components/chat/escape-hatch'
 import { SuggestionChips } from '@/components/chat/suggestion-chips'
 import { SessionNavBar } from '@/components/session/session-nav-bar'
 import { SessionPlanSidebar } from '@/components/session/session-plan-sidebar'
 import { EndConfirmation } from '@/components/session/end-confirmation'
-import { LearningPanel } from '@/components/panels/learning-panel'
+import { VoiceHelpPanel } from '@/components/voice/voice-help-panel'
+import { VoiceLookupPanel } from '@/components/voice/voice-lookup-panel'
+import { VoiceCorrectionsPanel } from '@/components/voice/voice-corrections-panel'
 import { Spinner } from '@/components/spinner'
 import { UsageLimitModal } from '@/components/usage-limit-modal'
 import { cn } from '@/lib/utils'
+import { useOnboarding } from '@/hooks/use-onboarding'
+import { CoachMark } from '@/components/onboarding/coach-mark'
 import type { UsageInfo } from '@lingle/shared/types'
-import { MODE_LABELS, type ScenarioMode } from '@/lib/experience-scenarios'
 
 const CHAT_DEFAULT_SUGGESTIONS = [
   'Hello!',
   'What should we talk about?',
   'Can you repeat that?',
 ]
+
+type ActivePanel = 'feedback' | 'help' | 'lookup' | null
 
 interface ChatSessionOverlayProps {
   prompt: string
@@ -46,15 +53,7 @@ interface ChatSessionOverlayProps {
   onEnd: (data: SessionEndData) => void
 }
 
-export function ChatSessionOverlay(props: ChatSessionOverlayProps) {
-  return (
-    <PanelProvider>
-      <ChatSessionOverlayInner {...props} />
-    </PanelProvider>
-  )
-}
-
-function ChatSessionOverlayInner({
+export function ChatSessionOverlay({
   prompt,
   mode,
   sessionId,
@@ -63,9 +62,6 @@ function ChatSessionOverlayInner({
   usage: initialUsage,
   onEnd,
 }: ChatSessionOverlayProps) {
-  const router = useRouter()
-  const panel = usePanel()
-  const { showRomaji, toggle: toggleRomaji } = useRomaji()
   const tts = useTTS()
 
   // ── State ──
@@ -76,11 +72,31 @@ function ChatSessionOverlayInner({
   const [difficultyViolations, setDifficultyViolations] = useState<Map<string, DifficultyViolation[]>>(new Map())
   const [analysisResults, setAnalysisResults] = useState<Record<number, TurnAnalysisResult>>({})
   const [planOpen, setPlanOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false)
   const [usageLimitMinutes, setUsageLimitMinutes] = useState(10)
   const [usageRemainingSeconds, setUsageRemainingSeconds] = useState<number | null>(null)
   const [sessionDuration, setSessionDuration] = useState(0)
+
+  // ── Help panel state ──
+  const [helpMessages, setHelpMessages] = useState<Array<{ role: 'user' | 'ai'; text: string }>>([
+    { role: 'ai', text: "Need help? Describe what you're trying to say and I'll guide you." },
+  ])
+  const [helpInput, setHelpInput] = useState('')
+  const [helpLoading, setHelpLoading] = useState(false)
+
+  // ── Lookup state ──
+  const [lookupResult, setLookupResult] = useState<{
+    word: string; reading?: string; meaning: string; partOfSpeech?: string; exampleSentence?: string; notes?: string
+  } | null>(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  // ── Translation state ──
+  const [translation, setTranslation] = useState<string | null>(null)
+
+  // ── X-ray state ──
+  const [xrayTokens, setXrayTokens] = useState<Array<{ surface: string; reading: string; meaning: string; pos: string }> | null>(null)
+  const [xrayLoading, setXrayLoading] = useState(false)
 
   // ── Steering ──
   const [steeringMessages, setSteeringMessages] = useState<Array<{ text: string; time: string }>>(
@@ -92,7 +108,6 @@ function ChatSessionOverlayInner({
   const turnCounterRef = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const startTimeRef = useRef(Date.now())
-  const panelAutoOpenedRef = useRef(false)
   const endingRef = useRef(false)
   const sentFirstMessageRef = useRef(false)
 
@@ -138,7 +153,6 @@ function ChatSessionOverlayInner({
     messages,
     sendMessage,
     status,
-    setMessages,
     error: chatError,
   } = useChat({
     transport,
@@ -177,15 +191,6 @@ function ChatSessionOverlayInner({
   }, [messages, isSending])
   const streamingTts = useStreamingTTS(latestAssistantText, isSending)
 
-  // ── Romaji annotations ──
-  const assistantTexts = useMemo(
-    () => messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => m.parts.filter((p) => p.type === 'text').map((p) => (p as { type: 'text'; text: string }).text).join('')),
-    [messages]
-  )
-  const { getAnnotated } = useAnnotatedTexts(assistantTexts, showRomaji)
-
   // ── Dynamic suggestions ──
   const dynamicSuggestions = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -205,28 +210,6 @@ function ChatSessionOverlayInner({
     }
     return null
   }, [messages])
-
-  // ── Auto-open panel on first panel-zone tool ──
-  const hasPanelTools = useMemo(() => {
-    for (const msg of messages) {
-      if (msg.role !== 'assistant') continue
-      for (const part of msg.parts) {
-        const partType = (part as { type: string }).type
-        if (partType.startsWith('tool-')) {
-          const toolName = partType.replace('tool-', '')
-          if (getToolZone(toolName) === 'panel') return true
-        }
-      }
-    }
-    return false
-  }, [messages])
-
-  useEffect(() => {
-    if (hasPanelTools && !panelAutoOpenedRef.current) {
-      panelAutoOpenedRef.current = true
-      panel.open()
-    }
-  }, [hasPanelTools, panel])
 
   // ── Update plan from updateSessionPlan tool ──
   useEffect(() => {
@@ -329,6 +312,10 @@ function ChatSessionOverlayInner({
             .catch(err => console.error('[chat] Turn analysis failed:', err))
         }
       }
+
+      // Clear translate/xray on new assistant message
+      setTranslation(null)
+      setXrayTokens(null)
     }
     prevIsSendingRef.current = isSending
   }, [isSending, messages, difficultyLevel, difficultyViolations])
@@ -351,6 +338,156 @@ function ChatSessionOverlayInner({
     return analysisResults[Math.max(...keys)]?.sectionTracking
   }, [analysisResults])
 
+  // ── Feedback count ──
+  const feedbackCount = useMemo(() => {
+    let count = 0
+    for (const result of Object.values(analysisResults)) {
+      count += result.corrections.length + (result.naturalnessFeedback?.length || 0)
+    }
+    return count
+  }, [analysisResults])
+
+  // ── Helper: get last assistant message text ──
+  const getLastAssistantText = useCallback(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        return messages[i].parts
+          .filter(p => p.type === 'text')
+          .map(p => (p as { type: 'text'; text: string }).text)
+          .join('')
+      }
+    }
+    return null
+  }, [messages])
+
+  // ── Help panel handler ──
+  const handleHelpSend = useCallback(async () => {
+    if (!helpInput.trim() || helpLoading) return
+    const query = helpInput.trim()
+    setHelpMessages(m => [...m, { role: 'user', text: query }])
+    setHelpInput('')
+    setHelpLoading(true)
+
+    try {
+      const recentHistory = messages.slice(-6).map(m => ({
+        role: m.role,
+        content: m.parts
+          .filter(p => p.type === 'text')
+          .map(p => (p as { type: 'text'; text: string }).text)
+          .join(''),
+      }))
+      const res = await fetch('/api/conversation/help', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, recentHistory }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setHelpMessages(m => [...m, { role: 'ai', text: data.suggestion }])
+      } else {
+        setHelpMessages(m => [...m, { role: 'ai', text: "Sorry, I couldn't get a suggestion right now." }])
+      }
+    } catch {
+      setHelpMessages(m => [...m, { role: 'ai', text: 'Something went wrong. Try again.' }])
+    } finally {
+      setHelpLoading(false)
+    }
+  }, [helpInput, helpLoading, messages])
+
+  // ── Translate last message (in help panel) ──
+  const handleTranslateLastMessage = useCallback(async () => {
+    const text = getLastAssistantText()
+    if (!text) return
+    setHelpLoading(true)
+    try {
+      const res = await fetch('/api/conversation/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setHelpMessages(m => [...m, { role: 'ai', text: data.translation }])
+      }
+    } catch {
+      setHelpMessages(m => [...m, { role: 'ai', text: 'Translation failed.' }])
+    } finally {
+      setHelpLoading(false)
+    }
+  }, [getLastAssistantText])
+
+  // ── Lookup handler ──
+  const handleLookup = useCallback(async (word: string) => {
+    if (!word.trim()) return
+    setLookupLoading(true)
+    setLookupResult(null)
+    try {
+      const context = getLastAssistantText() || ''
+      const res = await fetch('/api/conversation/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: word.trim(), context }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLookupResult(data)
+      }
+    } catch (err) {
+      console.error('[lookup] Failed:', err)
+    } finally {
+      setLookupLoading(false)
+    }
+  }, [getLastAssistantText])
+
+  // ── Translate handler (toggle) ──
+  const handleTranslate = useCallback(async () => {
+    if (translation) {
+      setTranslation(null)
+      return
+    }
+    const text = getLastAssistantText()
+    if (!text) return
+    try {
+      const res = await fetch('/api/conversation/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setTranslation(data.translation)
+      }
+    } catch (err) {
+      console.error('[translate] Failed:', err)
+    }
+  }, [translation, getLastAssistantText])
+
+  // ── X-ray handler (toggle) ──
+  const handleXray = useCallback(async () => {
+    if (xrayTokens) {
+      setXrayTokens(null)
+      return
+    }
+    const text = getLastAssistantText()
+    if (!text) return
+    setXrayLoading(true)
+    try {
+      const res = await fetch('/api/conversation/xray', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentence: text }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setXrayTokens(data.tokens)
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setXrayLoading(false)
+    }
+  }, [xrayTokens, getLastAssistantText])
+
   // ── Handlers ──
   const handleSend = useCallback(async () => {
     if (!input.trim() || isSending) return
@@ -367,24 +504,6 @@ function ChatSessionOverlayInner({
     setChosenChoiceIds((prev) => new Set(prev).add(blockId))
     sendMessage({ text })
   }, [sendMessage])
-
-  const handleVoiceTranscript = useCallback((text: string) => {
-    if (isSending) return
-    sendMessage({ text })
-  }, [isSending, sendMessage])
-
-  const handleEscapeHatch = useCallback(() => {
-    setInput("I'd like to switch to English for a moment: ")
-  }, [])
-
-  const handlePlanUpdate = useCallback(async (updates: Partial<SessionPlan>) => {
-    try {
-      const result = await api.conversationPlanUpdate(sessionId, updates)
-      setSessionPlan(result.plan)
-    } catch (err) {
-      console.error('Failed to update plan:', err)
-    }
-  }, [sessionId])
 
   const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -449,6 +568,12 @@ function ChatSessionOverlayInner({
   // ── Feedback count for nav ──
   const transcriptCount = messages.length
 
+  // ── Has assistant messages (for helper features) ──
+  const hasAssistantMessages = messages.some(m => m.role === 'assistant')
+
+  // ── Onboarding hints ──
+  const { isDismissed, dismiss } = useOnboarding()
+
   return createPortal(
     <div className="fixed inset-0 z-[99999] overflow-hidden bg-bg">
       {/* Session Plan sidebar (left) */}
@@ -468,7 +593,7 @@ function ChatSessionOverlayInner({
         className={cn(
           'relative z-[1] h-screen flex flex-col transition-[padding-left,padding-right] duration-[380ms] ease-[cubic-bezier(.76,0,.24,1)]',
           planOpen ? 'pl-[290px]' : 'pl-0',
-          panel.isOpen ? 'pr-[340px]' : 'pr-0',
+          activePanel ? 'pr-[380px]' : 'pr-0',
         )}
       >
         {/* Nav bar */}
@@ -486,40 +611,18 @@ function ChatSessionOverlayInner({
           onEnd={requestEnd}
           currentSectionLabel={currentSectionLabel}
           rightSlot={
-            <>
-              <button
-                className={cn(
-                  'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
-                  streamingTts.voiceEnabled
-                    ? 'bg-accent-brand/10 text-accent-brand'
-                    : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
-                )}
-                onClick={streamingTts.toggleVoice}
-                title={streamingTts.voiceEnabled ? 'Disable voice mode' : 'Enable voice mode'}
-              >
-                {streamingTts.voiceEnabled ? <SpeakerWaveIcon className="w-4 h-4" /> : <SpeakerXMarkIcon className="w-4 h-4" />}
-              </button>
-              <button
-                className={cn(
-                  'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
-                  panel.isOpen
-                    ? 'bg-accent-brand/10 text-accent-brand'
-                    : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
-                )}
-                onClick={panel.toggle}
-                title="Toggle session panel"
-              >
-                <Bars3Icon className="w-4 h-4" />
-              </button>
-              <button
-                className="inline-flex items-center gap-1.5 rounded-lg bg-bg-secondary px-3 py-1.5 text-[13px] font-medium text-text-secondary border border-border cursor-pointer transition-colors hover:border-accent-brand hover:text-accent-brand"
-                onClick={() => router.push(`/conversation/voice?sessionId=${sessionId}`)}
-                title="Switch to voice mode"
-              >
-                <MicrophoneIcon className="w-3 h-3" />
-                Voice
-              </button>
-            </>
+            <button
+              className={cn(
+                'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+                streamingTts.voiceEnabled
+                  ? 'bg-accent-brand/10 text-accent-brand'
+                  : 'text-text-muted hover:text-text-primary hover:bg-bg-hover'
+              )}
+              onClick={streamingTts.toggleVoice}
+              title={streamingTts.voiceEnabled ? 'Disable TTS' : 'Enable TTS'}
+            >
+              {streamingTts.voiceEnabled ? <SpeakerWaveIcon className="w-4 h-4" /> : <SpeakerXMarkIcon className="w-4 h-4" />}
+            </button>
           }
         />
 
@@ -533,8 +636,6 @@ function ChatSessionOverlayInner({
                   <UIMessageRenderer
                     key={msg.id}
                     message={msg}
-                    showRomaji={showRomaji}
-                    getAnnotated={getAnnotated}
                     chosenChoiceIds={chosenChoiceIds}
                     onChoiceSelect={handleChoiceSelect}
                     onPlay={
@@ -551,10 +652,42 @@ function ChatSessionOverlayInner({
                     onStop={msg.role === 'assistant' && msg.parts.some((p) => p.type === 'text' && (p as { type: 'text'; text: string }).text.trim()) ? tts.stop : undefined}
                     isPlayingAudio={tts.playingId === msg.id}
                     isStreaming={isSending && msg === messages[messages.length - 1] && msg.role === 'assistant'}
-                    panelOpen={panel.isOpen}
                     violations={difficultyViolations.get(msg.id)}
                   />
                 ))}
+
+                {/* Inline translation */}
+                {translation && (
+                  <div className="ml-0 my-1.5 px-3 py-2 bg-bg-secondary border border-border rounded-lg">
+                    <div className="text-[11px] font-medium text-text-muted mb-0.5 flex items-center gap-1">
+                      <LanguageIcon className="w-3 h-3" />
+                      Translation
+                    </div>
+                    <div className="text-[14px] text-text-secondary leading-[1.6]">{translation}</div>
+                  </div>
+                )}
+
+                {/* Inline X-ray */}
+                {xrayTokens && (
+                  <div className="ml-0 my-1.5 px-3 py-2 bg-bg-secondary border border-border rounded-lg">
+                    <div className="text-[11px] font-medium text-text-muted mb-1.5">X-ray</div>
+                    <div className="flex flex-wrap gap-1">
+                      {xrayTokens.map((token, i) => (
+                        <div
+                          key={i}
+                          className="inline-flex flex-col items-center gap-0.5 px-2 py-1.5 bg-bg-pure border border-border rounded-md"
+                        >
+                          <span className="text-[15px] font-jp-clean font-medium text-text-primary">{token.surface}</span>
+                          {token.reading && token.reading !== token.surface && (
+                            <span className="text-[11px] font-jp-clean text-text-muted">{token.reading}</span>
+                          )}
+                          <span className="text-[11px] text-text-secondary leading-tight text-center">{token.meaning}</span>
+                          <span className="text-[10px] text-text-placeholder">{token.pos}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Chat error */}
                 {chatError && (
@@ -565,7 +698,7 @@ function ChatSessionOverlayInner({
 
                 {/* Loading indicator */}
                 {isSending && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                  <div className="flex items-center gap-2.5 py-3 pl-10">
+                  <div className="flex items-center gap-2.5 py-3 pl-2">
                     <Spinner size={14} />
                     <span className="text-[13px] text-text-muted">Thinking...</span>
                   </div>
@@ -578,17 +711,106 @@ function ChatSessionOverlayInner({
             {/* Bottom area */}
             <div className="px-6 pt-2 pb-4 flex flex-col gap-3">
               <div className="max-w-3xl mx-auto w-full flex flex-col gap-3">
-                {/* Escape hatch */}
-                {messages.length > 0 && !isSending && mode !== 'reference' && mode !== 'immersion' && (
-                  <EscapeHatch onUse={handleEscapeHatch} />
-                )}
-
                 {/* Suggestion chips */}
                 {(messages.length === 0 || (messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !isSending)) && (
-                  <SuggestionChips
-                    suggestions={dynamicSuggestions ?? CHAT_DEFAULT_SUGGESTIONS}
-                    onSelect={handleSuggestionSelect}
-                  />
+                  <CoachMark
+                    hintId="hint_chat_suggestions"
+                    content="Tap a suggestion or type your own reply below."
+                    side="top"
+                    show={hasAssistantMessages && !isDismissed('hint_chat_suggestions')}
+                    onDismiss={() => dismiss('hint_chat_suggestions')}
+                  >
+                    <SuggestionChips
+                      suggestions={dynamicSuggestions ?? CHAT_DEFAULT_SUGGESTIONS}
+                      onSelect={handleSuggestionSelect}
+                    />
+                  </CoachMark>
+                )}
+
+                {/* Helper chip buttons */}
+                {hasAssistantMessages && (
+                  <CoachMark
+                    hintId="hint_chat_tools"
+                    content="Use these tools anytime — look up words, get translations, or see your feedback."
+                    side="top"
+                    show={isDismissed('hint_chat_suggestions') && !isDismissed('hint_chat_tools')}
+                    onDismiss={() => dismiss('hint_chat_tools')}
+                  >
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setActivePanel(p => p === 'lookup' ? null : 'lookup')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
+                        activePanel === 'lookup'
+                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
+                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
+                      )}
+                    >
+                      <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                      Look up
+                    </button>
+                    <button
+                      onClick={() => setActivePanel(p => p === 'help' ? null : 'help')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
+                        activePanel === 'help'
+                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
+                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
+                      )}
+                    >
+                      <QuestionMarkCircleIcon className="w-3.5 h-3.5" />
+                      Stuck?
+                    </button>
+                    <button
+                      onClick={handleTranslate}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
+                        translation
+                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
+                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
+                      )}
+                    >
+                      <LanguageIcon className="w-3.5 h-3.5" />
+                      Translate
+                    </button>
+                    <button
+                      onClick={handleXray}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
+                        xrayTokens
+                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
+                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
+                      )}
+                    >
+                      X-ray
+                      {xrayLoading && <Spinner size={10} />}
+                    </button>
+                    <button
+                      onClick={() => setActivePanel(p => p === 'feedback' ? null : 'feedback')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
+                        activePanel === 'feedback'
+                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
+                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
+                      )}
+                    >
+                      <PencilSquareIcon className="w-3.5 h-3.5" />
+                      Feedback
+                      {feedbackCount > 0 && (
+                        <span
+                          className={cn(
+                            'min-w-[16px] h-[16px] inline-flex items-center justify-center rounded-full text-[10px] font-bold px-1',
+                            activePanel === 'feedback'
+                              ? 'bg-accent-warm/15 text-accent-warm'
+                              : 'bg-warm-soft text-accent-warm',
+                          )}
+                        >
+                          {feedbackCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  </CoachMark>
                 )}
 
                 {/* Chat input */}
@@ -596,11 +818,8 @@ function ChatSessionOverlayInner({
                   value={input}
                   onChange={setInput}
                   onSend={handleSend}
-                  onVoiceTranscript={handleVoiceTranscript}
                   disabled={isSending || showUsageLimitModal}
                   placeholder={showUsageLimitModal ? 'Daily limit reached' : 'Type your message...'}
-                  showRomaji={showRomaji}
-                  onToggleRomaji={toggleRomaji}
                 />
 
                 {/* Usage countdown */}
@@ -616,21 +835,37 @@ function ChatSessionOverlayInner({
               </div>
             </div>
           </div>
-
-          {/* Side panel */}
-          {panel.isOpen && (
-            <div className="w-[340px] border-l border-border shrink-0">
-              <LearningPanel
-                messages={messages}
-                plan={sessionPlan}
-                sessionId={sessionId}
-                mode={mode as ScenarioMode}
-                onPlanUpdate={handlePlanUpdate}
-              />
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Help panel (right slide) */}
+      <VoiceHelpPanel
+        isOpen={activePanel === 'help'}
+        messages={helpMessages}
+        input={helpInput}
+        loading={helpLoading}
+        hasAiMessages={hasAssistantMessages}
+        onInputChange={setHelpInput}
+        onSend={handleHelpSend}
+        onTranslateLastMessage={handleTranslateLastMessage}
+        onClose={() => setActivePanel(null)}
+      />
+
+      {/* Lookup panel (right slide) */}
+      <VoiceLookupPanel
+        isOpen={activePanel === 'lookup'}
+        result={lookupResult}
+        loading={lookupLoading}
+        onClose={() => { setActivePanel(null); setLookupResult(null) }}
+        onLookup={handleLookup}
+      />
+
+      {/* Feedback panel (right slide) */}
+      <VoiceCorrectionsPanel
+        isOpen={activePanel === 'feedback'}
+        turnResults={analysisResults}
+        onClose={() => setActivePanel(null)}
+      />
 
       {/* End confirmation dialog */}
       <EndConfirmation

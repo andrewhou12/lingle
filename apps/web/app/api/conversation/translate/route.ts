@@ -4,7 +4,8 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
 
 export const POST = withAuth(async (request, { userId: _userId }) => {
-  const { text } = await request.json()
+  const { text, targetLanguage } = await request.json()
+  const lang = targetLanguage || 'Japanese'
 
   if (!text) {
     return NextResponse.json({ error: 'Missing text' }, { status: 400 })
@@ -13,7 +14,7 @@ export const POST = withAuth(async (request, { userId: _userId }) => {
   try {
     const { text: translation } = await generateText({
       model: anthropic('claude-haiku-4-5-20251001'),
-      prompt: `Translate this Japanese text to natural English. Return ONLY the translation, nothing else.\n\n${text}`,
+      prompt: `Translate this ${lang} text to natural English. Return ONLY the translation, nothing else.\n\n${text}`,
     })
 
     return NextResponse.json({ translation: translation.trim() })

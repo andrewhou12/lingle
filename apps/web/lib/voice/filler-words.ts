@@ -19,6 +19,24 @@ export function getFillerWords(code: string): string[] {
   return FILLER_WORDS[code] ?? []
 }
 
+/** Reaction/backchannel words by language (ISO 639-1 code). */
+export const REACTION_WORDS: Record<string, string[]> = {
+  ja: ['\u3042\u30FC\uFF01', '\u3078\u30FC', '\u3046\u3093\u3046\u3093', '\u3042\u3042', '\u306A\u308B\u307B\u3069', '\u305D\u3063\u304B'],
+  en: ['oh!', 'wow', 'right', 'I see', 'really?', 'huh'],
+  ko: ['\uC544\uFF5E', '\uC624\uFF5E', '\uC815\uB9D0?', '\uADF8\uB807\uAD6C\uB098', '\uB124', '\uC640'],
+  zh: ['\u54E6\uFF01', '\u771F\u7684\u5417', '\u539F\u6765\u5982\u6B64', '\u662F\u554A', '\u54C7'],
+  es: ['\u00A1ah!', '\u00A1no me digas!', 'ya veo', 'claro', '\u00BFen serio?'],
+  fr: ['ah !', 'oh !', 'vraiment ?', 'ah bon', 'd\'accord'],
+  de: ['ach!', 'wirklich?', 'aha', 'na ja', 'stimmt'],
+  it: ['ah!', 'davvero?', 'capisco', 'mamma mia', 'ma dai'],
+  pt: ['ah!', '\u00e9 mesmo?', 'nossa', 'entendi', 'que legal'],
+}
+
+/** Get the reaction word list for a language code. Returns empty array for unknown codes. */
+export function getReactionWords(code: string): string[] {
+  return REACTION_WORDS[code] ?? []
+}
+
 /** Check if a text token (lowercased, trimmed) matches a filler word for the given language. */
 export function isFillerWord(text: string, code: string): boolean {
   const normalized = text.toLowerCase().trim()

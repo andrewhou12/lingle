@@ -10,6 +10,8 @@
   --font-serif: var(--font-fraunces), Georgia, serif;
   --font-jp: var(--font-noto-serif-jp), 'Noto Serif JP', serif;
   --font-jp-clean: var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif;
+  --font-ko: var(--font-noto-sans-kr), 'Noto Sans KR', sans-serif;
+  --font-zh: var(--font-noto-sans-sc), 'Noto Sans SC', sans-serif;
 
   /* App-specific colors (generates bg-bg-secondary, text-text-muted, etc.) */
   --color-bg: var(--bg);

@@ -9,12 +9,16 @@ const PAUSE_MARKER_REGEX = /<\d+>/g
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'urE3OJfJRxJuk9kAMN0Y'
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY
-const CARTESIA_VOICE_JA = process.env.CARTESIA_VOICE_JA
 const TTS_PROVIDER_DEFAULT = process.env.TTS_PROVIDER || 'cartesia'
+
+function getCartesiaVoice(langCode: string): string | undefined {
+  return process.env[`CARTESIA_VOICE_${langCode.toUpperCase()}`]
+}
 
 export const POST = withAuth(async (request) => {
   const body = await request.json()
-  const { text, voice: voiceParam, speed, ttsProvider: ttsProviderParam } = body
+  const { text, voice: voiceParam, speed, ttsProvider: ttsProviderParam, targetLanguage } = body
+  const langCode = targetLanguage ? (targetLanguage === 'Mandarin Chinese' ? 'zh' : targetLanguage.toLowerCase().slice(0, 2)) : 'ja'
   const ttsProvider = ttsProviderParam === 'rime' || ttsProviderParam === 'elevenlabs' || ttsProviderParam === 'cartesia' ? ttsProviderParam : TTS_PROVIDER_DEFAULT
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
@@ -38,7 +42,7 @@ export const POST = withAuth(async (request) => {
     return synthesizeWithRime(spoken, speed)
   }
   if (ttsProvider === 'cartesia') {
-    return synthesizeWithCartesia(spoken)
+    return synthesizeWithCartesia(spoken, langCode)
   }
   return synthesizeWithElevenLabs(spoken, voiceParam)
 })
@@ -69,12 +73,13 @@ async function synthesizeWithRime(text: string, speed?: number): Promise<Respons
   }
 }
 
-async function synthesizeWithCartesia(text: string): Promise<Response> {
+async function synthesizeWithCartesia(text: string, langCode: string): Promise<Response> {
   if (!CARTESIA_API_KEY) {
     return NextResponse.json({ error: 'CARTESIA_API_KEY not configured' }, { status: 500 })
   }
-  if (!CARTESIA_VOICE_JA) {
-    return NextResponse.json({ error: 'CARTESIA_VOICE_JA not configured' }, { status: 500 })
+  const voiceId = getCartesiaVoice(langCode) || getCartesiaVoice('ja')
+  if (!voiceId) {
+    return NextResponse.json({ error: `No Cartesia voice configured for ${langCode}` }, { status: 500 })
   }
 
   const response = await fetch('https://api.cartesia.ai/tts/bytes', {
@@ -87,8 +92,8 @@ async function synthesizeWithCartesia(text: string): Promise<Response> {
     body: JSON.stringify({
       model_id: 'sonic-multilingual',
       transcript: text,
-      voice: { mode: 'id', id: CARTESIA_VOICE_JA },
-      language: 'ja',
+      voice: { mode: 'id', id: voiceId },
+      language: langCode,
       output_format: {
         container: 'raw',
         encoding: 'pcm_s16le',

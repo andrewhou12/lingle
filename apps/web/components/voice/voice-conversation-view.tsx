@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MODE_PLACEHOLDERS } from '@/lib/experience-scenarios'
+import { getModePlaceholders } from '@/lib/experience-scenarios'
 import { api } from '@/lib/api'
 import type { LearnerProfile, UsageInfo } from '@lingle/shared/types'
 import type { SessionPlan } from '@/lib/session-plan'
@@ -264,7 +264,7 @@ export function VoiceConversationView() {
               handleStartVoice()
             }
           }}
-          placeholder={MODE_PLACEHOLDERS[mode as keyof typeof MODE_PLACEHOLDERS] || MODE_PLACEHOLDERS.conversation}
+          placeholder={getModePlaceholders(profile?.targetLanguage || 'Japanese')[mode as 'conversation' | 'tutor' | 'immersion' | 'reference'] || getModePlaceholders(profile?.targetLanguage || 'Japanese').conversation}
           rows={2}
           className="w-full resize-none rounded-xl border border-border bg-bg-secondary px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-brand transition-colors"
         />
