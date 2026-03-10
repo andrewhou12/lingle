@@ -74,8 +74,14 @@ export const POST = withAuth(withUsageCheck(async (request, { userId: _userId })
     : ''
 
   const SPOKEN_LANGUAGE_RULES: Record<string, string> = {
-    Japanese: 'IGNORE particle omission that is natural in casual spoken Japanese (e.g. dropping は, を, が in casual speech).',
-    Korean: 'IGNORE marker omission that is natural in casual spoken Korean (e.g. dropping 은/는, 이/가, 을/를).',
+    Japanese: 'IGNORE particle omission natural in casual spoken Japanese (e.g. dropping は, を, が). IGNORE casual contractions (e.g. ている→てる, ではない→じゃない). IGNORE sentence-final particles and filler words (えっと, あの, まあ).',
+    Korean: 'IGNORE marker omission natural in casual spoken Korean (e.g. dropping 은/는, 이/가, 을/를). IGNORE casual contractions (e.g. 하는 것→하는 거, 것이→게). IGNORE filler words (음, 그, 어).',
+    'Mandarin Chinese': 'IGNORE filler words natural in spoken Mandarin (那个, 嗯, 就是). IGNORE omission of 的 in casual speech. IGNORE topic-prominent structures where the subject is dropped (pro-drop). IGNORE measure word simplification in casual speech (e.g. using 个 as a general classifier).',
+    Spanish: 'IGNORE subject pronoun omission natural in spoken Spanish (pro-drop language). IGNORE filler words (bueno, pues, o sea, es que). IGNORE casual contractions (pa\' for para, na\' for nada). IGNORE leísmo/laísmo that is regionally standard. IGNORE dropped -d- in past participles in casual speech (e.g. cansao for cansado).',
+    French: 'IGNORE "ne" omission in spoken negation (e.g. "je sais pas" instead of "je ne sais pas") — this is standard spoken French. IGNORE filler words (euh, ben, bon, enfin, quoi, du coup). IGNORE on used instead of nous. IGNORE informal question formation without inversion (e.g. "tu viens?" instead of "viens-tu?").',
+    German: 'IGNORE filler words natural in spoken German (also, halt, mal, na ja, ähm). IGNORE casual word order variations in spoken speech. IGNORE weil + verb-second order (common in spoken German though technically non-standard). IGNORE shortened forms (e.g. hab for habe, is for ist). IGNORE denn/mal particles that add conversational nuance.',
+    Italian: 'IGNORE subject pronoun omission natural in spoken Italian (pro-drop language). IGNORE filler words (allora, cioè, tipo, praticamente, insomma). IGNORE passato prossimo used instead of passato remoto in spoken northern Italian. IGNORE informal question formation. IGNORE clitic doubling in casual speech.',
+    Portuguese: 'IGNORE subject pronoun omission natural in spoken Portuguese (pro-drop language). IGNORE filler words (tipo, né, então, bom, sei lá). IGNORE ter used instead of haver in compound tenses in Brazilian Portuguese. IGNORE a gente used instead of nós. IGNORE pra/pro contractions (para + a/o). IGNORE tu with third-person verb conjugation common in Brazilian spoken Portuguese.',
   }
   const spokenRule = SPOKEN_LANGUAGE_RULES[profile?.targetLanguage ?? session.targetLanguage ?? ''] || ''
 
