@@ -34,12 +34,10 @@ const sessionAnalysisSchema = z.object({
   strengths: z.array(z.string()).describe('2-3 things the learner did well'),
   suggestions: z.array(z.string()).describe('2-3 actionable suggestions for improvement'),
   skillScores: z.object({
-    reading: z.number(),
-    listening: z.number(),
-    speaking: z.number(),
-    writing: z.number(),
-    vocabulary: z.number(),
-    grammar: z.number(),
+    vocabularyRange: z.number().min(0).max(100).describe('Variety and appropriateness of vocabulary used'),
+    grammarAccuracy: z.number().min(0).max(100).describe('Correctness of grammar, particles, conjugations'),
+    naturalness: z.number().min(0).max(100).describe('How native-like and natural the phrasing sounds'),
+    complexity: z.number().min(0).max(100).describe('Sophistication of sentence structures relative to level'),
   }),
 })
 
@@ -114,7 +112,11 @@ Focus on:
 - Errors in the LEARNER's messages only
 - The LEARNER's communication strategies and production quality
 
-For skill scores, assess based only on evidence from this session. Estimate conservatively for skills with little evidence (e.g. listening in text-only).
+For skill scores (0-100), assess based only on evidence from the learner's messages in this session:
+- vocabularyRange: variety and level-appropriateness of words the learner produced
+- grammarAccuracy: correctness of particles, conjugations, and sentence patterns
+- naturalness: how native-like and idiomatic the learner's phrasing sounds
+- complexity: sophistication of sentence structures relative to their level
 
 Be encouraging but honest. Identify specific, actionable improvements.
 

@@ -36,6 +36,10 @@ const voiceAnalysisSchema = z.object({
     suggestion: z.string().describe('More natural way to say it'),
     explanation: z.string().describe('One sentence. Why the suggestion sounds more natural.'),
   })).max(1).describe('At most ONE naturalness suggestion per turn. Only flag clear cases.'),
+  sectionTracking: z.object({
+    currentSectionId: z.string().describe('ID of the section currently being discussed'),
+    completedSectionIds: z.array(z.string()).describe('IDs of sections that have been fully covered'),
+  }).optional().describe('Track conversation skeleton progress. Only include if session has sections.'),
 })
 
 export const POST = withAuth(withUsageCheck(async (request, { userId: _userId }) => {
@@ -47,7 +51,7 @@ export const POST = withAuth(withUsageCheck(async (request, { userId: _userId })
 
   const session = await prisma.conversationSession.findUnique({
     where: { id: sessionId },
-    select: { targetLanguage: true, userId: true },
+    select: { targetLanguage: true, userId: true, sessionPlan: true },
   })
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
@@ -60,6 +64,13 @@ export const POST = withAuth(withUsageCheck(async (request, { userId: _userId })
 
   const historyBlock = recentHistory?.length
     ? `Recent conversation context:\n${recentHistory.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}\n\n`
+    : ''
+
+  // Extract sections from session plan for tracking
+  const sessionPlan = session.sessionPlan as Record<string, unknown> | null
+  const sections = sessionPlan?.sections as Array<{ id: string; label: string; description: string }> | undefined
+  const sectionsBlock = sections?.length
+    ? `\nConversation sections to track:\n${sections.map(s => `- ${s.id}: ${s.label} — ${s.description}`).join('\n')}\n`
     : ''
 
   try {
@@ -76,7 +87,7 @@ Learner info:
 - Target language: ${profile?.targetLanguage ?? session.targetLanguage}
 - Native language: ${profile?.nativeLanguage ?? 'English'}
 - Difficulty level: ${profile?.difficultyLevel ?? 3}
-
+${sectionsBlock}
 Rules:
 - Only flag GENUINE grammar/vocabulary errors — not stylistic choices, casual speech, or natural variation.
 - IGNORE transcription artifacts: the learner's text comes from speech-to-text, so missing punctuation, wrong quote marks (「」vs『』), spacing issues, or minor formatting differences are NOT errors. Never correct punctuation or formatting.
@@ -86,12 +97,13 @@ Rules:
 - Grammar notes: ONLY if the learner explicitly asked about a grammar point. Never proactively. 0-1 max.
 - Naturalness feedback: Only if the learner's sentence is grammatically correct but clearly textbook-ish. 0-1 items max.
 - If everything looks fine, return empty arrays. Most turns should have 0 corrections.
-- Be extremely selective. When in doubt, do NOT correct.`,
+- Be extremely selective. When in doubt, do NOT correct.
+- sectionTracking: If conversation sections are provided above, identify which section is currently active based on the conversation context, and which sections have been fully covered. Only include this field if sections are provided.`,
     })
 
     return NextResponse.json(object)
   } catch (err) {
     console.error('[voice-analyze] Analysis failed:', err)
-    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [], naturalnessFeedback: [] })
+    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [], naturalnessFeedback: [], sectionTracking: undefined })
   }
 }))

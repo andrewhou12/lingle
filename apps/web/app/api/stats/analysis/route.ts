@@ -23,12 +23,10 @@ const analysisSchema = z.object({
     severity: z.enum(['minor', 'notable', 'persistent']),
   })).describe('2-4 mistake patterns or habits'),
   skillScores: z.object({
-    reading: z.number().describe('Reading comprehension score'),
-    listening: z.number().describe('Listening comprehension score (estimate conservatively for text-only app)'),
-    speaking: z.number().describe('Speaking/production ability score'),
-    writing: z.number().describe('Writing ability score'),
-    vocabulary: z.number().describe('Vocabulary breadth and depth score'),
-    grammar: z.number().describe('Grammar accuracy and range score'),
+    vocabularyRange: z.number().min(0).max(100).describe('Variety and appropriateness of vocabulary the learner produced'),
+    grammarAccuracy: z.number().min(0).max(100).describe('Correctness of grammar, particles, conjugations'),
+    naturalness: z.number().min(0).max(100).describe('How native-like and idiomatic the learner\'s phrasing sounds'),
+    complexity: z.number().min(0).max(100).describe('Sophistication of sentence structures relative to level'),
   }),
 })
 
@@ -97,12 +95,12 @@ export const GET = withAuth(async (_request, { userId }) => {
 
 You have ${qualifyingSessions.length} conversation sessions to analyze. Assess the learner's abilities entirely from transcript evidence — look at their production quality, error patterns, vocabulary range, grammar accuracy, and communication strategies.
 
-For skill scores (0-100):
-- Base scores on what you observe in the transcripts
-- "listening" and "reading" should be estimated conservatively since this is a text-only app — infer from comprehension shown in responses
-- "speaking" maps to production quality in the target language
-- "writing" maps to written accuracy and naturalness
-- Be honest but not harsh — a beginner doing well at their level should still get reasonable scores relative to their level
+For skill scores (0-100), assess based only on what you can observe in the learner's messages:
+- vocabularyRange: variety and level-appropriateness of words the learner produced
+- grammarAccuracy: correctness of particles, conjugations, and sentence patterns
+- naturalness: how native-like and idiomatic the learner's phrasing sounds
+- complexity: sophistication of sentence structures relative to their level
+Be honest but not harsh — a beginner doing well at their level should still get reasonable scores
 
 ${compressedSessions.map((s, i) => `--- Session ${i + 1} (${s.mode}, ${s.durationMinutes} min, topic: ${s.topic}) ---
 ${s.messages.map((m) => `[${m.role}]: ${m.content}`).join('\n')}`).join('\n\n')}`,

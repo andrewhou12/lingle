@@ -28,6 +28,11 @@ const conversationPlanSchema = z.object({
   culturalContext: z.string().optional().describe('Relevant cultural context — e.g. "end-of-year party season"'),
   dynamic: z.string().optional().describe('Conversation dynamic — e.g. "AI leads", "learner is asking for advice"'),
   tension: z.string().optional().describe('Conversational tension or challenge — e.g. "politely decline an invitation"'),
+  sections: z.array(z.object({
+    id: z.string().describe('Short kebab-case ID — e.g. "greeting", "topic-1", "wrap-up"'),
+    label: z.string().describe('Short display label — e.g. "Greeting", "Weekend plans"'),
+    description: z.string().describe('1-sentence description of what happens in this section'),
+  })).describe('3-6 ordered conversation sections forming a skeleton/roadmap. Always start with a greeting/opener and end with a natural wrap-up.'),
 })
 
 const tutorPlanSchema = z.object({
@@ -139,6 +144,7 @@ function getModeSpecificPlanningInstructions(mode: string, targetLanguage: strin
 - culturalContext: relevant cultural context (optional)
 - dynamic: who leads, what's the conversational flow (optional)
 - tension: a conversational challenge or tension point (optional — e.g. "politely decline an invitation")
+- sections: Generate 3-6 ordered sections forming a conversation skeleton/roadmap. The first section should always be a greeting/opener. The last section should be a natural wrap-up. Middle sections are topics to explore. Each section has a short id (kebab-case), a label, and a 1-sentence description.
 
 IMPORTANT: This is a scene card, NOT a lesson plan. No learning objectives, no milestones, no grammar targets. The learning is implicit through natural conversation.
 
@@ -150,6 +156,7 @@ If the user prompt is empty, generic, or just "Free conversation":
 - Use a simple persona: { relationship: "friend", personality: "friendly and relaxed" }
 - Register: "casual", tone: "lighthearted"
 - Leave setting, culturalContext, dynamic, and tension EMPTY (omit them)
+- Still generate sections: greeting, casual chat, and wrap-up (3 minimum)
 - The learner wants to just talk freely — don't impose a scene on them`
   }
 }
@@ -210,6 +217,11 @@ function getFallbackPlan(mode: string, sessionFocus: string): SessionPlan {
         },
         register: 'polite',
         tone: 'lighthearted',
+        sections: [
+          { id: 'greeting', label: 'Greeting', description: 'Warm greeting and set the scene' },
+          { id: 'main-topic', label: 'Main Topic', description: 'Explore the main conversation topic' },
+          { id: 'wrap-up', label: 'Wrap-up', description: 'Wind down and say goodbye naturally' },
+        ],
       }, 'conversation')
   }
 }

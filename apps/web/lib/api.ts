@@ -138,12 +138,10 @@ class LingleApiClient {
           severity: 'minor' | 'notable' | 'persistent'
         }[]
         skillScores: {
-          reading: number
-          listening: number
-          speaking: number
-          writing: number
-          vocabulary: number
-          grammar: number
+          vocabularyRange: number
+          grammarAccuracy: number
+          naturalness: number
+          complexity: number
         }
       }
     }>('/stats/analysis')

@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { SUPPORTED_LANGUAGES } from '@/lib/languages'
 import { LanguageProvider, useLanguage } from '@/hooks/use-language'
+import { useOnboarding } from '@/hooks/use-onboarding'
+import { CoachMark } from '@/components/onboarding/coach-mark'
 import { getDifficultyLevel } from '@/lib/difficulty-levels'
 
 /* ── Nav Sections ── */
@@ -266,6 +268,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 function AppLayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { targetLanguage, setTargetLanguage } = useLanguage()
+  const onboarding = useOnboarding()
+  const [hasCompletedSession, setHasCompletedSession] = useState(false)
+
+  // Check if user has completed at least one session (for sidebar hint)
+  useEffect(() => {
+    api.conversationList().then((sessions) => {
+      if (sessions.some((s: { durationSeconds: number | null }) => s.durationSeconds !== null && s.durationSeconds >= 60)) {
+        setHasCompletedSession(true)
+      }
+    }).catch(() => {})
+  }, [])
 
   // Sidebar collapse state with localStorage persistence
   const [collapsed, setCollapsed] = useState(false)
@@ -343,6 +356,13 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
         {!collapsed && <UsageBanner />}
 
         {/* Nav sections */}
+        <CoachMark
+          hintId="hint_sidebar"
+          content="Find your session history and settings here."
+          side="right"
+          show={hasCompletedSession && onboarding.isDismissed('welcome_card') && !onboarding.isDismissed('hint_sidebar')}
+          onDismiss={() => onboarding.dismiss('hint_sidebar')}
+        >
         <nav className={cn('flex-1 overflow-y-auto pb-2.5', collapsed ? 'px-1' : 'px-2.5')}>
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label}>
@@ -395,6 +415,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
+        </CoachMark>
 
         {/* User footer */}
         <UserFooter collapsed={collapsed} />

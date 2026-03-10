@@ -6,10 +6,11 @@ import { createPortal } from 'react-dom'
 import { useVoiceConversation, type UseVoiceConversationReturn } from '@/hooks/use-voice-conversation'
 import { getVoiceToolZone } from '@/lib/voice/voice-tool-zones'
 import type { SessionPlan } from '@/lib/session-plan'
+import { isConversationPlan } from '@/lib/session-plan'
 import { VoiceCentralOrb } from './voice-central-orb'
 import { VoiceStateRing } from './voice-state-ring'
-import { VoiceNavBar } from './voice-nav-bar'
-import { VoiceSessionPlanSidebar } from './voice-session-plan-sidebar'
+import { SessionNavBar } from '@/components/session/session-nav-bar'
+import { SessionPlanSidebar } from '@/components/session/session-plan-sidebar'
 import { VoiceLiveSubtitles } from './voice-live-subtitles'
 import { VoiceTranscriptPanel } from './voice-transcript-panel'
 import { VoiceCorrectionsPanel } from './voice-corrections-panel'
@@ -18,20 +19,15 @@ import { VoiceLookupPanel } from './voice-lookup-panel'
 import { VoiceControls, type ActivePanel } from './voice-controls'
 import { VoiceFallbackInput } from './voice-fallback-input'
 import { VoiceTurnGrade } from './voice-turn-grade'
-import { VoiceEndConfirmation } from './voice-end-confirmation'
+import { EndConfirmation } from '@/components/session/end-confirmation'
 import { ToolToastContainer } from './tool-toast'
 import { ToolTray } from './tool-tray'
 import { VocabularyCard } from '@/components/chat/vocabulary-card'
 import { GrammarNote } from '@/components/chat/grammar-note'
 import { Spinner } from '@/components/spinner'
 import { cn } from '@/lib/utils'
-import type { TranscriptLine, VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
-
-export interface SessionEndData {
-  duration: number
-  transcript: TranscriptLine[]
-  analysisResults: Record<number, VoiceAnalysisResult>
-}
+export type { SessionEndData } from '@/lib/session-types'
+import type { SessionEndData } from '@/lib/session-types'
 
 interface VoiceSessionOverlayProps {
   prompt: string
@@ -530,16 +526,27 @@ function SessionOverlayInner({
     if (voice.isTalking) setRightPanel(null)
   }, [voice.isTalking])
 
+  // Derive current section label for nav bar
+  const currentPlan = voice.sessionPlan || existingPlan || null
+  const currentSectionLabel = useMemo(() => {
+    if (!currentPlan || !isConversationPlan(currentPlan) || !currentPlan.sections?.length) return undefined
+    if (!voice.sectionTracking) return undefined
+    const section = currentPlan.sections.find(s => s.id === voice.sectionTracking!.currentSectionId)
+    return section?.label
+  }, [currentPlan, voice.sectionTracking])
+
   return createPortal(
     <div className="fixed inset-0 z-[99999] overflow-hidden bg-bg">
       {/* Session Plan sidebar (left) */}
-      <VoiceSessionPlanSidebar
+      <SessionPlanSidebar
         isOpen={planOpen}
         plan={voice.sessionPlan || existingPlan || null}
         onCollapse={() => setPlanOpen(false)}
         onSteer={handleSteer}
         onPlanSave={handlePlanSave}
         steeringMessages={steeringMessages}
+        currentSectionId={voice.sectionTracking?.currentSectionId}
+        completedSectionIds={voice.sectionTracking?.completedSectionIds}
       />
 
       {/* Main layout */}
@@ -551,7 +558,7 @@ function SessionOverlayInner({
         )}
       >
         {/* Nav bar */}
-        <VoiceNavBar
+        <SessionNavBar
           plan={voice.sessionPlan}
           duration={voice.duration}
           transcriptCount={voice.transcript.length}
@@ -564,6 +571,7 @@ function SessionOverlayInner({
           }}
           onToggleSubtitles={() => setShowSubtitles(p => !p)}
           onEnd={requestEnd}
+          currentSectionLabel={currentSectionLabel}
         />
 
         {/* Main stage */}
@@ -571,27 +579,16 @@ function SessionOverlayInner({
           {/* Starting overlay */}
           {isStarting && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-bg">
-              {/* Animated rings */}
-              <div className="relative mb-6">
-                <div className="w-[100px] h-[100px] rounded-full border-[1.5px] border-border-subtle animate-[voice-loading-ring_3s_ease-in-out_infinite]" />
-                <div className="absolute inset-[14px] rounded-full border-[1.5px] border-border animate-[voice-loading-ring_3s_ease-in-out_0.4s_infinite]" />
-                <div className="absolute inset-[28px] rounded-full border-[2px] border-accent-brand/30 animate-[voice-loading-ring_3s_ease-in-out_0.8s_infinite]" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full bg-accent-brand/10 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-accent-brand">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                    </svg>
-                  </div>
+              <div className="flex flex-col items-center gap-5">
+                <Spinner size={22} />
+                <div className="flex flex-col items-center gap-1.5">
+                  <p className="text-[15px] font-medium text-text-primary tracking-[-0.01em]">
+                    Connecting
+                  </p>
+                  <p className="text-[13px] text-text-muted">
+                    Setting up your voice session...
+                  </p>
                 </div>
-              </div>
-              <p className="text-[14px] font-medium text-text-primary mb-1">Connecting...</p>
-              <p className="text-[12px] text-text-muted">Setting up your voice session</p>
-              <div className="flex gap-1 mt-4">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-brand/40 animate-[voice-loading-dot_1.2s_ease-in-out_infinite]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-brand/40 animate-[voice-loading-dot_1.2s_ease-in-out_0.2s_infinite]" />
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-brand/40 animate-[voice-loading-dot_1.2s_ease-in-out_0.4s_infinite]" />
               </div>
             </div>
           )}
@@ -759,7 +756,7 @@ function SessionOverlayInner({
       )}
 
       {/* End confirmation dialog */}
-      <VoiceEndConfirmation
+      <EndConfirmation
         isOpen={showEndConfirm}
         onConfirm={handleEndConfirm}
         onCancel={handleEndCancel}

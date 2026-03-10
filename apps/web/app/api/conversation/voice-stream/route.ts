@@ -40,6 +40,18 @@ function stripNonTargetLanguage(text: string): string {
 
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY
 const CARTESIA_VOICE_JA = process.env.CARTESIA_VOICE_JA
+const CARTESIA_VOICE_EN = process.env.CARTESIA_VOICE_EN
+
+// Detect if a sentence is predominantly English (Latin-script) vs Japanese (CJK)
+const CJK_RANGE = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uff00-\uff9f]/g
+function detectSentenceLanguage(text: string): 'ja' | 'en' {
+  const cjkCount = (text.match(CJK_RANGE) || []).length
+  const latinCount = (text.match(LATIN_CHAR) || []).length
+  // If more Latin chars than CJK, treat as English
+  if (latinCount > 0 && cjkCount === 0) return 'en'
+  if (latinCount > cjkCount * 2) return 'en'
+  return 'ja'
+}
 
 // Same session cache as send route — systemPrompt/sessionPlan/mode never change mid-session
 const sessionCache = new Map<string, { systemPrompt: string; sessionPlan: unknown; mode: string | null }>()
@@ -127,8 +139,17 @@ export const POST = withAuth(async (request, { userId }) => {
     let sentenceCount = 0
 
     const dispatchSentence = (sentence: string) => {
-      const cleaned = stripNonTargetLanguage(cleanForTTS(sentence))
+      // Don't strip English when the assistant is intentionally speaking it
+      const sentenceLang = detectSentenceLanguage(sentence)
+      const cleaned = sentenceLang === 'en'
+        ? cleanForTTS(sentence)
+        : stripNonTargetLanguage(cleanForTTS(sentence))
       if (!cleaned || PUNCTUATION_ONLY.test(cleaned)) return
+
+      // Use same voice for both languages — switching voices mid-response sounds
+      // like two different people. The multilingual model handles English with
+      // the Japanese voice (slight accent, but consistent speaker identity).
+      const voiceId = CARTESIA_VOICE_JA!
 
       const idx = sentenceCount++
       audioChain = audioChain.then(async () => {
@@ -146,8 +167,8 @@ export const POST = withAuth(async (request, { userId }) => {
             body: JSON.stringify({
               model_id: 'sonic-multilingual',
               transcript: cleaned,
-              voice: { mode: 'id', id: CARTESIA_VOICE_JA },
-              language: 'ja',
+              voice: { mode: 'id', id: voiceId },
+              language: sentenceLang,
               output_format: {
                 container: 'raw',
                 encoding: 'pcm_s16le',
@@ -157,7 +178,7 @@ export const POST = withAuth(async (request, { userId }) => {
           })
 
           const ttfa = performance.now() - tTts
-          console.log(`[voice-stream:timing] cartesia[${idx}] TTFA:${ttfa.toFixed(0)}ms "${cleaned.slice(0, 40)}"`)
+          console.log(`[voice-stream:timing] cartesia[${idx}] TTFA:${ttfa.toFixed(0)}ms lang:${sentenceLang} "${cleaned.slice(0, 40)}"`)
 
           if (!response.ok) {
             const errorText = await response.text().catch(() => 'unknown')

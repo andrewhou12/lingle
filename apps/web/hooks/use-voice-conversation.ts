@@ -47,6 +47,11 @@ export interface UseVoiceConversationOptions {
   onPlanUpdate?: (plan: SessionPlan) => void
 }
 
+export interface SectionTracking {
+  currentSectionId: string
+  completedSectionIds: string[]
+}
+
 export interface UseVoiceConversationReturn {
   voiceState: VoiceState
   transcript: TranscriptLine[]
@@ -77,6 +82,7 @@ export interface UseVoiceConversationReturn {
   ttsPlaying: boolean
   analysisResults: Record<number, VoiceAnalysisResult>
   retryLast: () => void
+  sectionTracking: SectionTracking | null
 }
 
 export function useVoiceConversation(
@@ -223,6 +229,10 @@ export function useVoiceConversation(
   }, [getVoicePlayer])
 
   const doVoiceStream = useCallback(async (userText: string) => {
+    // Ensure abort controller is fresh (may have been aborted by strict mode cleanup)
+    if (voiceStreamAbortRef.current.signal.aborted) {
+      voiceStreamAbortRef.current = new AbortController()
+    }
     const gen = ++voiceStreamGenRef.current
     const t0 = performance.now()
     voiceStreamDoneRef.current = false
@@ -689,6 +699,15 @@ export function useVoiceConversation(
     fsmRef.current.sendTextMessage(text)
   }, [])
 
+  // Derive section tracking from latest analysis result
+  const sectionTracking = useMemo((): SectionTracking | null => {
+    const entries = Object.entries(analysisResults)
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i][1].sectionTracking) return entries[i][1].sectionTracking!
+    }
+    return null
+  }, [analysisResults])
+
   const retryLast = useCallback(() => {
     // Remove last user+assistant pair from voice history
     if (voiceHistoryRef.current.length >= 2) {
@@ -724,6 +743,7 @@ export function useVoiceConversation(
         clearTimeout(sessionExpiryRef.current)
       }
       voiceStreamAbortRef.current.abort()
+      voiceStreamAbortRef.current = new AbortController()
       voicePlayerRef.current?.dispose()
       fsmRef.current.dispose()
     }
@@ -759,5 +779,6 @@ export function useVoiceConversation(
     ttsPlaying: vsTtsPlaying,
     analysisResults,
     retryLast,
+    sectionTracking,
   }
 }

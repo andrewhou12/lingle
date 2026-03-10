@@ -38,6 +38,10 @@ export interface VoiceAnalysisResult {
     suggestion: string
     explanation: string
   }>
+  sectionTracking?: {
+    currentSectionId: string
+    completedSectionIds: string[]
+  }
 }
 
 export interface EnrichedUtterance {
@@ -246,6 +250,7 @@ export class VoiceSessionFSM {
                 vocabularyCards: result.vocabularyCards || [],
                 grammarNotes: result.grammarNotes || [],
                 naturalnessFeedback: result.naturalnessFeedback || [],
+                sectionTracking: result.sectionTracking || undefined,
               })
             }
           })

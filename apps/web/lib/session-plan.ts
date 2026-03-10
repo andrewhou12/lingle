@@ -5,6 +5,17 @@ import type { ScenarioMode } from './experience-scenarios'
 export type LessonStepType = 'activate' | 'explain' | 'check' | 'practice' | 'produce' | 'review'
 export type LessonStepStatus = 'upcoming' | 'active' | 'completed' | 'skipped'
 
+// --- Conversation section (skeleton roadmap) ---
+
+export type ConversationSectionStatus = 'upcoming' | 'active' | 'completed'
+
+export interface ConversationSection {
+  id: string          // e.g., "greeting", "topic-1"
+  label: string       // Short display label, e.g., "Greeting", "Weekend plans"
+  description: string // 1-line description of what happens in this section
+  status: ConversationSectionStatus
+}
+
 // --- ConversationPlan — scene card (no shared base) ---
 
 export interface ConversationPlan {
@@ -22,6 +33,7 @@ export interface ConversationPlan {
   culturalContext?: string
   dynamic?: string
   tension?: string
+  sections?: ConversationSection[]
 }
 
 // --- TutorPlan — structured lesson (no shared base) ---
@@ -105,6 +117,13 @@ export function normalizePlan(raw: unknown, mode?: string): SessionPlan {
     case 'conversation': {
       // New shape: has `topic` and `persona`
       if (obj.topic && obj.persona) {
+        const rawSections = obj.sections as Array<Record<string, unknown>> | undefined
+        const sections: ConversationSection[] | undefined = rawSections?.map((s) => ({
+          id: (s.id as string) || '',
+          label: (s.label as string) || '',
+          description: (s.description as string) || '',
+          status: ((s.status as ConversationSectionStatus) || 'upcoming'),
+        }))
         return {
           mode: 'conversation',
           topic: obj.topic as string,
@@ -116,6 +135,7 @@ export function normalizePlan(raw: unknown, mode?: string): SessionPlan {
           culturalContext: obj.culturalContext as string | undefined,
           dynamic: obj.dynamic as string | undefined,
           tension: obj.tension as string | undefined,
+          sections: sections?.length ? sections : undefined,
         }
       }
       // Old shape: migrate from focus/scenario
@@ -230,6 +250,17 @@ export function formatPlanForPrompt(plan: SessionPlan): string {
       if (plan.culturalContext) lines.push(`Cultural context: ${plan.culturalContext}`)
       if (plan.dynamic) lines.push(`Dynamic: ${plan.dynamic}`)
       if (plan.tension) lines.push(`Tension: ${plan.tension}`)
+      if (plan.sections && plan.sections.length > 0) {
+        lines.push('')
+        lines.push('Conversation Flow:')
+        for (const section of plan.sections) {
+          const statusIcon =
+            section.status === 'completed' ? '[x]' :
+            section.status === 'active' ? '[>]' :
+            '[ ]'
+          lines.push(`  ${statusIcon} ${section.label}: ${section.description}`)
+        }
+      }
       break
     }
 
