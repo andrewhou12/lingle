@@ -158,6 +158,9 @@ export class VoiceSessionFSM {
     if (this._state === 'SPEAKING') {
       this.dispatch('INTERRUPTED')
       this._deps.tts.interrupt()
+      // Clear sendInFlight synchronously — the aborted stream's async catch
+      // may fire after the user's next utterance, causing a race condition
+      this._sendInFlight = false
     }
   }
 
@@ -283,6 +286,7 @@ export class VoiceSessionFSM {
     if (this._state === 'SPEAKING' || this._state === 'THINKING') {
       this._deps.tts.interrupt()
       this.dispatch('INTERRUPTED')
+      this._sendInFlight = false
     }
 
     this._deps.onTalkingChange(true)

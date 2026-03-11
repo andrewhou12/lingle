@@ -91,10 +91,6 @@ export function ChatSessionOverlay({
   // ── Translation state ──
   const [translation, setTranslation] = useState<string | null>(null)
 
-  // ── X-ray state ──
-  const [xrayTokens, setXrayTokens] = useState<Array<{ surface: string; reading: string; meaning: string; pos: string }> | null>(null)
-  const [xrayLoading, setXrayLoading] = useState(false)
-
   // ── Suggestion state ──
   const [suggestion, setSuggestion] = useState<string | null>(null)
   const [suggestionLoading, setSuggestionLoading] = useState(false)
@@ -280,9 +276,8 @@ export function ChatSessionOverlay({
         }
       }
 
-      // Clear translate/xray/suggestion on new assistant message
+      // Clear translate/suggestion on new assistant message
       setTranslation(null)
-      setXrayTokens(null)
       setSuggestion(null)
     }
     prevIsSendingRef.current = isSending
@@ -471,32 +466,6 @@ export function ChatSessionOverlay({
       console.error('[translate] Failed:', err)
     }
   }, [translation, getLastAssistantText])
-
-  // ── X-ray handler (toggle) ──
-  const handleXray = useCallback(async () => {
-    if (xrayTokens) {
-      setXrayTokens(null)
-      return
-    }
-    const text = getLastAssistantText()
-    if (!text) return
-    setXrayLoading(true)
-    try {
-      const res = await fetch('/api/conversation/xray', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentence: text }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setXrayTokens(data.tokens)
-      }
-    } catch {
-      // silent fail
-    } finally {
-      setXrayLoading(false)
-    }
-  }, [xrayTokens, getLastAssistantText])
 
   // ── Suggestion handler (toggle) ──
   const handleSuggest = useCallback(async () => {
@@ -693,38 +662,6 @@ export function ChatSessionOverlay({
                   </div>
                 )}
 
-                {/* Inline X-ray */}
-                {(xrayTokens || xrayLoading) && (
-                  <div className="ml-0 my-1.5 px-3 py-2 bg-bg-secondary border border-border rounded-lg">
-                    <div className="text-[11px] font-medium text-text-muted mb-1.5 flex items-center gap-1">
-                      <MagnifyingGlassIcon className="w-3 h-3" />
-                      X-ray
-                    </div>
-                    {xrayLoading ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <Spinner size={14} />
-                        <span className="text-[12px] text-text-muted">Breaking down sentence...</span>
-                      </div>
-                    ) : xrayTokens && (
-                      <div className="flex flex-wrap gap-1">
-                        {xrayTokens.map((token, i) => (
-                          <div
-                            key={i}
-                            className="inline-flex flex-col items-center gap-0.5 px-2 py-1.5 bg-bg-pure border border-border rounded-md"
-                          >
-                            <span className="text-[15px] font-jp-clean font-medium text-text-primary">{token.surface}</span>
-                            {token.reading && token.reading !== token.surface && (
-                              <span className="text-[11px] font-jp-clean text-text-muted">{token.reading}</span>
-                            )}
-                            <span className="text-[11px] text-text-secondary leading-tight text-center">{token.meaning}</span>
-                            <span className="text-[10px] text-text-placeholder">{token.pos}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Inline suggestion */}
                 {(suggestion || suggestionLoading) && (
                   <div className="ml-0 my-1.5 px-3 py-2 bg-bg-secondary border border-border rounded-lg">
@@ -810,19 +747,6 @@ export function ChatSessionOverlay({
                     >
                       <LanguageIcon className="w-3.5 h-3.5" />
                       Translate
-                    </button>
-                    <button
-                      onClick={handleXray}
-                      disabled={xrayLoading}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-sans cursor-pointer transition-colors',
-                        xrayTokens || xrayLoading
-                          ? 'bg-bg-active border-border-strong text-text-primary font-medium'
-                          : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
-                      )}
-                    >
-                      <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-                      X-ray
                     </button>
                     <button
                       onClick={handleSuggest}

@@ -12,6 +12,7 @@ import type { ScenarioMode } from '@/lib/experience-scenarios'
 import type { Prisma } from '@prisma/client'
 import { MODE_TOOLS } from '@/lib/conversation-tools'
 import { getLanguageById } from '@/lib/languages'
+import { getVarietySeed } from '@/lib/conversation-variety'
 
 // --- Per-mode Zod schemas ---
 
@@ -154,13 +155,9 @@ IMPORTANT: This is a scene card, NOT a lesson plan. No learning objectives, no m
 If the user provided a specific topic or scenario, make the scene card match it — specific and interesting.
 
 If the user prompt is empty, generic, or just "Free conversation":
-- Do NOT invent elaborate scenarios, fictional locations, or detailed backstories
-- Set the topic to something simple and natural like "Casual chat" or "日常会話"
-- Use a simple persona: { relationship: "friend", personality: "friendly and relaxed" }
-- Register: "casual", tone: "lighthearted"
-- Leave setting, culturalContext, dynamic, and tension EMPTY (omit them)
-- Still generate sections: greeting, casual chat, and wrap-up (3 minimum)
-- The learner wants to just talk freely — don't impose a scene on them`
+- If a VARIETY SEED is provided, use it as inspiration to create a specific, interesting scene card. Adapt the persona, topic, tone, and setting from the seed. Make it feel like a real, natural conversation — not a language exercise.
+- If no variety seed is provided, set the topic to something simple and natural and let the learner lead.
+- Either way: no elaborate fictional scenarios. Keep it grounded and realistic — like a real conversation someone might actually have.`
   }
 }
 
@@ -271,6 +268,9 @@ export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   const schema = getPlanSchema(resolvedMode, registerOpts)
   let plan: SessionPlan
   try {
+    const isGenericPrompt = !prompt || prompt.trim() === '' || prompt.trim().toLowerCase() === 'free conversation'
+    const varietySeed = (resolvedMode === 'conversation' && isGenericPrompt) ? `\n\n${getVarietySeed()}` : ''
+
     const planPrompt = resolvedMode === 'conversation' || resolvedMode === 'tutor'
       ? `You are a session planner for a language learning app.
 
@@ -280,9 +280,9 @@ Difficulty: ${level.label}
 Target language: ${profile.targetLanguage}
 Native language: ${profile.nativeLanguage}
 
-${getModeSpecificPlanningInstructions(resolvedMode, profile.targetLanguage, registerOpts)}
+${getModeSpecificPlanningInstructions(resolvedMode, profile.targetLanguage, registerOpts)}${varietySeed}
 
-Generate the plan as JSON. Make it specific to the user's prompt and difficulty level.`
+Generate the plan as JSON. Make it specific${isGenericPrompt ? ' — use the variety seed to create an interesting, specific scene card. Do NOT generate a generic "casual chat" plan' : ' to the user\'s prompt and difficulty level'}.`
       : `You are a session planner for a language learning app.
 
 User prompt: "${sessionFocus}"

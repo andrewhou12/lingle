@@ -95,7 +95,7 @@ async function synthesizeWithCartesia(text: string, langCode: string): Promise<R
       voice: { mode: 'id', id: voiceId },
       language: langCode,
       output_format: {
-        container: 'raw',
+        container: 'wav',
         encoding: 'pcm_s16le',
         sample_rate: 24000,
       },
@@ -110,8 +110,7 @@ async function synthesizeWithCartesia(text: string, langCode: string): Promise<R
 
   return new Response(response.body, {
     headers: {
-      'Content-Type': 'audio/pcm',
-      'Content-Length': response.headers.get('Content-Length') || '',
+      'Content-Type': 'audio/wav',
     },
   })
 }

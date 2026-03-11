@@ -324,15 +324,19 @@ export function useVoiceConversation(
           sendingRef.current = false
           try { audio.ctrl?.close() } catch {}
           audio.ctrl = null
+          fsmRef.current.onStreamingEnd(null, null)
         },
       })
     } catch (err) {
-      if (!voiceStreamAbortRef.current.signal.aborted) {
+      const wasAborted = (err as Error)?.name === 'AbortError'
+      if (!wasAborted) {
         console.error('[voice-stream:client] fetch error:', err)
       }
       voiceStreamDoneRef.current = true
       sendingRef.current = false
       try { audio.ctrl?.close() } catch {}
+      // Safety net: ensure FSM isn't stuck with sendInFlight=true
+      fsmRef.current.onStreamingEnd(null, null)
     }
 
     await playPromise
