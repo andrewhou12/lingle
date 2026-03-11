@@ -1,6 +1,8 @@
 import { streamText, type UIMessage, convertToModelMessages } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { withAuth } from '@/lib/api-helpers'
+
+export const maxDuration = 120
 import { createConversationTools, createVoiceModeTools } from '@/lib/conversation-tools'
 import { buildVoiceSystemPrompt } from '@/lib/conversation-prompt'
 import { getSessionWithCache } from '@/lib/conversation-session-cache'

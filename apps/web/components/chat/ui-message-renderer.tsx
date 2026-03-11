@@ -24,6 +24,7 @@ export function UIMessageRenderer({
   isStreaming,
   panelOpen,
   violations,
+  onRetry,
 }: {
   message: UIMessage
   chosenChoiceIds: Set<string>
@@ -34,6 +35,7 @@ export function UIMessageRenderer({
   isStreaming?: boolean
   panelOpen?: boolean
   violations?: DifficultyViolation[]
+  onRetry?: (correctedText: string) => void
 }) {
   if (message.role === 'user') {
     const textContent = message.parts
@@ -70,6 +72,7 @@ export function UIMessageRenderer({
             chosenChoiceIds={chosenChoiceIds}
             onChoiceSelect={onChoiceSelect}
             panelOpen={panelOpen}
+            onRetry={onRetry}
           />
         )
       })}
@@ -98,6 +101,7 @@ function PartRenderer({
   chosenChoiceIds,
   onChoiceSelect,
   panelOpen,
+  onRetry,
 }: {
   part: UIMessage['parts'][number]
   isStreaming?: boolean
@@ -105,6 +109,7 @@ function PartRenderer({
   chosenChoiceIds: Set<string>
   onChoiceSelect: (text: string, blockId: string) => void
   panelOpen?: boolean
+  onRetry?: (correctedText: string) => void
 }) {
   if (part.type === 'text') {
     const text = (part as { type: 'text'; text: string }).text
@@ -175,7 +180,7 @@ function PartRenderer({
     if (toolName === 'showCorrection') {
       if (toolPart.state === 'output-available' && toolPart.output) {
         const output = toolPart.output as { original: string; corrected: string; explanation: string; grammarPoint?: string }
-        return <CorrectionCard {...output} />
+        return <CorrectionCard {...output} onRetry={onRetry} />
       }
       if (toolPart.state === 'input-available') return <CorrectionCardSkeleton />
       return null

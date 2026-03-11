@@ -15,7 +15,7 @@ type Grade = 'good' | 'ok' | 'fix'
 
 function gradeForResult(r: TurnAnalysisResult): Grade {
   if (r.corrections.length > 0 || (r.registerMismatches?.length ?? 0) > 0 || (r.l1Interference?.length ?? 0) > 0) return 'fix'
-  if (r.naturalnessFeedback.length > 0 || (r.alternativeExpressions?.length ?? 0) > 0) return 'ok'
+  if (r.naturalnessFeedback.length > 0 || (r.alternativeExpressions?.length ?? 0) > 0 || (r.conversationalTips?.length ?? 0) > 0) return 'ok'
   return 'good'
 }
 
@@ -36,7 +36,7 @@ export function VoiceCorrectionsPanel({ isOpen, turnResults, onClose }: VoiceCor
   const entries = Object.entries(turnResults).sort(([a], [b]) => Number(a) - Number(b))
 
   const totalCorrections = entries.reduce((sum, [, r]) => sum + r.corrections.length + (r.registerMismatches?.length ?? 0) + (r.l1Interference?.length ?? 0), 0)
-  const totalTips = entries.reduce((sum, [, r]) => sum + r.naturalnessFeedback.length + (r.alternativeExpressions?.length ?? 0), 0)
+  const totalTips = entries.reduce((sum, [, r]) => sum + r.naturalnessFeedback.length + (r.alternativeExpressions?.length ?? 0) + (r.conversationalTips?.length ?? 0), 0)
   const totalItems = totalCorrections + totalTips
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export function VoiceCorrectionsPanel({ isOpen, turnResults, onClose }: VoiceCor
         ) : (
           entries.map(([turnIdx, result]) => {
             const grade = gradeForResult(result)
-            const hasContent = result.corrections.length > 0 || result.naturalnessFeedback.length > 0 || (result.registerMismatches?.length ?? 0) > 0 || (result.l1Interference?.length ?? 0) > 0 || (result.alternativeExpressions?.length ?? 0) > 0
+            const hasContent = result.corrections.length > 0 || result.naturalnessFeedback.length > 0 || (result.registerMismatches?.length ?? 0) > 0 || (result.l1Interference?.length ?? 0) > 0 || (result.alternativeExpressions?.length ?? 0) > 0 || (result.conversationalTips?.length ?? 0) > 0
 
             return (
               <div key={turnIdx} className="py-3.5 border-b border-border/60 last:border-b-0">
@@ -186,6 +186,19 @@ export function VoiceCorrectionsPanel({ isOpen, turnResults, onClose }: VoiceCor
                         <span className="text-[13.5px] font-jp-clean font-semibold text-text-primary">{a.alternative}</span>
                       </div>
                       <span className="text-[12px] text-text-muted leading-[1.5] font-sans block mt-2">{a.explanation}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Conversational tips */}
+                {result.conversationalTips?.map((t, i) => (
+                  <div key={`ct-${i}`} className="ml-4 mt-1">
+                    <div className="bg-bg-pure border border-border rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                      <div className="flex items-baseline gap-2 mb-1.5">
+                        <span className="text-[10.5px] font-medium text-purple bg-purple-soft rounded-full px-2 py-0.5 shrink-0 font-sans">Culture tip</span>
+                      </div>
+                      <span className="text-[13.5px] font-sans font-medium text-text-primary block">{t.tip}</span>
+                      <span className="text-[12px] text-text-muted leading-[1.5] font-sans block mt-1.5">{t.explanation}</span>
                     </div>
                   </div>
                 ))}

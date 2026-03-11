@@ -5,9 +5,10 @@ interface CorrectionCardProps {
   corrected: string
   explanation: string
   grammarPoint?: string
+  onRetry?: (correctedText: string) => void
 }
 
-export function CorrectionCard({ original, corrected, explanation, grammarPoint }: CorrectionCardProps) {
+export function CorrectionCard({ original, corrected, explanation, grammarPoint, onRetry }: CorrectionCardProps) {
   return (
     <div className="my-2 bg-bg-pure border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       {/* Before → After */}
@@ -19,12 +20,20 @@ export function CorrectionCard({ original, corrected, explanation, grammarPoint 
         <span className="text-[13.5px] font-jp-clean font-semibold text-text-primary">{corrected}</span>
       </div>
 
-      {/* Grammar point badge + explanation */}
+      {/* Grammar point badge + explanation + retry */}
       <div className="flex items-baseline gap-2 mt-2">
         {grammarPoint && (
           <span className="text-[10.5px] font-medium text-text-secondary bg-bg-secondary rounded-full px-2 py-0.5 shrink-0">{grammarPoint}</span>
         )}
-        <span className="text-[12px] text-text-muted leading-[1.5]">{explanation}</span>
+        <span className="text-[12px] text-text-muted leading-[1.5] flex-1">{explanation}</span>
+        {onRetry && (
+          <button
+            onClick={() => onRetry(corrected)}
+            className="text-[11.5px] font-medium text-accent-brand hover:text-accent-brand/80 transition-colors shrink-0 ml-1"
+          >
+            Try this →
+          </button>
+        )}
       </div>
     </div>
   )

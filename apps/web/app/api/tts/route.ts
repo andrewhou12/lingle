@@ -92,7 +92,11 @@ async function synthesizeWithCartesia(text: string, langCode: string): Promise<R
     body: JSON.stringify({
       model_id: 'sonic-multilingual',
       transcript: text,
-      voice: { mode: 'id', id: voiceId },
+      voice: {
+        mode: 'id',
+        id: voiceId,
+        __experimental_controls: { speed: -0.1 },
+      },
       language: langCode,
       output_format: {
         container: 'wav',

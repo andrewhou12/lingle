@@ -6,6 +6,8 @@ import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import type { Prisma } from '@prisma/client'
 
+export const maxDuration = 120
+
 export const POST = withAuth(async (request, { userId }) => {
   void userId // used implicitly via dbSession.userId
   const { sessionId } = await request.json()

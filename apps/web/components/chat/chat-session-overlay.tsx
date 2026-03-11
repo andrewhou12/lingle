@@ -508,6 +508,10 @@ export function ChatSessionOverlay({
     sendMessage({ text })
   }, [sendMessage])
 
+  const handleRetry = useCallback((correctedText: string) => {
+    setInput(correctedText)
+  }, [])
+
   const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -648,6 +652,7 @@ export function ChatSessionOverlay({
                     isPlayingAudio={tts.playingId === msg.id}
                     isStreaming={isSending && msg === messages[messages.length - 1] && msg.role === 'assistant'}
                     violations={difficultyViolations.get(msg.id)}
+                    onRetry={handleRetry}
                   />
                 ))}
 

@@ -183,7 +183,7 @@ export function createConversationTools(_userId: string, _sessionId: string, mod
 
     showVocabularyCard: tool({
       description:
-        'Show a vocabulary card for a word. ONLY use when: (1) the learner explicitly asks what a word means, or (2) you intentionally use a word well above their level and want to teach it. Do NOT show cards for routine vocabulary — most words should just be used naturally without a card.',
+        'Show a vocabulary card for a word. ONLY use when: (1) the learner explicitly asks what a word means, or (2) you intentionally use a word ABOVE the learner\'s current level and want to teach it. NEVER show cards for words at or below the learner\'s level — a B1 learner does not need cards for N5/N4 vocabulary. Cards are for stretch items only.',
       inputSchema: z.object({
         word: z.string().describe('The word in the target language'),
         reading: z.string().optional().describe('Reading/pronunciation (e.g. hiragana for kanji)'),
@@ -199,7 +199,7 @@ export function createConversationTools(_userId: string, _sessionId: string, mod
 
     showGrammarNote: tool({
       description:
-        'Show a grammar explanation card. Use when teaching a grammar point, when the learner asks about grammar, or when a grammar pattern comes up that deserves explanation.',
+        'Show a grammar explanation card for patterns AT OR ABOVE the learner\'s current level. NEVER show grammar cards for patterns below their level — a B1 learner does not need N5/N4 grammar explained. Use when teaching a new/stretch grammar point, or when the learner explicitly asks about grammar.',
       inputSchema: z.object({
         pattern: z.string().describe('The grammar pattern (e.g. "~temoidesuka")'),
         meaning: z.string().describe('What the pattern means in English'),

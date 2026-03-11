@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 import { useVoiceConversation, type UseVoiceConversationReturn } from '@/hooks/use-voice-conversation'
-import { getVoiceToolZone } from '@/lib/voice/voice-tool-zones'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan } from '@/lib/session-plan'
 import { VoiceCentralOrb } from './voice-central-orb'
@@ -20,12 +19,8 @@ import { VoiceHelpPanel } from './voice-help-panel'
 import { VoiceLookupPanel } from './voice-lookup-panel'
 import { VoiceControls, type ActivePanel } from './voice-controls'
 import { VoiceFallbackInput } from './voice-fallback-input'
-import { VoiceTurnGrade } from './voice-turn-grade'
+import { motion, AnimatePresence } from 'framer-motion'
 import { EndConfirmation } from '@/components/session/end-confirmation'
-import { ToolToastContainer } from './tool-toast'
-import { ToolTray } from './tool-tray'
-import { VocabularyCard } from '@/components/chat/vocabulary-card'
-import { GrammarNote } from '@/components/chat/grammar-note'
 import { Spinner } from '@/components/spinner'
 import { cn } from '@/lib/utils'
 export type { SessionEndData } from '@/lib/session-types'
@@ -85,7 +80,9 @@ function SessionOverlayInner({
   const [rightPanel, setRightPanel] = useState<ActivePanel>(null)
   const [showSubtitles, setShowSubtitles] = useState(true)
   const [showKeyboard, setShowKeyboard] = useState(false)
-  const [dismissedToasts, setDismissedToasts] = useState<Set<string>>(new Set())
+  const [notesHighlight, setNotesHighlight] = useState(false)
+  const [showCorrectionBanner, setShowCorrectionBanner] = useState(false)
+  const correctionBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Help panel state ──
   const [helpMessages, setHelpMessages] = useState<Array<{ role: 'user' | 'ai'; text: string }>>([
@@ -186,68 +183,38 @@ function SessionOverlayInner({
     return { original: c.original, corrected: c.corrected, explanation: c.explanation, grammarPoint: c.grammarPoint }
   }, [latestResult])
 
-  // ── Tool outputs for toasts (corrections now handled by grade indicator) ──
-  const toolOutputs = useMemo(() => {
-    const outputs: Array<{ id: string; toolName: string; output: Record<string, unknown> }> = []
-
-    for (const msg of voice.messages) {
-      if (msg.role !== 'assistant') continue
-      for (const part of msg.parts) {
-        const partType = (part as { type: string }).type
-        if (!partType.startsWith('tool-')) continue
-        const toolName = partType.replace('tool-', '')
-        const zone = getVoiceToolZone(toolName)
-        if (zone !== 'toast') continue
-        // Skip corrections — handled by grade indicator
-        if (toolName === 'showCorrection') continue
-        const toolPart = part as { type: string; state: string; output?: unknown }
-        if (toolPart.state === 'output-available' && toolPart.output) {
-          const id = `${msg.id}-${toolName}-${outputs.length}`
-          outputs.push({ id, toolName, output: toolPart.output as Record<string, unknown> })
-        }
-      }
-    }
-
-    // Only vocab and grammar from analysis — corrections handled by grade
-    for (const [turnIdx, result] of Object.entries(voice.analysisResults)) {
-      for (const card of result.vocabularyCards) {
-        const id = `analysis-${turnIdx}-vocab-${card.word}`
-        outputs.push({ id, toolName: 'showVocabularyCard', output: card as unknown as Record<string, unknown> })
-      }
-      for (const note of result.grammarNotes) {
-        const id = `analysis-${turnIdx}-grammar-${note.pattern}`
-        outputs.push({ id, toolName: 'showGrammarNote', output: note as unknown as Record<string, unknown> })
-      }
-    }
-
-    return outputs
-  }, [voice.messages, voice.analysisResults])
-
-  // Toast management
   const openCorrectionsPanel = useCallback(() => {
     setRightPanel('feedback')
   }, [])
 
-  const activeToasts = useMemo(
-    () => toolOutputs
-      .filter(t => !dismissedToasts.has(t.id))
-      .slice(-3)
-      .map(t => ({
-        id: t.id,
-        content: renderToolCard(t.toolName, t.output),
-        duration: 8000,
-      })),
-    [toolOutputs, dismissedToasts],
-  )
+  // Show correction banner when new corrections arrive
+  const prevCorrectionTurnRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (latestTurnIdx === null || latestTurnIdx === prevCorrectionTurnRef.current) return
+    prevCorrectionTurnRef.current = latestTurnIdx
+    if (latestCorrection) {
+      setShowCorrectionBanner(true)
+      if (correctionBannerTimerRef.current) clearTimeout(correctionBannerTimerRef.current)
+      correctionBannerTimerRef.current = setTimeout(() => setShowCorrectionBanner(false), 12000)
+    } else {
+      setShowCorrectionBanner(false)
+    }
+    return () => {
+      if (correctionBannerTimerRef.current) clearTimeout(correctionBannerTimerRef.current)
+    }
+  }, [latestTurnIdx, latestCorrection])
 
-  const trayItems = useMemo(
-    () => toolOutputs.map(t => ({ id: t.id, content: renderToolCard(t.toolName, t.output) })),
-    [toolOutputs],
-  )
-
-  const handleDismissToast = useCallback((id: string) => {
-    setDismissedToasts(prev => new Set(prev).add(id))
-  }, [])
+  // Flash the Session Notes panel when new analysis items arrive
+  const prevAnalysisCountRef = useRef(0)
+  useEffect(() => {
+    const count = Object.keys(voice.analysisResults).length
+    if (count > prevAnalysisCountRef.current) {
+      setNotesHighlight(true)
+      const timer = setTimeout(() => setNotesHighlight(false), 1500)
+      return () => clearTimeout(timer)
+    }
+    prevAnalysisCountRef.current = count
+  }, [voice.analysisResults])
 
   // ── Help panel handlers ──
   const handleHelpSend = useCallback(async () => {
@@ -585,7 +552,7 @@ function SessionOverlayInner({
       />
 
       {/* Persistent session notes (right) */}
-      <SessionNotesPanel analysisResults={voice.analysisResults} />
+      <SessionNotesPanel analysisResults={voice.analysisResults} highlight={notesHighlight} />
 
       {/* Main layout */}
       <div
@@ -699,6 +666,47 @@ function SessionOverlayInner({
 
         </main>
 
+        {/* Correction banner with retry */}
+        <AnimatePresence>
+          {showCorrectionBanner && latestCorrection && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0 flex justify-center px-6 pb-2"
+            >
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-bg-pure border border-border-subtle rounded-lg shadow-[0_1px_2px_rgba(0,0,0,.04)] max-w-[500px]">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[13px] font-jp-clean text-text-secondary line-through">{latestCorrection.original}</span>
+                    <span className="text-text-secondary text-[12px]">&rarr;</span>
+                    <span className="text-[13px] font-jp-clean font-medium text-text-primary">{latestCorrection.corrected}</span>
+                  </div>
+                  <div className="text-[12px] text-text-secondary mt-0.5 truncate">{latestCorrection.explanation}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    voice.retryLast()
+                    setShowCorrectionBanner(false)
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-md bg-bg-secondary border border-border text-[12px] font-medium text-text-primary cursor-pointer transition-colors hover:bg-bg-hover hover:border-border-strong"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={() => setShowCorrectionBanner(false)}
+                  className="shrink-0 text-text-secondary hover:text-text-primary transition-colors cursor-pointer bg-transparent border-none p-0"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Voice controls */}
         <VoiceControls
           voiceState={voice.voiceState}
@@ -759,24 +767,8 @@ function SessionOverlayInner({
         disabled={voice.isStreaming}
       />
 
-      {/* Turn grade indicator (bottom right) */}
-      <VoiceTurnGrade
-        latestResult={latestResult}
-        latestTurnIdx={latestTurnIdx}
-        onOpenFeedback={openCorrectionsPanel}
-      />
 
-      {/* Tool toasts (top right per mockup) */}
-      <ToolToastContainer
-        toasts={activeToasts}
-        onDismiss={handleDismissToast}
-        className="!fixed !top-[70px] !right-[18px] !bottom-auto !flex-col !gap-2"
-      />
-
-      {/* Tool tray */}
-      {dismissedToasts.size > 0 && trayItems.length > 0 && (
-        <ToolTray items={trayItems} />
-      )}
+      {/* Tool cards are now shown in the Session Notes panel */}
 
       {/* Inactivity warning */}
       {inactivityWarning && !showEndConfirm && (
@@ -813,29 +805,3 @@ function SessionOverlayInner({
   )
 }
 
-function renderToolCard(toolName: string, output: Record<string, unknown>): React.ReactNode {
-  if (toolName === 'showVocabularyCard') {
-    return (
-      <VocabularyCard
-        word={output.word as string}
-        reading={output.reading as string | undefined}
-        meaning={output.meaning as string}
-        partOfSpeech={output.partOfSpeech as string | undefined}
-        exampleSentence={output.exampleSentence as string | undefined}
-        notes={output.notes as string | undefined}
-      />
-    )
-  }
-  if (toolName === 'showGrammarNote') {
-    return (
-      <GrammarNote
-        pattern={output.pattern as string}
-        meaning={output.meaning as string}
-        formation={output.formation as string}
-        examples={output.examples as { japanese: string; english: string }[]}
-        level={output.level as string | undefined}
-      />
-    )
-  }
-  return null
-}

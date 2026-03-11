@@ -3,6 +3,8 @@ import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
+
+export const maxDuration = 60
 import { withUsageCheck, getUsageInfo } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 import { buildSystemPrompt } from '@/lib/experience-prompt'

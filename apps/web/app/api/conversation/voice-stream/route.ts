@@ -12,6 +12,8 @@ import { parseCartesiaSSE } from '@/lib/cartesia-sse'
 import { FRAME, encodeFrame } from '@/lib/voice/voice-stream-protocol'
 import { getLanguageById } from '@/lib/languages'
 
+export const maxDuration = 120
+
 const RUBY_REGEX = /\{([^}|]+)\|[^}]+\}/g
 const PAUSE_MARKER_REGEX = /<\d+>/g
 const PUNCTUATION_ONLY = /^[\u3002\uFF01\uFF1F.!?\s\u2026\u2500\u2014\u3001,]+$/
@@ -165,7 +167,11 @@ export const POST = withAuth(async (request, { userId }) => {
             body: JSON.stringify({
               model_id: 'sonic-multilingual',
               transcript: cleaned,
-              voice: { mode: 'id', id: voiceId },
+              voice: {
+                mode: 'id',
+                id: voiceId,
+                __experimental_controls: { speed: -0.1 },
+              },
               language: sentenceLang,
               output_format: {
                 container: 'raw',

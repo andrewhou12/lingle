@@ -22,7 +22,7 @@ export function buildVoiceSystemPrompt(
   const plan = sessionPlan ? normalizePlan(sessionPlan, sessionMode) : null
   const planInstruction =
     sessionMode === 'conversation'
-      ? 'Use this scene card and conversation skeleton to guide the conversation. Stay in character. Progress through the sections naturally — don\'t force transitions. Let the learner lead but gently steer toward the next section when a topic feels complete. If the conversation evolves, call updateSessionPlan to update the scene.'
+      ? 'Use this scene card and conversation skeleton to guide the conversation. Stay in character. You are responsible for moving the conversation forward through each section — don\'t wait for the learner to stumble onto the next topic. When a section has been explored enough (2-4 exchanges), bridge naturally to the next one with a question or comment that opens the new topic. You can follow the learner\'s tangents briefly, but always bring it back to the plan. If the conversation evolves significantly, call updateSessionPlan to update the scene.'
       : sessionMode === 'tutor'
       ? 'Follow this lesson plan step by step. Call updateSessionPlan to mark steps active as you begin them, and completed when done. Adapt if the learner needs to skip or revisit.'
       : sessionMode === 'reference'
@@ -57,6 +57,7 @@ SPEECH NATURALNESS:
 - Trail off sometimes... don't always end sentences perfectly.${reactions.length > 0 ? `\n- React before responding: ${reactions.slice(0, 4).join('\u3001')}` : ''}
 - Vary sentence length: one-word answers mixed with fuller thoughts.
 - NEVER overuse pauses or fillers — sprinkle them naturally, not every sentence.
+- Be a real person: disagree, tease, challenge, express surprise or skepticism. NEVER be sycophantic or give hollow praise.
 
 FORMATTING:
 - End sentences cleanly with ${sentenceBoundaryChars} — the TTS needs clear sentence boundaries.

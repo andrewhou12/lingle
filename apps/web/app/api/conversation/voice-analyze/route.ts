@@ -3,6 +3,8 @@ import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
+
+export const maxDuration = 60
 import { withUsageCheck } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 
@@ -52,6 +54,10 @@ const voiceAnalysisSchema = z.object({
     alternative: z.string().describe('A more idiomatic, common, or nuanced way to say it'),
     explanation: z.string().describe('One sentence. What makes the alternative better or different — collocation, nuance, or register.'),
   })).describe('When the learner\'s phrasing is correct but there\'s a notably better or more idiomatic alternative. Includes collocation improvements. 0-1 items max.'),
+  conversationalTips: z.array(z.object({
+    tip: z.string().describe('A short actionable tip in English, e.g. "Ask them about their week too" or "Use a follow-up question here"'),
+    explanation: z.string().describe('One sentence. Why this matters culturally or pragmatically — e.g. reciprocity norms, showing interest, politeness expectations.'),
+  })).describe('Cultural or pragmatic tips about the learner\'s conversational behavior — not grammar. Flag when the learner misses a social cue: not asking a reciprocal question, not acknowledging what was said, being too direct/indirect for the culture, missing a chance to show empathy or interest. 0-1 items max. Only flag clear opportunities, not every turn.'),
   takeaways: z.array(z.string()).describe('0-2 short bullet-point notes of notable things from this turn the learner should remember: key expressions, cultural context, usage tips, or "aha moments". Only include genuinely memorable insights, not routine exchanges. Most turns should have 0.'),
   sectionTracking: z.object({
     currentSectionId: z.string().describe('ID of the section currently being discussed'),
@@ -129,6 +135,7 @@ ${spokenRule ? `- ${spokenRule}\n` : ''}- Keep explanations to ONE concise sente
 - Register mismatches: If the expected register is specified above, check if the learner used the wrong formality level. e.g. using です/ます in a casual conversation, or casual forms in a polite/formal setting. 0-1 items max. Only flag clear mismatches, not borderline cases.
 - L1 interference: Check if the learner's sentence structure, word order, or phrasing mirrors ${profile?.nativeLanguage ?? 'English'} patterns instead of natural ${profile?.targetLanguage ?? session.targetLanguage}. Common examples: direct translation of idioms, wrong word order calqued from the native language, using words in ways that only make sense from the native language perspective. 0-1 items max. Only flag when it's clearly L1 influence, not just a generic error.
 - Alternative expressions: If the learner said something correct but there's a notably more idiomatic, natural, or commonly-used alternative (including better collocations), suggest it. This expands their active repertoire. 0-1 items max. Only suggest when the alternative is genuinely better, not just different.
+- Conversational tips: Flag when the learner misses a cultural or pragmatic opportunity — e.g. not asking a reciprocal question after being asked one, not showing interest in what the other person said, being too blunt or too indirect for the context, missing empathy cues. These are about conversational behavior, not grammar. 0-1 items max.
 - Be extremely selective overall. Each feedback type is 0-1 items max. A typical turn should have feedback in only 1-2 categories, not all of them. Don't overwhelm the learner.
 - sectionTracking: If conversation sections are provided above, identify which section is currently active based on the conversation context, and which sections have been fully covered. Only include this field if sections are provided.`,
     })
@@ -136,6 +143,6 @@ ${spokenRule ? `- ${spokenRule}\n` : ''}- Keep explanations to ONE concise sente
     return NextResponse.json(object)
   } catch (err) {
     console.error('[voice-analyze] Analysis failed:', err)
-    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [], naturalnessFeedback: [], registerMismatches: [], l1Interference: [], alternativeExpressions: [], takeaways: [], sectionTracking: undefined })
+    return NextResponse.json({ corrections: [], vocabularyCards: [], grammarNotes: [], naturalnessFeedback: [], registerMismatches: [], l1Interference: [], alternativeExpressions: [], conversationalTips: [], takeaways: [], sectionTracking: undefined })
   }
 }))

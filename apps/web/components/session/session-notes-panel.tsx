@@ -9,6 +9,7 @@ import type { TurnAnalysisResult } from '@/lib/session-types'
 
 interface SessionNotesPanelProps {
   analysisResults: Record<number, TurnAnalysisResult>
+  highlight?: boolean
 }
 
 interface CollapsibleSectionProps {
@@ -47,7 +48,7 @@ function CollapsibleSection({ title, count, accentClass, defaultOpen = true, chi
   )
 }
 
-export function SessionNotesPanel({ analysisResults }: SessionNotesPanelProps) {
+export function SessionNotesPanel({ analysisResults, highlight }: SessionNotesPanelProps) {
   const { targetLanguage } = useLanguage()
   const fontClean = getTargetFontCleanClass(targetLanguage || 'Japanese')
 
@@ -154,7 +155,10 @@ export function SessionNotesPanel({ analysisResults }: SessionNotesPanelProps) {
   const totalItems = takeaways.length + vocab.length + corrections.length + grammar.length + registerMismatches.length + l1Interference.length + alternatives.length
 
   return (
-    <div className="fixed right-6 top-[72px] bottom-6 z-[9] w-[280px] flex flex-col bg-bg-pure border border-border-subtle rounded-lg shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)] overflow-hidden">
+    <div className={cn(
+      "fixed right-6 top-[72px] bottom-6 z-[9] w-[280px] flex flex-col bg-bg-pure border rounded-lg shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)] overflow-hidden transition-[border-color] duration-500",
+      highlight ? 'border-accent-brand' : 'border-border-subtle',
+    )}>
       {/* Header */}
       <div className="px-5 pt-5 pb-4 shrink-0">
         <span className="text-[13px] font-medium text-text-secondary">Session Notes</span>

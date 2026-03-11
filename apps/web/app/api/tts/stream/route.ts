@@ -75,7 +75,11 @@ export const POST = withAuth(async (request) => {
         body: JSON.stringify({
           model_id: 'sonic-multilingual',
           transcript: spoken,
-          voice: { mode: 'id', id: voiceId },
+          voice: {
+            mode: 'id',
+            id: voiceId,
+            __experimental_controls: { speed: -0.1 },
+          },
           language: langCode,
           output_format: {
             container: 'raw',

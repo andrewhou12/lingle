@@ -50,6 +50,10 @@ export interface TurnAnalysisResult {
     alternative: string
     explanation: string
   }>
+  conversationalTips?: Array<{
+    tip: string
+    explanation: string
+  }>
   takeaways?: string[]
   sectionTracking?: {
     currentSectionId: string
