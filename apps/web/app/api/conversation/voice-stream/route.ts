@@ -64,6 +64,17 @@ function cleanForTTS(text: string): string {
   return text.replace(RUBY_REGEX, '$1').replace(PAUSE_MARKER_REGEX, '').trim()
 }
 
+/** Classify a sentence to pick per-sentence Cartesia voice controls */
+function getSentenceControls(text: string): { speed: number; emotion?: string[] } {
+  const trimmed = text.trim()
+  // Short reactions/acknowledgments — natural speed, no slowdown
+  if (trimmed.length < 12) return { speed: 0 }
+  // Questions — slight curiosity, natural pace
+  if (/[？?]$/.test(trimmed)) return { speed: -0.05, emotion: ['curiosity'] }
+  // Longer statements — baseline slight slowdown
+  return { speed: -0.1 }
+}
+
 export const POST = withAuth(async (request, { userId }) => {
   const t0 = performance.now()
   const body = await request.json()
@@ -157,6 +168,7 @@ export const POST = withAuth(async (request, { userId }) => {
         try {
           await safeWrite(encodeFrame(FRAME.SENTENCE_START, encoder.encode(cleaned)))
 
+          const controls = getSentenceControls(cleaned)
           const response = await fetch('https://api.cartesia.ai/tts/sse', {
             method: 'POST',
             headers: {
@@ -170,7 +182,7 @@ export const POST = withAuth(async (request, { userId }) => {
               voice: {
                 mode: 'id',
                 id: voiceId,
-                __experimental_controls: { speed: -0.1 },
+                __experimental_controls: controls,
               },
               language: sentenceLang,
               output_format: {

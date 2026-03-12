@@ -37,6 +37,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Bench results
+scripts/bench/results/
+
 
 # Electron
 release/

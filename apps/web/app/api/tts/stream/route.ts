@@ -17,6 +17,13 @@ function getCartesiaVoice(langCode: string): string | undefined {
   return process.env[`CARTESIA_VOICE_${langCode.toUpperCase()}`]
 }
 
+function getSentenceControls(text: string): { speed: number; emotion?: string[] } {
+  const trimmed = text.trim()
+  if (trimmed.length < 12) return { speed: 0 }
+  if (/[？?]$/.test(trimmed)) return { speed: -0.05, emotion: ['curiosity'] }
+  return { speed: -0.1 }
+}
+
 export const POST = withAuth(async (request) => {
   const t0 = performance.now()
   const body = await request.json()
@@ -65,6 +72,7 @@ export const POST = withAuth(async (request) => {
       }
 
       const tFetch = performance.now()
+      const controls = getSentenceControls(spoken)
       const response = await fetch('https://api.cartesia.ai/tts/sse', {
         method: 'POST',
         headers: {
@@ -78,7 +86,7 @@ export const POST = withAuth(async (request) => {
           voice: {
             mode: 'id',
             id: voiceId,
-            __experimental_controls: { speed: -0.1 },
+            __experimental_controls: controls,
           },
           language: langCode,
           output_format: {
