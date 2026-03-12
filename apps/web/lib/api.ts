@@ -56,7 +56,7 @@ class LingleApiClient {
       if (body.error === 'usage_limit_exceeded') {
         throw new UsageLimitError(body)
       }
-      throw new Error(`API error: ${res.status}`)
+      throw new Error(body.error || `API error: ${res.status}`)
     }
     this.cache.clear()
     return res.json()
