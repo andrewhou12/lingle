@@ -1,0 +1,27 @@
+{
+  "name": "@lingle/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx src/index.ts dev",
+    "start": "node --import tsx src/index.ts start",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@lingle/db": "workspace:*",
+    "@lingle/shared": "workspace:*",
+    "@livekit/agents": "^1.0.0",
+    "@livekit/agents-plugin-cartesia": "^1.0.0",
+    "@livekit/agents-plugin-deepgram": "^1.0.0",
+    "@livekit/agents-plugin-livekit": "^1.0.0",
+    "@livekit/agents-plugin-silero": "^1.0.0",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.7.0"
+  }
+}

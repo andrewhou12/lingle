@@ -48,6 +48,8 @@ export interface SectionTracking {
   completedSectionIds: string[]
 }
 
+export type InputMode = 'ptt' | 'vad'
+
 export interface UseVoiceConversationReturn {
   voiceState: VoiceState
   transcript: TranscriptLine[]
@@ -81,6 +83,8 @@ export interface UseVoiceConversationReturn {
   retryLast: () => void
   sectionTracking: SectionTracking | null
   isAnalyzing: boolean
+  /** 'ptt' = push-to-talk (default/Soniox), 'vad' = voice activity detection (LiveKit) */
+  inputMode: InputMode
 }
 
 export function useVoiceConversation(
@@ -824,5 +828,6 @@ export function useVoiceConversation(
     retryLast,
     sectionTracking,
     isAnalyzing: pendingAnalysisTurns.size > 0,
+    inputMode: 'ptt' as const,
   }
 }

@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 import { useVoiceConversation, type UseVoiceConversationReturn } from '@/hooks/use-voice-conversation'
+import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
+import { getVoiceProvider } from '@/lib/voice/voice-provider-config'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan } from '@/lib/session-plan'
 import { VoiceCentralOrb } from './voice-central-orb'
@@ -37,11 +39,42 @@ interface VoiceSessionOverlayProps {
 }
 
 export function VoiceSessionOverlay(props: VoiceSessionOverlayProps) {
+  const provider = useMemo(() => getVoiceProvider(), [])
+
+  if (provider === 'livekit') {
+    return <LiveKitVoiceSession {...props} />
+  }
+
+  return <DefaultVoiceSession {...props} />
+}
+
+function DefaultVoiceSession(props: VoiceSessionOverlayProps) {
   const { prompt, mode, sessionId: existingSessionId, plan: existingPlan, steeringNotes, onEnd } = props
 
   const voice = useVoiceConversation({
     sessionId: existingSessionId,
     autoEndpoint: false,
+  })
+
+  return (
+    <SessionOverlayInner
+      voice={voice}
+      prompt={prompt}
+      mode={mode}
+      existingSessionId={existingSessionId}
+      existingPlan={existingPlan}
+      steeringNotes={steeringNotes}
+      onEnd={onEnd}
+    />
+  )
+}
+
+function LiveKitVoiceSession(props: VoiceSessionOverlayProps) {
+  const { prompt, mode, sessionId: existingSessionId, plan: existingPlan, steeringNotes, onEnd } = props
+
+  const voice = useLiveKitVoice({
+    sessionId: existingSessionId,
+    sessionPlan: existingPlan,
   })
 
   return (
@@ -673,7 +706,7 @@ function SessionOverlayInner({
                 voice.voiceState === 'THINKING' && 'text-ring-thinking',
                 voice.voiceState === 'SPEAKING' && 'text-ring-ai',
               )}>
-                {voice.voiceState === 'IDLE' && 'Hold to speak'}
+                {voice.voiceState === 'IDLE' && (voice.inputMode === 'vad' ? (voice.isMuted ? 'Muted' : 'Ready') : 'Hold to speak')}
                 {voice.voiceState === 'LISTENING' && 'Listening...'}
                 {voice.voiceState === 'THINKING' && 'Thinking...'}
                 {voice.voiceState === 'SPEAKING' && 'Speaking...'}
@@ -762,6 +795,9 @@ function SessionOverlayInner({
               setRightPanel(p => p === panel ? null : panel)
             }
           }}
+          inputMode={voice.inputMode}
+          isMuted={voice.isMuted}
+          onToggleMute={voice.toggleMute}
         />
       </div>
 

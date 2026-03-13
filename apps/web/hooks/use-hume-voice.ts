@@ -367,5 +367,6 @@ export function useHumeVoice(opts: {
     },
     sectionTracking: null,
     isAnalyzing: false,
+    inputMode: 'ptt' as const,
   }
 }

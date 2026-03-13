@@ -6,6 +6,8 @@
   "description": "Lingle language learning platform",
   "scripts": {
     "dev:web": "pnpm --filter @lingle/web dev",
+    "dev:agent": "pnpm --filter @lingle/agent dev",
+    "dev:all": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "db:migrate": "prisma migrate dev",
