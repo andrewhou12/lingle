@@ -18,6 +18,8 @@ export function useStreamingTTS(
   isStreaming: boolean
 ): UseStreamingTTSReturn {
   const { targetLanguage } = useLanguage()
+  const targetLanguageRef = useRef(targetLanguage)
+  targetLanguageRef.current = targetLanguage
   const [voiceEnabled, setVoiceEnabled] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const trackerRef = useRef(createSentenceBoundaryTracker())
@@ -56,7 +58,7 @@ export function useStreamingTTS(
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sentence, ttsProvider: getTtsProvider(), targetLanguage }),
+        body: JSON.stringify({ text: sentence, ttsProvider: getTtsProvider(), targetLanguage: targetLanguageRef.current }),
       })
       if (!res.ok || stoppedRef.current) {
         playingRef.current = false

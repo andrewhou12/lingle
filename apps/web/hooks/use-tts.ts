@@ -56,7 +56,7 @@ export function useTTS() {
       console.error('TTS error:', err)
       cleanup()
     }
-  }, [cleanup])
+  }, [cleanup, targetLanguage])
 
   const stop = useCallback(() => {
     cleanup()
