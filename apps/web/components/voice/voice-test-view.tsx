@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useMemo, useCallback } from 'react'
+import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
 import { VoiceCentralOrb } from './voice-central-orb'
@@ -8,12 +8,14 @@ import { VoiceStateRing } from './voice-state-ring'
 import { VoiceLiveSubtitles } from './voice-live-subtitles'
 import { cn } from '@/lib/utils'
 
-const TEST_METADATA = {
-  sessionMode: 'conversation',
-  basePrompt:
+const TEST_PROMPTS: Record<string, string> = {
+  Japanese:
     'You are a friendly Japanese conversation partner. Have a casual chat in Japanese. ' +
     'Keep your responses short and natural. Use simple Japanese appropriate for an intermediate learner. ' +
     'Start by greeting the user in Japanese.',
+  English:
+    'You are a friendly English conversation partner. Have a casual chat in English. ' +
+    'Keep your responses short and natural. Start by greeting the user.',
 }
 
 const STATE_LABELS: Record<string, string> = {
@@ -26,6 +28,7 @@ const STATE_LABELS: Record<string, string> = {
 export function VoiceTestView() {
   const router = useRouter()
   const startedRef = useRef(false)
+  const [lang, setLang] = useState<'Japanese' | 'English'>('Japanese')
 
   const voice = useLiveKitVoice({})
 
@@ -33,12 +36,29 @@ export function VoiceTestView() {
   useEffect(() => {
     if (startedRef.current) return
     startedRef.current = true
-    voice.startDirect(TEST_METADATA)
+    voice.startDirect({
+      sessionMode: 'conversation',
+      basePrompt: TEST_PROMPTS[lang],
+      targetLanguage: lang,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleEnd = useCallback(() => {
-    voice.endSession()
+  const switchLanguage = useCallback(async (newLang: 'Japanese' | 'English') => {
+    setLang(newLang)
+    await voice.endSession()
+    // Wait for room to fully disconnect before reconnecting
+    await new Promise((r) => setTimeout(r, 1000))
+    startedRef.current = true
+    voice.startDirect({
+      sessionMode: 'conversation',
+      basePrompt: TEST_PROMPTS[newLang],
+      targetLanguage: newLang,
+    })
+  }, [voice])
+
+  const handleEnd = useCallback(async () => {
+    await voice.endSession()
     router.push('/conversation')
   }, [voice, router])
 
@@ -79,6 +99,23 @@ export function VoiceTestView() {
           Voice Test
         </div>
         <div className="flex items-center gap-3">
+          {/* Language toggle */}
+          <div className="flex items-center rounded-full border border-border bg-bg-pure p-0.5">
+            {(['Japanese', 'English'] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => lang !== l && switchLanguage(l)}
+                className={cn(
+                  'px-3 py-1 rounded-full text-[12px] font-medium transition-colors cursor-pointer',
+                  lang === l
+                    ? 'bg-accent-brand text-white'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+              >
+                {l === 'Japanese' ? 'JP' : 'EN'}
+              </button>
+            ))}
+          </div>
           <span className="text-[12px] text-text-muted tabular-nums">
             {formatDuration(voice.duration)}
           </span>

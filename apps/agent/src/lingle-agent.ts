@@ -11,6 +11,11 @@ import { buildVoiceSystemPrompt } from '@lingle/shared/conversation-prompt'
 import type { ScenarioMode } from '@lingle/shared/scenario-mode'
 import type { AgentMetadata } from './config.js'
 
+/** Returns true if the transcript is empty noise (dots, punctuation, whitespace) */
+function isGarbageTranscript(text: string): boolean {
+  return /^[\s.…。、,!?！？·]+$/.test(text) || text.trim().length === 0
+}
+
 export class LingleAgent extends voice.Agent {
   private metadata: AgentMetadata
   private turnIndex = 0
@@ -31,13 +36,19 @@ export class LingleAgent extends voice.Agent {
     chatCtx: llm.ChatContext,
     newMessage: llm.ChatMessage,
   ): Promise<void> {
-    this.turnIndex++
-
     // Extract user text from the new message
     const userText = extractText(newMessage)
 
+    // Skip garbage transcripts (e.g. ".." from noise)
+    if (!userText || isGarbageTranscript(userText)) {
+      console.log(`[LingleAgent] skipping garbage transcript: "${userText}"`)
+      return
+    }
+
+    this.turnIndex++
+
     // Fire post-turn analysis asynchronously
-    if (this.metadata.analyzeEndpoint && this.metadata.sessionId && userText) {
+    if (this.metadata.analyzeEndpoint && this.metadata.sessionId) {
       this.runAnalysis(userText).catch((err) => {
         console.error('[LingleAgent] Analysis failed:', err)
       })

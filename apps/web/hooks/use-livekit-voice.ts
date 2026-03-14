@@ -13,6 +13,19 @@ import type { SessionPlan } from '@/lib/session-plan'
 import type { VoiceState, TranscriptLine, VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
 import type { UseVoiceConversationReturn, SectionTracking } from './use-voice-conversation'
 
+/** Strip Cartesia SSML/prosody tags and filler tags from text for display */
+function stripSSML(text: string): string {
+  return text
+    .replace(/<next_filler>.*?<\/next_filler>/gs, '')
+    .replace(/<\/?(?:break|speed|volume|emotion|prosody)\b[^>]*\/?>/gi, '')
+    .trim()
+}
+
+/** Returns true if a transcript is just noise (dots, punctuation, whitespace) */
+function isGarbageTranscript(text: string): boolean {
+  return /^[\s.…。、,!?！？·]+$/.test(text) || text.trim().length === 0
+}
+
 /**
  * LiveKit voice hook — connects to a LiveKit room with an agent worker
  * and returns the same UseVoiceConversationReturn interface so the
@@ -70,22 +83,27 @@ export function useLiveKitVoice(opts: {
       for (const segment of segments) {
         const role = participant?.identity === agentIdentityRef.current ? 'assistant' : 'user'
 
+        // Skip garbage transcripts (e.g. ".." from background noise)
+        if (role === 'user' && isGarbageTranscript(segment.text)) continue
+
         if (segment.final) {
+          const displayText = role === 'assistant' ? stripSSML(segment.text) : segment.text
           setTranscript((prev) => [
             ...prev,
-            { role, text: segment.text, isFinal: true, timestamp: Date.now() },
+            { role, text: displayText, isFinal: true, timestamp: Date.now() },
           ])
           // Clear partial text when final
           if (role === 'assistant') {
-            setSpokenSentences((prev) => [...prev, segment.text])
+            setSpokenSentences((prev) => [...prev, displayText])
             setCurrentSentence(null)
             setPartialText('')
           }
         } else {
           // Update partial text for non-final segments
           if (role === 'assistant') {
-            setCurrentSentence(segment.text)
-            setPartialText(segment.text)
+            const displayText = stripSSML(segment.text)
+            setCurrentSentence(displayText)
+            setPartialText(displayText)
           }
         }
       }

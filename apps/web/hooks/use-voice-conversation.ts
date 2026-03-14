@@ -486,7 +486,6 @@ export function useVoiceConversation(
     }
     prevStreamingRef.current = isStreaming
   }, [isStreaming, isActive, messages])
-
   // Watchdog: reset if stuck
   useEffect(() => {
     if (voiceState !== 'THINKING' && voiceState !== 'SPEAKING') return

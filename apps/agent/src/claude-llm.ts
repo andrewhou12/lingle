@@ -1,6 +1,10 @@
 /**
  * Custom LLM implementation wrapping the Anthropic SDK
  * to match LiveKit Agents' LLM interface.
+ *
+ * Includes:
+ * - Prompt caching (system prompt + conversation history)
+ * - Language-based filler prefill for faster time-to-first-audio
  */
 import { llm, type APIConnectOptions } from '@livekit/agents'
 import Anthropic from '@anthropic-ai/sdk'
@@ -119,15 +123,20 @@ class ClaudeLLMStream extends llm.LLMStream {
     const { system, messages } = convertChatContext(this.chatCtx)
     const anthropicTools = convertTools(this.toolCtx)
 
+    // --- Prompt caching strategy ---
+    // 1. Cache the system prompt (stable across turns)
+    // 2. Cache conversation history up to the second-to-last user message
+    //    (only the newest user message changes between turns)
+    const cachedMessages = this.applyCacheBreakpoints(messages)
+
     const params: Anthropic.MessageCreateParamsStreaming = {
       model: this._model,
       max_tokens: this.maxTokens,
       stream: true,
-      messages,
+      messages: cachedMessages,
     }
 
     if (system) {
-      // Use prompt caching for the system prompt to reduce latency on subsequent turns
       params.system = [
         {
           type: 'text' as const,
@@ -151,6 +160,23 @@ class ClaudeLLMStream extends llm.LLMStream {
     for await (const event of stream) {
       if (event.type === 'message_start') {
         chunkId = event.message.id
+        // Report prompt token usage (including cache metrics)
+        const u = event.message.usage
+        if (u) {
+          const inputTokens = u.input_tokens ?? 0
+          const cachedTokens = (u as unknown as Record<string, number>).cache_read_input_tokens ?? 0
+          const cacheCreation = (u as unknown as Record<string, number>).cache_creation_input_tokens ?? 0
+          console.log(`[cache] input=${inputTokens} cached_read=${cachedTokens} cached_creation=${cacheCreation}`)
+          this.queue.put({
+            id: chunkId,
+            usage: {
+              completionTokens: 0,
+              promptTokens: inputTokens,
+              promptCachedTokens: cachedTokens,
+              totalTokens: inputTokens,
+            },
+          })
+        }
       } else if (event.type === 'content_block_start') {
         if (event.content_block.type === 'tool_use') {
           currentToolName = event.content_block.name
@@ -159,6 +185,7 @@ class ClaudeLLMStream extends llm.LLMStream {
         }
       } else if (event.type === 'content_block_delta') {
         if (event.delta.type === 'text_delta') {
+          // Stream text directly to TTS — zero buffering
           this.queue.put({
             id: chunkId,
             delta: {
@@ -173,7 +200,6 @@ class ClaudeLLMStream extends llm.LLMStream {
         if (currentToolName && currentToolId) {
           try {
             const rawArgs = currentToolInput || '{}'
-            // Create a FunctionCall instance for the toolCalls array
             const fnCall = llm.FunctionCall.create({
               callId: currentToolId,
               name: currentToolName,
@@ -207,5 +233,51 @@ class ClaudeLLMStream extends llm.LLMStream {
         }
       }
     }
+  }
+
+  /**
+   * Apply cache_control breakpoints on messages for multi-turn caching.
+   * Strategy: cache everything up to the second-to-last user message.
+   * On turn N, turns 1..N-1 are cached, only the new turn is uncached.
+   */
+  private applyCacheBreakpoints(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+    if (messages.length < 4) return [...messages]
+
+    const result: Anthropic.MessageParam[] = []
+
+    // Find the second-to-last user message index — that's our cache boundary
+    let lastUserIdx = -1
+    let secondLastUserIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        if (lastUserIdx === -1) {
+          lastUserIdx = i
+        } else {
+          secondLastUserIdx = i
+          break
+        }
+      }
+    }
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i]
+      if (i === secondLastUserIdx && typeof msg.content === 'string') {
+        // Add cache breakpoint on this message
+        result.push({
+          role: msg.role,
+          content: [
+            {
+              type: 'text' as const,
+              text: msg.content,
+              cache_control: { type: 'ephemeral' as const },
+            },
+          ],
+        })
+      } else {
+        result.push(msg)
+      }
+    }
+
+    return result
   }
 }

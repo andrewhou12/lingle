@@ -11,6 +11,7 @@ export function getVoiceId(languageCode: string): string {
 /** Map language IDs to Deepgram STT language codes */
 export function getDeepgramLanguage(languageId: string): string {
   const map: Record<string, string> = {
+    English: 'en',
     Japanese: 'ja',
     Korean: 'ko',
     'Mandarin Chinese': 'zh',
@@ -26,6 +27,7 @@ export function getDeepgramLanguage(languageId: string): string {
 /** Map language IDs to Cartesia TTS language codes */
 export function getCartesiaLanguage(languageId: string): string {
   const map: Record<string, string> = {
+    English: 'en',
     Japanese: 'ja',
     Korean: 'ko',
     'Mandarin Chinese': 'zh',
