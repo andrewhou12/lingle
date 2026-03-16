@@ -199,9 +199,13 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
-    // Resume AudioContext to satisfy browser autoplay policy
-    // (connectToRoom is always called from a user gesture handler)
-    await room.startAudio()
+    // Resume AudioContext on next user gesture — useEffect calls break the
+    // gesture chain before we get here, so we can't call startAudio() directly.
+    const unlockAudio = () => {
+      room.startAudio().catch(() => {})
+    }
+    document.addEventListener('click', unlockAudio, { once: true })
+    document.addEventListener('touchstart', unlockAudio, { once: true })
 
     // Enable microphone
     await room.localParticipant.setMicrophoneEnabled(true)
