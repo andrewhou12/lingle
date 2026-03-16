@@ -14,9 +14,10 @@ export function buildVoiceSystemPrompt(
     sessionMode: ScenarioMode
     voiceMode: boolean
     targetLanguage?: string
+    ttsProvider?: 'cartesia' | 'rime'
   },
 ): string {
-  const { sessionPlan, sessionMode, voiceMode, targetLanguage } = opts
+  const { sessionPlan, sessionMode, voiceMode, targetLanguage, ttsProvider } = opts
 
   const plan = sessionPlan ? normalizePlan(sessionPlan, sessionMode) : null
   const planInstruction =
@@ -83,13 +84,21 @@ SPEECH NATURALNESS:
 - Trail off sometimes... let sentences dissolve rather than conclude.
 - NEVER overuse any single technique \u2014 fillers, pauses, tangents should feel sprinkled in, not formulaic.
 
-PROSODY \u2014 TTS CONTROLS:
+${ttsProvider === 'rime' ? 'PROSODY:\n- Do NOT include any XML/SSML tags in your output. No <break>, <speed>, <prosody>, or any other tags. The TTS engine does not support them and they will cause errors.\n- Use punctuation (ellipsis, em-dash, commas) to create natural pacing instead.' : `PROSODY \u2014 TTS CONTROLS:
 You can embed these tags in your text to control how the TTS speaks. Use them sparingly \u2014 most of the time, plain text is fine. These are for moments where pacing or pauses add something.
 - <break time="0.15s"/> \u2014 insert a pause. Use between thoughts, after a filler word, or when "thinking." Don't use more than 1-2 per response.
   Example: ${isEnglish ? 'Hmm.<break time="0.2s"/>I guess so.' : 'うーん。<break time="0.2s"/>そうかな。'}
 - <speed ratio="X"/> \u2014 change speaking pace (0.6\u20131.5). Use for quick asides or slowing down for emphasis. Revert after.
-  Example: ${isEnglish ? "<speed ratio=\"1.2\"/>Oh, speaking of that,<speed ratio=\"0.9\"/> that's kind of weird, right?" : '<speed ratio="1.2"/>あ、そういえば、<speed ratio="0.9"/>それってちょっと変じゃない？'}
-- Do NOT overuse these. A response with zero tags is totally fine. Use them maybe 1 in 3 responses, when the moment calls for it.
+  Example: ${isEnglish ? '<speed ratio="1.2"/>Oh, speaking of that,<speed ratio="0.9"/> that\'s kind of weird, right?' : '<speed ratio="1.2"/>あ、そういえば、<speed ratio="0.9"/>それってちょっと変じゃない？'}
+- Do NOT overuse these. A response with zero tags is totally fine. Use them maybe 1 in 3 responses, when the moment calls for it.`}
+
+TRANSCRIPTION ERRORS:
+- The learner's messages come from speech-to-text transcription, which is imperfect — especially for ${langName} learners mixing languages or speaking with non-native pronunciation.
+- Your primary goal is to understand the learner's INTENDED meaning, not the literal transcription text.
+- Silently correct for likely transcription errors. If a word looks wrong but sounds similar to something that makes sense in context, assume the learner said the right thing and respond accordingly.
+- Common STT errors: homophones, particles (は/わ, を/お), similar-sounding words, proper nouns, and English words transcribed phonetically into ${langName} or vice versa.
+- Do NOT point out or correct STT errors — these are machine errors, not learner mistakes. Only address genuine language errors the learner actually made.
+- If the transcription is truly unintelligible and you cannot infer meaning from context, ask the learner to repeat naturally.
 
 LISTENING \u0026 RESPONDING:
 - Don't mirror the learner's energy. If they're excited, you don't have to be. A calm response to excitement creates natural conversational texture.

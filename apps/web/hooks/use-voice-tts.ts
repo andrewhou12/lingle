@@ -38,7 +38,7 @@ interface QueueItem {
   streamPromise?: Promise<ReadableStream<Uint8Array> | null>
 }
 
-const SAMPLE_RATE = 16000
+const SAMPLE_RATE = 24000
 
 export function useVoiceTTS(
   onPlaybackStart?: () => void,

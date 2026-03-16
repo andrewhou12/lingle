@@ -221,7 +221,7 @@ export function useVoiceConversation(
 
   const getVoicePlayer = useCallback((): PCMStreamPlayer => {
     if (!voicePlayerRef.current) {
-      voicePlayerRef.current = new PCMStreamPlayer(16000)
+      voicePlayerRef.current = new PCMStreamPlayer(24000)
     }
     return voicePlayerRef.current
   }, [])

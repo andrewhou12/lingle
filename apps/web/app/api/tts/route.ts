@@ -94,11 +94,11 @@ async function synthesizeWithCartesia(text: string, langCode: string): Promise<R
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Cartesia-Version': '2024-06-10',
+      'Cartesia-Version': '2025-04-16',
       'X-API-Key': CARTESIA_API_KEY,
     },
     body: JSON.stringify({
-      model_id: 'sonic-multilingual',
+      model_id: 'sonic',
       transcript: text,
       voice: {
         mode: 'id',
@@ -109,7 +109,7 @@ async function synthesizeWithCartesia(text: string, langCode: string): Promise<R
       output_format: {
         container: 'wav',
         encoding: 'pcm_s16le',
-        sample_rate: 16000,
+        sample_rate: 24000,
       },
     }),
   })

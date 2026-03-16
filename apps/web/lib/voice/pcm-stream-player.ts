@@ -26,7 +26,7 @@ export class PCMStreamPlayer {
   // Min 256 samples (~16ms at 16kHz) to avoid scheduling tiny buffers that cause clicks
   private static readonly MIN_SAMPLES = 256
 
-  constructor(sampleRate = 16000) {
+  constructor(sampleRate = 24000) {
     this.sampleRate = sampleRate
   }
 

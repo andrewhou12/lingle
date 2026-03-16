@@ -51,12 +51,21 @@ importers:
       '@livekit/agents-plugin-livekit':
         specifier: ^1.0.0
         version: 1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))
+      '@livekit/agents-plugin-openai':
+        specifier: ^1.0.50
+        version: 1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)(zod@4.3.6)
+      '@livekit/agents-plugin-rime':
+        specifier: ^1.0.50
+        version: 1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)
       '@livekit/agents-plugin-silero':
         specifier: ^1.0.0
         version: 1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
+      openai:
+        specifier: ^6.25.0
+        version: 6.25.0(ws@8.19.0)(zod@4.3.6)
     devDependencies:
       tsx:
         specifier: ^4.7.0
@@ -890,6 +899,18 @@ packages:
     resolution: {integrity: sha512-vuczrH56+A+JrJm9k3mmTaE8bTlT1oU++F9B0Ryd/nQRZ2ExA4dhIfdiKDPna8TN89rj5d0ax6k/ntkomJ9KJA==}
     peerDependencies:
       '@livekit/agents': 1.0.50
+
+  '@livekit/agents-plugin-openai@1.0.50':
+    resolution: {integrity: sha512-7esqiMajgKcnixgOH8L2Bnwr/9AQllAXhXfsw0C2r6AwN+/lLfxt2IZHDF0Uewy6gFjEYG7AWyjie0gGLE5O+w==}
+    peerDependencies:
+      '@livekit/agents': 1.0.50
+      '@livekit/rtc-node': ^0.13.24
+
+  '@livekit/agents-plugin-rime@1.0.50':
+    resolution: {integrity: sha512-iHV0ageVrGf80Ipui8mkiZhxNK0kY2QVlc+ivvQCeCT6YcJc6dLOY9ik/a/L/yMffN0kvPLFleCBqVYhFRKlXw==}
+    peerDependencies:
+      '@livekit/agents': 1.0.50
+      '@livekit/rtc-node': ^0.13.24
 
   '@livekit/agents-plugin-silero@1.0.50':
     resolution: {integrity: sha512-Q5qoUY6+DIyPyiU2+lJ+RYA87c0tno2gWX61DWYHR47rTE2wvIMoxwmiKrTud/iWqNAZBBRIWTfe2ZPcB2cIpQ==}
@@ -5242,6 +5263,27 @@ snapshots:
       '@huggingface/transformers': 3.7.2
       '@livekit/agents': 1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6)
       onnxruntime-node: 1.21.0
+
+  '@livekit/agents-plugin-openai@1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)(zod@4.3.6)':
+    dependencies:
+      '@livekit/agents': 1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6)
+      '@livekit/mutex': 1.1.1
+      '@livekit/rtc-node': 0.13.24
+      openai: 6.25.0(ws@8.19.0)(zod@4.3.6)
+      ws: 8.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+      - zod
+
+  '@livekit/agents-plugin-rime@1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)':
+    dependencies:
+      '@livekit/agents': 1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6)
+      '@livekit/rtc-node': 0.13.24
+      ws: 8.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@livekit/agents-plugin-silero@1.0.50(@livekit/agents@1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6))(@livekit/rtc-node@0.13.24)':
     dependencies:

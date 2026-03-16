@@ -199,6 +199,10 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
+    // Resume AudioContext to satisfy browser autoplay policy
+    // (connectToRoom is always called from a user gesture handler)
+    await room.startAudio()
+
     // Enable microphone
     await room.localParticipant.setMicrophoneEnabled(true)
   }, [])
