@@ -26,15 +26,13 @@ COPY apps/agent/tsconfig.json ./apps/agent/tsconfig.json
 # Generate Prisma client for Linux
 RUN pnpm --filter @lingle/db build
 
-# Download turn-detector model files required by @livekit/agents-plugin-livekit
-WORKDIR /app/apps/agent
-RUN node --import tsx src/index.ts download-files
-
-# Run as non-root (required by LiveKit Cloud)
-RUN useradd -m -u 1001 lingle
+# Create non-root user before downloading models so cache lands in their home dir
+RUN useradd -m -u 1001 lingle && chown -R lingle:lingle /app
 USER lingle
 
+# Download turn-detector model files — must run as the same user as runtime
 WORKDIR /app/apps/agent
+RUN node --import tsx src/index.ts download-files
 
 # Use tsx to run TypeScript directly (same as local dev)
 ENTRYPOINT ["node", "--import", "tsx", "src/index.ts", "start"]
