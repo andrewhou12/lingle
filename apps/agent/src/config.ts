@@ -96,11 +96,16 @@ export function getRimeLanguage(languageId: string): string {
   return map[languageId] || 'jpn'
 }
 
-/** Resolve which TTS provider to use: metadata > env > default (cartesia) */
+/** Resolve which TTS provider to use: metadata > language-based > env > default */
 export function resolveAgentTtsProvider(metadata: AgentMetadata): AgentTtsProvider {
+  // Explicit override from metadata
   if (metadata.ttsProvider === 'rime' || metadata.ttsProvider === 'cartesia') {
     return metadata.ttsProvider
   }
+  // Language-based default: Rime for English, Cartesia for everything else
+  if (metadata.targetLanguage === 'English') return 'rime'
+  if (metadata.targetLanguage) return 'cartesia'
+  // Env fallback when no language is specified
   const envProvider = process.env.AGENT_TTS_PROVIDER
   if (envProvider === 'rime' || envProvider === 'cartesia') {
     return envProvider

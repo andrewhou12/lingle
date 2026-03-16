@@ -74,8 +74,13 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
       modelId: 'arcana',
       speaker,
       lang: rimeLang,
-      speedAlpha: rimeLang === 'jpn' ? 1.0 : 0.87,
+      speedAlpha: 1.0,
       samplingRate: 24000,
+      // Lower temperature = more consistent voice across separate synthesis calls.
+      // Critical because the Rime plugin doesn't support streaming — each sentence
+      // is an independent API call with no shared voice state.
+      temperature: 0.3,
+      repetition_penalty: 1.1,
     })
   }
 

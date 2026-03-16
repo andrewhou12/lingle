@@ -238,7 +238,7 @@ class RimeWebSocket {
    * Uses a TransformStream so writer.close() properly flushes through HTTP responses.
    * Creates a dedicated WS connection with PCM format per call.
    */
-  synthesizeStream(text: string, speed?: number): { readable: ReadableStream<Uint8Array>; cancel: () => void } {
+  synthesizeStream(text: string, speed?: number, lang?: string): { readable: ReadableStream<Uint8Array>; cancel: () => void } {
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
     const writer = writable.getWriter()
     const isArcana = this.isArcana
@@ -256,7 +256,8 @@ class RimeWebSocket {
         params.set('speedAlpha', (1.0 / speed).toString())
       }
     }
-    if (RIME_LANG) params.set('lang', RIME_LANG)
+    const effectiveLang = lang || RIME_LANG
+    if (effectiveLang) params.set('lang', effectiveLang)
 
     const url = `${WS_URL}?${params.toString()}`
     console.log('[rime-ws] streaming connect (PCM)')
