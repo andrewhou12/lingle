@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
 import { VoiceAuraOrb } from './voice-aura-orb'
@@ -29,7 +28,6 @@ const STATE_LABELS: Record<string, string> = {
 }
 
 export function VoiceTestView() {
-  const router = useRouter()
   const [lang, setLang] = useState<'Japanese' | 'English'>('Japanese')
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [joined, setJoined] = useState(false)
@@ -58,8 +56,8 @@ export function VoiceTestView() {
 
   const handleEnd = useCallback(async () => {
     await voice.endSession()
-    router.push('/conversation')
-  }, [voice, router])
+    setJoined(false)
+  }, [voice])
 
   // Map transcript for the chat panel
   const transcriptEntries: LingleTranscriptEntry[] = useMemo(() => {
