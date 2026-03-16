@@ -1,0 +1,7 @@
+[agent]
+id = "CA_7bnitVBrwYNZ"
+name = "lingle-agent"
+dockerfile = "Dockerfile"
+
+[project]
+subdomain = "lingle-l9x09ixo"

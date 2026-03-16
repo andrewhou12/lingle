@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.39.0
         version: 0.39.0
+      '@livekit/agents':
+        specifier: ^1.0.0
+        version: 1.0.50(@livekit/rtc-node@0.13.24)(zod@4.3.6)
     devDependencies:
       '@prisma/client':
         specifier: ^6.19.2

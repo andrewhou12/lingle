@@ -26,6 +26,7 @@
     "typescript": "^5.7.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@livekit/agents": "^1.0.0"
   }
 }
