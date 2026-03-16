@@ -20,6 +20,7 @@
     "@livekit/agents-plugin-openai": "^1.0.50",
     "@livekit/agents-plugin-rime": "^1.0.50",
     "@livekit/agents-plugin-silero": "^1.0.0",
+    "@soniox/node": "^1.1.2",
     "dotenv": "^17.3.1",
     "openai": "^6.25.0"
   },

@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AnimatePresence, motion } from 'motion/react'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
-import { VoiceCentralOrb } from './voice-central-orb'
-import { VoiceStateRing } from './voice-state-ring'
+import { VoiceAuraOrb } from './voice-aura-orb'
+import { toAgentState } from './voice-aura-orb'
+import { LingleControlBar } from './lingle-control-bar'
+import { LingleChatTranscript, type LingleTranscriptEntry } from './lingle-chat-transcript'
 import { VoiceLiveSubtitles } from './voice-live-subtitles'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +32,7 @@ export function VoiceTestView() {
   const router = useRouter()
   const startedRef = useRef(false)
   const [lang, setLang] = useState<'Japanese' | 'English'>('Japanese')
+  const [isChatOpen, setIsChatOpen] = useState(false)
 
   const voice = useLiveKitVoice({})
 
@@ -47,7 +51,6 @@ export function VoiceTestView() {
   const switchLanguage = useCallback(async (newLang: 'Japanese' | 'English') => {
     setLang(newLang)
     await voice.endSession()
-    // Wait for room to fully disconnect before reconnecting
     await new Promise((r) => setTimeout(r, 1000))
     startedRef.current = true
     voice.startDirect({
@@ -62,21 +65,15 @@ export function VoiceTestView() {
     router.push('/conversation')
   }, [voice, router])
 
-  // M key to toggle mute
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.key === 'm' || e.key === 'M') {
-        e.preventDefault()
-        voice.toggleMute()
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [voice.toggleMute])
+  // Map transcript for the chat panel
+  const transcriptEntries: LingleTranscriptEntry[] = useMemo(() => {
+    return voice.transcript.map((line) => ({
+      ...line,
+      formattedTime: new Date(line.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }))
+  }, [voice.transcript])
 
-  // Get latest transcript lines for subtitles
+  // Latest lines for subtitles
   const lastUserLine = useMemo(() => {
     for (let i = voice.transcript.length - 1; i >= 0; i--) {
       if (voice.transcript[i].role === 'user' && voice.transcript[i].isFinal) return voice.transcript[i]
@@ -119,27 +116,20 @@ export function VoiceTestView() {
           <span className="text-[12px] text-text-muted tabular-nums">
             {formatDuration(voice.duration)}
           </span>
-          <button
-            onClick={handleEnd}
-            className="px-4 py-1.5 rounded-full border border-border text-[13px] text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong transition-colors cursor-pointer"
-          >
-            End
-          </button>
         </div>
       </div>
 
-      {/* Center: Orb + state label */}
+      {/* Center: Orb + state + subtitles */}
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <div className="relative">
-          <VoiceCentralOrb state={voice.voiceState} size={200} />
-          <VoiceStateRing state={voice.voiceState} isTalking={voice.isTalking} size={200} />
+        <div className="w-[200px] h-[200px]">
+          <VoiceAuraOrb voiceState={voice.voiceState} room={voice.room} className="w-[200px] h-[200px]" />
         </div>
 
         <div className="text-[14px] text-text-secondary h-5">
           {STATE_LABELS[voice.voiceState] || ''}
         </div>
 
-        {/* Subtitles */}
+        {/* Live subtitles under the orb (always visible) */}
         <VoiceLiveSubtitles
           partialText={voice.partialText}
           userLine={lastUserLine}
@@ -151,56 +141,45 @@ export function VoiceTestView() {
         />
       </div>
 
-      {/* Bottom: Mute button */}
-      <div className="flex flex-col items-center gap-3 px-6 pb-8 pt-3">
-        <div className="h-5 flex items-center gap-1.5 text-[12px] text-text-secondary">
-          {voice.isMuted ? (
-            <>
-              <span>Mic muted</span>
-              <span className="mx-0.5 text-border-strong">&middot;</span>
-              <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-bg-pure border border-border text-text-secondary shadow-[0_1px_0_rgba(0,0,0,.06)]">M</kbd>
-              <span>to unmute</span>
-            </>
-          ) : (
-            <>
-              <span>Speak naturally</span>
-              <span className="mx-0.5 text-border-strong">&middot;</span>
-              <kbd className="font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-bg-pure border border-border text-text-secondary shadow-[0_1px_0_rgba(0,0,0,.06)]">M</kbd>
-              <span>to mute</span>
-            </>
-          )}
-        </div>
-
-        <button
-          onClick={voice.toggleMute}
-          className={cn(
-            'relative w-16 h-16 rounded-full cursor-pointer flex items-center justify-center select-none transition-all active:scale-[0.94]',
-            voice.isMuted
-              ? 'bg-red-500/80 shadow-[0_3px_10px_rgba(239,68,68,.25)] hover:bg-red-500 hover:shadow-[0_6px_20px_rgba(239,68,68,.3)]'
-              : 'bg-accent-brand shadow-[0_3px_10px_rgba(47,47,47,.22)] hover:bg-[#111] hover:scale-105 hover:shadow-[0_6px_20px_rgba(47,47,47,.3)]',
-          )}
-        >
-          {voice.isMuted ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round">
-              <path d="M1 1l22 22" />
-              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.35 2.17" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          )}
-        </button>
-
-        {voice.error && (
-          <div className="text-[13px] text-red-500 mt-2">{voice.error}</div>
+      {/* Transcript panel — slides up from bottom when chat is open */}
+      <AnimatePresence>
+        {isChatOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 280, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="w-full max-w-lg mx-auto px-4 overflow-hidden shrink-0"
+          >
+            <div className="h-[280px] rounded-xl border border-border bg-bg-pure overflow-hidden">
+              <LingleChatTranscript
+                agentState={toAgentState(voice.voiceState)}
+                entries={transcriptEntries}
+                className="h-full"
+              />
+            </div>
+          </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* Bottom: agents-ui control bar */}
+      <div className="flex flex-col items-center gap-3 px-6 pb-8 pt-3 w-full max-w-md shrink-0">
+        {voice.error && (
+          <div className="text-[13px] text-red-500">{voice.error}</div>
+        )}
+
+        <LingleControlBar
+          variant="livekit"
+          voiceState={voice.voiceState}
+          isMuted={voice.isMuted}
+          onToggleMute={voice.toggleMute}
+          onEnd={handleEnd}
+          isConnected={voice.isActive}
+          isChatOpen={isChatOpen}
+          onToggleChat={() => setIsChatOpen((v) => !v)}
+          onSendText={voice.sendTextMessage}
+          inputMode={voice.inputMode}
+        />
       </div>
     </div>
   )

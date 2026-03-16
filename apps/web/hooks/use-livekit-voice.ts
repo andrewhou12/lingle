@@ -430,15 +430,20 @@ export function useLiveKitVoice(opts: {
   }, [isMuted])
 
   const sendTextMessage = useCallback((text: string) => {
-    if (!text.trim() || !roomRef.current || !agentIdentityRef.current) return
+    if (!text.trim() || !roomRef.current) return
 
+    // Add to local transcript so it appears in the chat panel immediately
+    setTranscript((prev) => [
+      ...prev,
+      { role: 'user', text: text.trim(), isFinal: true, timestamp: Date.now() },
+    ])
+
+    // Send via data channel (topic: 'lingle-chat') — the agent listens for this
+    const encoder = new TextEncoder()
+    const payload = encoder.encode(JSON.stringify({ type: 'chat', text: text.trim() }))
     roomRef.current.localParticipant
-      .performRpc({
-        destinationIdentity: agentIdentityRef.current,
-        method: 'send_text',
-        payload: JSON.stringify({ text: text.trim() }),
-      })
-      .catch((err) => console.error('[livekit-voice] send_text RPC failed:', err))
+      .publishData(payload, { reliable: true, topic: 'lingle-chat' })
+      .catch((err: unknown) => console.error('[livekit-voice] publishData failed:', err))
   }, [])
 
   // ── Push-to-talk ──
@@ -512,6 +517,7 @@ export function useLiveKitVoice(opts: {
   const emptyMessages = useMemo(() => [] as never[], [])
 
   return {
+    room: roomRef.current,
     voiceState,
     transcript,
     partialText,

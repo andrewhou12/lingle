@@ -5,6 +5,37 @@
 /** Supported TTS providers for the LiveKit agent pipeline */
 export type AgentTtsProvider = 'cartesia' | 'rime'
 
+/** Supported STT providers for the LiveKit agent pipeline */
+export type AgentSttProvider = 'deepgram' | 'soniox'
+
+/** Map language IDs to Soniox language hint codes */
+export function getSonioxLanguageHints(languageId: string): string[] {
+  const map: Record<string, string[]> = {
+    English: ['en'],
+    Japanese: ['ja', 'en'],
+    Korean: ['ko', 'en'],
+    'Mandarin Chinese': ['zh', 'en'],
+    Spanish: ['es', 'en'],
+    French: ['fr', 'en'],
+    German: ['de', 'en'],
+    Italian: ['it', 'en'],
+    Portuguese: ['pt', 'en'],
+  }
+  return map[languageId] || ['ja', 'en']
+}
+
+/** Resolve which STT provider to use: metadata > env > default (deepgram) */
+export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvider {
+  if (metadata.sttProvider === 'soniox' || metadata.sttProvider === 'deepgram') {
+    return metadata.sttProvider
+  }
+  const envProvider = process.env.AGENT_STT_PROVIDER
+  if (envProvider === 'soniox' || envProvider === 'deepgram') {
+    return envProvider
+  }
+  return 'deepgram'
+}
+
 /** Default Cartesia voice IDs per language (from environment variables) */
 export function getCartesiaVoiceId(languageCode: string): string {
   const envKey = `CARTESIA_VOICE_${languageCode.toUpperCase()}`
@@ -90,6 +121,7 @@ export interface AgentMetadata {
   basePrompt?: string
   analyzeEndpoint?: string
   ttsProvider?: AgentTtsProvider
+  sttProvider?: AgentSttProvider
 }
 
 export function parseAgentMetadata(raw: string | undefined): AgentMetadata {

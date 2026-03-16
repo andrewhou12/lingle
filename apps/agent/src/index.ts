@@ -33,9 +33,33 @@ import {
   getDeepgramLanguage,
   getCartesiaLanguage,
   getRimeLanguage,
+  getSonioxLanguageHints,
   resolveAgentTtsProvider,
+  resolveAgentSttProvider,
   type AgentMetadata,
 } from './config.js'
+import { STT as SonioxSTT } from './soniox-stt.js'
+
+/** Build the STT instance based on the resolved provider */
+function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
+  const provider = resolveAgentSttProvider(metadata)
+  const targetLang = metadata.targetLanguage || 'Japanese'
+
+  if (provider === 'soniox') {
+    const hints = getSonioxLanguageHints(targetLang)
+    console.log(`[agent] STT=soniox hints=${hints.join(',')}`)
+    return new SonioxSTT({
+      languageHints: hints,
+      sampleRate: 48000,
+      enableEndpointDetection: true,
+      maxEndpointDelayMs: 2000,
+    })
+  }
+
+  const deepgramLang = getDeepgramLanguage(targetLang)
+  console.log(`[agent] STT=deepgram lang=${deepgramLang}`)
+  return new deepgram.STT({ model: 'nova-3', language: deepgramLang })
+}
 
 /** Build the TTS instance based on the resolved provider */
 function buildTts(metadata: AgentMetadata): tts.TTS {
@@ -65,7 +89,8 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
     language: cartesiaLang,
     speed: cartesiaLang === 'ja' ? 0.8 : 1.15,
     sampleRate: 24000,
-    wordTimestamps: true,
+    // Cartesia only supports word timestamps for English
+    wordTimestamps: cartesiaLang === 'en',
   })
 }
 
@@ -94,15 +119,14 @@ export default defineAgent({
     console.log('[agent] metadata:', ctx.job.metadata)
 
     const targetLang = metadata.targetLanguage || 'Japanese'
-    const deepgramLang = getDeepgramLanguage(targetLang)
-    console.log(`[agent] language=${targetLang} deepgram=${deepgramLang}`)
+    console.log(`[agent] language=${targetLang}`)
 
     // Create the voice agent session
     // LLM: GPT-4o mini for conversation (290ms median TTFT vs ~600ms+ Claude Haiku)
     // Analysis still uses Claude Haiku (async, not latency-critical)
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad as silero.VAD,
-      stt: new deepgram.STT({ model: 'nova-3', language: deepgramLang }),
+      stt: buildStt(metadata),
       llm: new openai.LLM({
         model: 'gpt-4o-mini',
         maxCompletionTokens: 300,
@@ -114,23 +138,56 @@ export default defineAgent({
       turnDetection: new turnDetector.MultilingualModel(),
       voiceOptions: {
         preemptiveGeneration: true,
-        // Wider endpoint window for language learners who pause while thinking
-        minEndpointingDelay: 0.5,
-        maxEndpointingDelay: 2.5,
+        // Balance: low min lets the turn detector fire early when confident,
+        // high max gives learners time to think. The MultilingualModel handles
+        // the intelligence — these are just bounds.
+        minEndpointingDelay: 0.3,
+        maxEndpointingDelay: 2.0,
         minInterruptionDuration: 0.3,
         minInterruptionWords: 1,
       },
     })
 
-    // Log pipeline latency metrics for each turn
+    // ─── Comprehensive latency instrumentation ───
+    // Track per-turn timing across the full STT→LLM→TTS pipeline
+    let turnStart = 0
+    let sttDoneAt = 0
+
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        console.log(`[metrics:EOU] endOfUtteranceDelay=${m.endOfUtteranceDelayMs.toFixed(0)}ms transcriptionDelay=${m.transcriptionDelayMs.toFixed(0)}ms`)
+        turnStart = Date.now()
+        sttDoneAt = turnStart // EOU fires when STT finalizes the user's turn
+        console.log(
+          `[metrics:EOU] endOfUtteranceDelay=${m.endOfUtteranceDelayMs.toFixed(0)}ms` +
+          ` transcriptionDelay=${m.transcriptionDelayMs.toFixed(0)}ms` +
+          ` turnDetectionDelay=${(m.endOfUtteranceDelayMs - m.transcriptionDelayMs).toFixed(0)}ms`,
+        )
       } else if (m.type === 'llm_metrics') {
-        console.log(`[metrics:LLM] ttft=${m.ttftMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms tokens=${m.completionTokens} cancelled=${m.cancelled} cached=${m.promptCachedTokens}`)
+        const llmDoneAt = Date.now()
+        const sinceEou = sttDoneAt ? llmDoneAt - sttDoneAt : 0
+        console.log(
+          `[metrics:LLM] ttft=${m.ttftMs.toFixed(0)}ms` +
+          ` total=${m.durationMs.toFixed(0)}ms` +
+          ` tokens=${m.completionTokens}` +
+          ` cached=${m.promptCachedTokens}` +
+          ` cancelled=${m.cancelled}` +
+          ` sinceEou=${sinceEou}ms`,
+        )
       } else if (m.type === 'tts_metrics') {
-        console.log(`[metrics:TTS] ttfb=${m.ttfbMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms chars=${m.charactersCount} cancelled=${m.cancelled}`)
+        const ttsDoneAt = Date.now()
+        const totalPipeline = turnStart ? ttsDoneAt - turnStart : 0
+        console.log(
+          `[metrics:TTS] ttfb=${m.ttfbMs.toFixed(0)}ms` +
+          ` total=${m.durationMs.toFixed(0)}ms` +
+          ` chars=${m.charactersCount}` +
+          ` cancelled=${m.cancelled}`,
+        )
+        if (totalPipeline > 0) {
+          console.log(`[metrics:PIPELINE] voice-to-voice=${totalPipeline}ms (from EOU to first TTS audio)`)
+        }
+      } else if (m.type === 'vad_metrics') {
+        console.log(`[metrics:VAD] speechDuration=${(m as unknown as { speechDurationMs?: number }).speechDurationMs ?? '?'}ms`)
       }
     })
 
@@ -139,6 +196,20 @@ export default defineAgent({
     await session.start({
       room: ctx.room,
       agent,
+    })
+
+    // Listen for text messages from the client via data channel
+    ctx.room.on('dataReceived', (payload: Uint8Array) => {
+      try {
+        const decoded = new TextDecoder().decode(payload)
+        const message = JSON.parse(decoded)
+        if (message.type === 'chat' && typeof message.text === 'string' && message.text.trim()) {
+          console.log(`[agent] Received chat text: "${message.text}"`)
+          session.generateReply({ userInput: message.text.trim() })
+        }
+      } catch {
+        // Not JSON or not a chat message — ignore
+      }
     })
 
     // Wait for a participant to join

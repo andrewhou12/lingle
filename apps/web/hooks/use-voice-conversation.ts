@@ -51,6 +51,8 @@ export interface SectionTracking {
 export type InputMode = 'ptt' | 'vad'
 
 export interface UseVoiceConversationReturn {
+  /** The underlying LiveKit Room instance (only available for LiveKit provider) */
+  room?: import('livekit-client').Room | null
   voiceState: VoiceState
   transcript: TranscriptLine[]
   partialText: string
