@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ComponentProps } from 'react'
-import { MicIcon, MicOffIcon, MessageSquareTextIcon, SendHorizontal, Loader } from 'lucide-react'
+import { MicIcon, MicOffIcon, MessageSquareTextIcon, SendHorizontal, Loader, PhoneCall, PhoneOff } from 'lucide-react'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
 import { motion, type MotionProps } from 'motion/react'
 
@@ -84,6 +84,7 @@ export interface LingleControlBarProps {
   voiceState: VoiceState
   isMuted: boolean
   onToggleMute: () => void
+  onJoin?: () => void
   onEnd: () => void
   isConnected?: boolean
   /** Unviewed corrections/feedback count for the chat badge */
@@ -111,6 +112,7 @@ export function LingleControlBar({
   voiceState,
   isMuted,
   onToggleMute,
+  onJoin,
   onEnd,
   isConnected = true,
   feedbackCount = 0,
@@ -234,20 +236,32 @@ export function LingleControlBar({
           )}
         </div>
 
-        {/* End session */}
-        <Button
-          size="default"
-          variant="destructive"
-          onClick={onEnd}
-          disabled={!isConnected}
-          className={cn(
-            isLivekit &&
-              'bg-destructive/10 dark:bg-destructive/10 text-destructive hover:bg-destructive/20 dark:hover:bg-destructive/20 focus:bg-destructive/20 focus-visible:ring-destructive/20 rounded-full font-mono text-xs font-bold tracking-wider',
-          )}
-        >
-          <span className="hidden md:inline">END</span>
-          <span className="inline md:hidden">END</span>
-        </Button>
+        {/* Join / End session */}
+        {onJoin ? (
+          <Button
+            size="default"
+            onClick={onJoin}
+            className={cn(
+              'bg-green-500/10 text-green-600 hover:bg-green-500/20 focus-visible:ring-green-500/20',
+              isLivekit && 'rounded-full',
+            )}
+          >
+            <PhoneCall className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            size="default"
+            variant="destructive"
+            onClick={onEnd}
+            disabled={!isConnected}
+            className={cn(
+              isLivekit &&
+                'bg-destructive/10 dark:bg-destructive/10 text-destructive hover:bg-destructive/20 dark:hover:bg-destructive/20 focus:bg-destructive/20 focus-visible:ring-destructive/20 rounded-full',
+            )}
+          >
+            <PhoneOff className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       {/* Keyboard hints */}

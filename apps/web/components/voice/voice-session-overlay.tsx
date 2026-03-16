@@ -112,7 +112,8 @@ function SessionOverlayInner({
   const { targetLanguage } = useLanguage()
 
   // ── Panel state ──
-  const [isStarting, setIsStarting] = useState(true)
+  const [joined, setJoined] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
   const [rightPanel, setRightPanel] = useState<ActivePanel>(null)
   const [showSubtitles, setShowSubtitles] = useState(true)
@@ -169,30 +170,23 @@ function SessionOverlayInner({
     }
   }, [sessionSettings.introduceNewItems])
 
-  const startedRef = useRef(false)
-
-  // Start session on mount
-  useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
-
-    const init = async () => {
-      try {
-        if (existingPlan && existingSessionId) {
-          await voice.startWithExistingPlan(existingSessionId, existingPlan, prompt, steeringNotes)
-        } else if (existingSessionId) {
-          await voice.startSession()
-        } else {
-          await voice.startNewSession(prompt, mode)
-        }
-      } catch (err) {
-        console.error('Failed to start voice session:', err)
+  const handleJoin = useCallback(async () => {
+    setJoined(true)
+    setIsStarting(true)
+    try {
+      if (existingPlan && existingSessionId) {
+        await voice.startWithExistingPlan(existingSessionId, existingPlan, prompt, steeringNotes)
+      } else if (existingSessionId) {
+        await voice.startSession()
+      } else {
+        await voice.startNewSession(prompt, mode)
       }
-      setIsStarting(false)
+    } catch (err) {
+      console.error('Failed to start voice session:', err)
     }
-    init()
+    setIsStarting(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [existingPlan, existingSessionId, prompt, mode])
 
   // Format duration
   const formatTime = useCallback((seconds: number) => {
@@ -656,7 +650,7 @@ function SessionOverlayInner({
         {/* Main stage — scrollable when content overflows */}
         <main className="flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto overflow-x-visible relative pl-[310px] pr-[310px]">
           {/* Starting overlay */}
-          {isStarting && (
+          {joined && isStarting && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-bg">
               <div className="flex flex-col items-center gap-5">
                 <Spinner size={22} />
@@ -801,6 +795,8 @@ function SessionOverlayInner({
           inputMode={voice.inputMode}
           isMuted={voice.isMuted}
           onToggleMute={voice.toggleMute}
+          onJoin={!joined ? handleJoin : undefined}
+          onEnd={joined ? requestEnd : undefined}
         />
       </div>
 

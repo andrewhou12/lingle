@@ -199,13 +199,10 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
-    // Resume AudioContext on next user gesture — useEffect calls break the
-    // gesture chain before we get here, so we can't call startAudio() directly.
-    const unlockAudio = () => {
-      room.startAudio().catch(() => {})
-    }
-    document.addEventListener('click', unlockAudio, { once: true })
-    document.addEventListener('touchstart', unlockAudio, { once: true })
+    // Resume AudioContext — this must be called from a user gesture handler.
+    // Both voice-session-overlay and voice-test-view now require an explicit
+    // "Join" button click before calling connectToRoom, so this is safe.
+    await room.startAudio()
 
     // Enable microphone
     await room.localParticipant.setMicrophoneEnabled(true)

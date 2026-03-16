@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import {
   ChatBubbleLeftRightIcon,
   ArrowPathIcon,
+  PhoneArrowUpRightIcon,
+  PhoneXMarkIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import { useOnboarding } from '@/hooks/use-onboarding'
@@ -32,6 +34,10 @@ interface VoiceControlsProps {
   isMuted?: boolean
   /** Toggle mute (used in VAD mode) */
   onToggleMute?: () => void
+  /** Join the call (shown when not connected) */
+  onJoin?: () => void
+  /** End/disconnect the call (shown when connected) */
+  onEnd?: () => void
 }
 
 const CIRC = 2 * Math.PI * 33
@@ -54,6 +60,8 @@ export function VoiceControls({
   inputMode = 'ptt',
   isMuted = false,
   onToggleMute,
+  onJoin,
+  onEnd,
 }: VoiceControlsProps) {
   const ringRef = useRef<SVGCircleElement>(null)
   const startTimeRef = useRef<number>(0)
@@ -317,6 +325,25 @@ export function VoiceControls({
         onDismiss={() => dismiss('hint_voice_feedback')}
       >
       <div className="flex gap-2">
+        {/* Phone join / disconnect button */}
+        {onJoin && (
+          <button
+            onClick={onJoin}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[13px] font-sans cursor-pointer transition-colors bg-green-500/10 border-green-500/20 text-green-600 hover:bg-green-500/20 hover:border-green-500/30"
+          >
+            <PhoneArrowUpRightIcon className="w-4 h-4" />
+            Join
+          </button>
+        )}
+        {onEnd && (
+          <button
+            onClick={onEnd}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[13px] font-sans cursor-pointer transition-colors bg-red-500/10 border-red-500/20 text-red-600 hover:bg-red-500/20 hover:border-red-500/30"
+          >
+            <PhoneXMarkIcon className="w-4 h-4" />
+            End
+          </button>
+        )}
         {canRetry && (
           <button
             onClick={onRetry}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
@@ -30,30 +30,26 @@ const STATE_LABELS: Record<string, string> = {
 
 export function VoiceTestView() {
   const router = useRouter()
-  const startedRef = useRef(false)
   const [lang, setLang] = useState<'Japanese' | 'English'>('Japanese')
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [joined, setJoined] = useState(false)
 
   const voice = useLiveKitVoice({})
 
-  // Auto-connect on mount
-  useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
-    voice.startDirect({
+  const handleJoin = useCallback(async () => {
+    setJoined(true)
+    await voice.startDirect({
       sessionMode: 'conversation',
       basePrompt: TEST_PROMPTS[lang],
       targetLanguage: lang,
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [voice, lang])
 
   const switchLanguage = useCallback(async (newLang: 'Japanese' | 'English') => {
     setLang(newLang)
     await voice.endSession()
     await new Promise((r) => setTimeout(r, 1000))
-    startedRef.current = true
-    voice.startDirect({
+    await voice.startDirect({
       sessionMode: 'conversation',
       basePrompt: TEST_PROMPTS[newLang],
       targetLanguage: newLang,
@@ -173,8 +169,9 @@ export function VoiceTestView() {
           voiceState={voice.voiceState}
           isMuted={voice.isMuted}
           onToggleMute={voice.toggleMute}
+          onJoin={!joined ? handleJoin : undefined}
           onEnd={handleEnd}
-          isConnected={voice.isActive}
+          isConnected={joined && voice.isActive}
           isChatOpen={isChatOpen}
           onToggleChat={() => setIsChatOpen((v) => !v)}
           onSendText={voice.sendTextMessage}
