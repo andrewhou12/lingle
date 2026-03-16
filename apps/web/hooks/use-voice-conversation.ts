@@ -48,7 +48,11 @@ export interface SectionTracking {
   completedSectionIds: string[]
 }
 
+export type InputMode = 'ptt' | 'vad'
+
 export interface UseVoiceConversationReturn {
+  /** The underlying LiveKit Room instance (only available for LiveKit provider) */
+  room?: import('livekit-client').Room | null
   voiceState: VoiceState
   transcript: TranscriptLine[]
   partialText: string
@@ -69,6 +73,7 @@ export interface UseVoiceConversationReturn {
   isStreaming: boolean
   startNewSession: (prompt: string, mode: string) => Promise<void>
   startWithExistingPlan: (sessionId: string, plan: SessionPlan, prompt: string, steeringNotes?: string[]) => Promise<void>
+  startDirect: (metadata: Record<string, unknown>) => Promise<void>
   startTalking: () => void
   stopTalking: () => void
   cancelTalking: () => void
@@ -81,6 +86,8 @@ export interface UseVoiceConversationReturn {
   retryLast: () => void
   sectionTracking: SectionTracking | null
   isAnalyzing: boolean
+  /** 'ptt' = push-to-talk (default/Soniox), 'vad' = voice activity detection (LiveKit) */
+  inputMode: InputMode
 }
 
 export function useVoiceConversation(
@@ -216,7 +223,7 @@ export function useVoiceConversation(
 
   const getVoicePlayer = useCallback((): PCMStreamPlayer => {
     if (!voicePlayerRef.current) {
-      voicePlayerRef.current = new PCMStreamPlayer(16000)
+      voicePlayerRef.current = new PCMStreamPlayer(24000)
     }
     return voicePlayerRef.current
   }, [])
@@ -481,7 +488,6 @@ export function useVoiceConversation(
     }
     prevStreamingRef.current = isStreaming
   }, [isStreaming, isActive, messages])
-
   // Watchdog: reset if stuck
   useEffect(() => {
     if (voiceState !== 'THINKING' && voiceState !== 'SPEAKING') return
@@ -812,6 +818,7 @@ export function useVoiceConversation(
     isStreaming,
     startNewSession,
     startWithExistingPlan,
+    startDirect: async () => { /* not supported in default voice provider */ },
     startTalking,
     stopTalking,
     cancelTalking,
@@ -824,5 +831,6 @@ export function useVoiceConversation(
     retryLast,
     sectionTracking,
     isAnalyzing: pendingAnalysisTurns.size > 0,
+    inputMode: 'ptt' as const,
   }
 }

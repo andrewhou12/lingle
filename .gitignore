@@ -44,3 +44,4 @@ scripts/bench/results/
 # Electron
 release/
 .vercel
+apps/web/tsconfig.tsbuildinfo

@@ -6,6 +6,8 @@
   "description": "Lingle language learning platform",
   "scripts": {
     "dev:web": "pnpm --filter @lingle/web dev",
+    "dev:agent": "pnpm --filter @lingle/agent dev",
+    "dev:all": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "db:migrate": "prisma migrate dev",
@@ -24,6 +26,7 @@
     "typescript": "^5.7.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@livekit/agents": "^1.0.0"
   }
 }

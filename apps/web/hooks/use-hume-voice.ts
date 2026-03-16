@@ -347,6 +347,7 @@ export function useHumeVoice(opts: {
     isStreaming: isPlaying,
     startNewSession,
     startWithExistingPlan,
+    startDirect: async () => { /* not supported in Hume provider */ },
     startTalking,
     stopTalking,
     cancelTalking,
@@ -367,5 +368,6 @@ export function useHumeVoice(opts: {
     },
     sectionTracking: null,
     isAnalyzing: false,
+    inputMode: 'ptt' as const,
   }
 }

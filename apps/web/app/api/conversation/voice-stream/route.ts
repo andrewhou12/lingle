@@ -10,6 +10,7 @@ import type { ScenarioMode } from '@/lib/experience-scenarios'
 import { createSentenceBoundaryTracker } from '@/lib/voice/sentence-boundary'
 import { parseCartesiaSSE } from '@/lib/cartesia-sse'
 import { getCartesiaWs } from '@/lib/cartesia-ws'
+import { getRimeWs } from '@/lib/rime-ws'
 import { FRAME, encodeFrame } from '@/lib/voice/voice-stream-protocol'
 import { getLanguageById } from '@/lib/languages'
 
@@ -212,6 +213,23 @@ export const POST = withAuth(async (request, { userId }) => {
               totalBytes += value.length
               await safeWrite(encodeFrame(FRAME.AUDIO, value))
             }
+          }
+
+          // English sentences → Rime TTS (24kHz PCM)
+          if (sentenceLang === 'en') {
+            const { readable: rimeReadable } = getRimeWs().synthesizeStream(cleaned, undefined, 'eng')
+            const rimeReader = rimeReadable.getReader()
+            while (true) {
+              const { done, value } = await rimeReader.read()
+              if (done) break
+              if (!value || value.length === 0) continue
+              chunkCount++
+              totalBytes += value.length
+              await safeWrite(encodeFrame(FRAME.AUDIO, value))
+            }
+            console.log(`[voice-stream:timing] rime[${idx}] done:${(performance.now() - tTts).toFixed(0)}ms chunks:${chunkCount} bytes:${totalBytes} "${cleaned.slice(0, 30)}"`)
+            await safeWrite(encodeFrame(FRAME.SENTENCE_END, new Uint8Array(0)))
+            return
           }
 
           // Try WebSocket first — reuses persistent connection, saves ~50-100ms per sentence
