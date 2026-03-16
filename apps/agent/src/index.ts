@@ -84,7 +84,7 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
   const voiceId = metadata.voiceId || getCartesiaVoiceId(cartesiaLang)
   console.log(`[agent] TTS=cartesia voice=${voiceId} lang=${cartesiaLang}`)
   return new cartesia.TTS({
-    model: 'sonic',
+    model: 'sonic-3',
     voice: voiceId,
     language: cartesiaLang,
     speed: cartesiaLang === 'ja' ? 0.8 : 1.15,
@@ -150,44 +150,59 @@ export default defineAgent({
 
     // ─── Comprehensive latency instrumentation ───
     // Track per-turn timing across the full STT→LLM→TTS pipeline
-    let turnStart = 0
-    let sttDoneAt = 0
+    let eouTimestamp = 0
+    let llmFirstTokenAt = 0
+    let preemptiveStartAt = 0
 
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        turnStart = Date.now()
-        sttDoneAt = turnStart // EOU fires when STT finalizes the user's turn
+        eouTimestamp = Date.now()
         console.log(
           `[metrics:EOU] endOfUtteranceDelay=${m.endOfUtteranceDelayMs.toFixed(0)}ms` +
           ` transcriptionDelay=${m.transcriptionDelayMs.toFixed(0)}ms` +
           ` turnDetectionDelay=${(m.endOfUtteranceDelayMs - m.transcriptionDelayMs).toFixed(0)}ms`,
         )
       } else if (m.type === 'llm_metrics') {
-        const llmDoneAt = Date.now()
-        const sinceEou = sttDoneAt ? llmDoneAt - sttDoneAt : 0
+        llmFirstTokenAt = Date.now() - m.durationMs + m.ttftMs
+        const effectiveTtft = eouTimestamp ? Math.max(0, llmFirstTokenAt - eouTimestamp) : m.ttftMs
         console.log(
           `[metrics:LLM] ttft=${m.ttftMs.toFixed(0)}ms` +
+          ` effectiveTtft=${effectiveTtft.toFixed(0)}ms` +
           ` total=${m.durationMs.toFixed(0)}ms` +
           ` tokens=${m.completionTokens}` +
           ` cached=${m.promptCachedTokens}` +
-          ` cancelled=${m.cancelled}` +
-          ` sinceEou=${sinceEou}ms`,
+          ` cancelled=${m.cancelled}`,
         )
       } else if (m.type === 'tts_metrics') {
-        const ttsDoneAt = Date.now()
-        const totalPipeline = turnStart ? ttsDoneAt - turnStart : 0
         console.log(
           `[metrics:TTS] ttfb=${m.ttfbMs.toFixed(0)}ms` +
           ` total=${m.durationMs.toFixed(0)}ms` +
           ` chars=${m.charactersCount}` +
           ` cancelled=${m.cancelled}`,
         )
-        if (totalPipeline > 0) {
-          console.log(`[metrics:PIPELINE] voice-to-voice=${totalPipeline}ms (from EOU to first TTS audio)`)
-        }
       } else if (m.type === 'vad_metrics') {
         console.log(`[metrics:VAD] speechDuration=${(m as unknown as { speechDurationMs?: number }).speechDurationMs ?? '?'}ms`)
+      }
+    })
+
+    // Track preemptive generation start
+    session.on(voice.AgentSessionEventTypes.SpeechCreated, () => {
+      preemptiveStartAt = Date.now()
+    })
+
+    // Track actual voice-to-voice: EOU → agent starts speaking (first audio playout)
+    session.on(voice.AgentSessionEventTypes.AgentStateChanged, (ev) => {
+      if (ev.newState === 'speaking' && eouTimestamp > 0) {
+        const voiceToVoice = Date.now() - eouTimestamp
+        const preemptiveSaved = preemptiveStartAt > 0 && preemptiveStartAt < eouTimestamp
+          ? eouTimestamp - preemptiveStartAt
+          : 0
+        console.log(
+          `[metrics:PIPELINE] voice-to-voice=${voiceToVoice}ms` +
+          ` (EOU → first audio playout)` +
+          (preemptiveSaved > 0 ? ` preemptiveSaved=${preemptiveSaved}ms` : ''),
+        )
       }
     })
 

@@ -84,13 +84,10 @@ SPEECH NATURALNESS:
 - Trail off sometimes... let sentences dissolve rather than conclude.
 - NEVER overuse any single technique \u2014 fillers, pauses, tangents should feel sprinkled in, not formulaic.
 
-${ttsProvider === 'rime' ? 'PROSODY:\n- Do NOT include any XML/SSML tags in your output. No <break>, <speed>, <prosody>, or any other tags. The TTS engine does not support them and they will cause errors.\n- Use punctuation (ellipsis, em-dash, commas) to create natural pacing instead.' : `PROSODY \u2014 TTS CONTROLS:
-You can embed these tags in your text to control how the TTS speaks. Use them sparingly \u2014 most of the time, plain text is fine. These are for moments where pacing or pauses add something.
-- <break time="0.15s"/> \u2014 insert a pause. Use between thoughts, after a filler word, or when "thinking." Don't use more than 1-2 per response.
-  Example: ${isEnglish ? 'Hmm.<break time="0.2s"/>I guess so.' : 'うーん。<break time="0.2s"/>そうかな。'}
-- <speed ratio="X"/> \u2014 change speaking pace (0.6\u20131.5). Use for quick asides or slowing down for emphasis. Revert after.
-  Example: ${isEnglish ? '<speed ratio="1.2"/>Oh, speaking of that,<speed ratio="0.9"/> that\'s kind of weird, right?' : '<speed ratio="1.2"/>あ、そういえば、<speed ratio="0.9"/>それってちょっと変じゃない？'}
-- Do NOT overuse these. A response with zero tags is totally fine. Use them maybe 1 in 3 responses, when the moment calls for it.`}
+PROSODY:
+- Do NOT include any XML/SSML tags in your output. No <break>, <speed>, <prosody>, or any other tags. They can cause voice glitches and artifacts.
+- Use punctuation to create natural pacing instead: ellipsis (…) for trailing off, em-dash (—) for abrupt shifts, commas for brief pauses, periods for full stops.
+- Example: ${isEnglish ? 'Hmm… I guess so.' : 'うーん…そうかな。'}
 
 TRANSCRIPTION ERRORS:
 - The learner's messages come from speech-to-text transcription, which is imperfect — especially for ${langName} learners mixing languages or speaking with non-native pronunciation.

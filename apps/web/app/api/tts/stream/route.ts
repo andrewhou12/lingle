@@ -29,7 +29,8 @@ export const POST = withAuth(async (request) => {
   const body = await request.json()
   const { text, speed, ttsProvider: ttsProviderParam, targetLanguage } = body
   const langCode = targetLanguage ? (targetLanguage === 'Mandarin Chinese' ? 'zh' : targetLanguage.toLowerCase().slice(0, 2)) : 'ja'
-  const ttsProvider = ttsProviderParam === 'rime' || ttsProviderParam === 'elevenlabs' || ttsProviderParam === 'cartesia' ? ttsProviderParam : TTS_PROVIDER_DEFAULT
+  const explicitProvider = ttsProviderParam === 'rime' || ttsProviderParam === 'elevenlabs' || ttsProviderParam === 'cartesia' ? ttsProviderParam : TTS_PROVIDER_DEFAULT
+  const ttsProvider = langCode === 'ja' ? 'cartesia' : langCode === 'en' ? 'rime' : explicitProvider
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
@@ -81,13 +82,13 @@ export const POST = withAuth(async (request) => {
           'X-API-Key': CARTESIA_API_KEY,
         },
         body: JSON.stringify({
-          model_id: 'sonic',
+          model_id: 'sonic-3',
           transcript: spoken,
           voice: {
             mode: 'id',
             id: voiceId,
-            __experimental_controls: controls,
           },
+          generation_config: controls,
           language: langCode,
           output_format: {
             container: 'raw',
