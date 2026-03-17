@@ -33,7 +33,7 @@ export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvid
   if (envProvider === 'soniox' || envProvider === 'deepgram') {
     return envProvider
   }
-  return 'deepgram'
+  return 'soniox'
 }
 
 /** Default Cartesia voice IDs per language (from environment variables) */

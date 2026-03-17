@@ -3,7 +3,7 @@
  *
  * Uses:
  * - Silero VAD for voice activity detection
- * - Deepgram Nova-3 for STT
+ * - Soniox for STT (Deepgram available via AGENT_STT_PROVIDER=deepgram or metadata)
  * - GPT-4o mini for conversation LLM (optimized for voice latency)
  * - Claude Haiku for async analysis (post-turn, not latency-critical)
  * - Cartesia Sonic or Rime Arcana TTS (configurable via metadata or AGENT_TTS_PROVIDER env)
