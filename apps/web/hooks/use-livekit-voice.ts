@@ -209,12 +209,21 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
-    // ── DEBUG: log all remote participants + register catch-all listeners ──
+    // ── DEBUG: poll remoteParticipants every second for 30s ──
     console.log('[dbg] connected. remoteParticipants:', [...room.remoteParticipants.values()].map(p => ({
-      identity: p.identity,
-      attributes: p.attributes,
-      tracks: [...p.trackPublications.values()].map(t => ({ kind: t.kind, subscribed: !!t.track })),
+      identity: p.identity, attributes: p.attributes,
     })))
+    const pollInterval = setInterval(() => {
+      const participants = [...room.remoteParticipants.values()]
+      if (participants.length > 0) {
+        console.log('[dbg] poll — remoteParticipants:', participants.map(p => ({
+          identity: p.identity, attributes: p.attributes,
+          tracks: [...p.trackPublications.values()].map(t => ({ kind: t.kind, subscribed: !!t.track })),
+        })))
+        clearInterval(pollInterval)
+      }
+    }, 1000)
+    setTimeout(() => clearInterval(pollInterval), 30000)
     room.on(RoomEvent.ParticipantConnected, (p) => {
       console.log('[dbg] ParticipantConnected:', p.identity, p.attributes)
     })
