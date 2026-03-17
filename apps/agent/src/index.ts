@@ -119,9 +119,12 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
+    console.log('[agent] entry started, room:', ctx.room.name)
     // With auto-dispatch, job metadata is empty. Read metadata from the
     // first human participant's token metadata instead.
+    console.log('[agent] waiting for participant...')
     await ctx.waitForParticipant()
+    console.log('[agent] participant joined')
     const participant = [...ctx.room.remoteParticipants.values()][0]
     const rawMetadata = participant?.metadata ?? ctx.job.metadata
     console.log('[agent] participant metadata:', rawMetadata)
