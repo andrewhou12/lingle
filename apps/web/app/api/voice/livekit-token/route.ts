@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { AccessToken, AgentDispatchClient } from 'livekit-server-sdk'
+import { AccessToken } from 'livekit-server-sdk'
 import { withAuth } from '@/lib/api-helpers'
 
 export const POST = withAuth(async (request: NextRequest, { userId }) => {
@@ -21,8 +21,11 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
   const identity = userId || `user-${crypto.randomUUID().slice(0, 8)}`
 
   // Create an access token for the browser participant
+  // Agent metadata is embedded in the token so the auto-dispatched agent
+  // can read it from ctx.job.metadata when it joins the room.
   const token = new AccessToken(apiKey, apiSecret, {
     identity,
+    metadata: JSON.stringify(metadata || {}),
   })
 
   token.addGrant({
@@ -34,13 +37,6 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
   })
 
   const jwt = await token.toJwt()
-
-  // Dispatch the agent with metadata in the background — don't block the token return.
-  // The agent picks up the job around the same time the client connects.
-  const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret)
-  dispatchClient.createDispatch(roomName, 'lingle-agent', {
-    metadata: JSON.stringify(metadata || {}),
-  }).catch((err) => console.error('[livekit-token] dispatch failed:', err))
 
   return NextResponse.json({
     token: jwt,

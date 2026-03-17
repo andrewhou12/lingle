@@ -119,9 +119,13 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
-    // Parse job metadata (set by explicit agent dispatch from the web client)
-    const metadata = parseAgentMetadata(ctx.job.metadata)
-    console.log('[agent] metadata:', ctx.job.metadata)
+    // With auto-dispatch, job metadata is empty. Read metadata from the
+    // first human participant's token metadata instead.
+    await ctx.waitForParticipant()
+    const participant = [...ctx.room.remoteParticipants.values()][0]
+    const rawMetadata = participant?.metadata ?? ctx.job.metadata
+    console.log('[agent] participant metadata:', rawMetadata)
+    const metadata = parseAgentMetadata(rawMetadata)
 
     const targetLang = metadata.targetLanguage || 'Japanese'
     console.log(`[agent] language=${targetLang}`)
@@ -232,10 +236,7 @@ export default defineAgent({
       }
     })
 
-    // Wait for a participant to join
-    await ctx.waitForParticipant()
-
-    // Generate the initial greeting (agent's system prompt FIRST MESSAGE rules apply)
+    // Generate the initial greeting
     session.generateReply()
   },
 })
@@ -243,5 +244,5 @@ export default defineAgent({
 // Boot the agent worker when run directly
 const thisFile = fileURLToPath(import.meta.url)
 if (resolve(process.argv[1]) === thisFile) {
-  cli.runApp(new WorkerOptions({ agent: thisFile, agentName: 'lingle-agent' }))
+  cli.runApp(new WorkerOptions({ agent: thisFile }))
 }
