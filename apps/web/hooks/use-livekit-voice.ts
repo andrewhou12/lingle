@@ -70,11 +70,12 @@ export function useLiveKitVoice(opts: {
 
     roomRef.current = room
 
-    // Listen for agent participant joining
+    // Listen for agent participant joining — identify by agent state attribute,
+    // not by identity string (agent identity is a UUID that doesn't contain 'agent')
     room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-      // Agent participants typically have identity starting with 'agent'
-      if (participant.identity.includes('agent')) {
+      if (participant.attributes?.['lk.agent.state'] !== undefined || participant.identity.includes('agent')) {
         agentIdentityRef.current = participant.identity
+        console.log('[livekit-voice] agent joined:', participant.identity)
       }
     })
 
@@ -109,23 +110,30 @@ export function useLiveKitVoice(opts: {
       }
     })
 
-    // Listen for agent state changes
+    // Listen for agent state changes — use lk.agent.state attribute presence
+    // to identify the agent rather than matching by identity string
     room.on(RoomEvent.ParticipantAttributesChanged, (_changed, participant) => {
-      if (participant.identity === agentIdentityRef.current) {
-        const agentState = participant.attributes?.['lk.agent.state']
-        switch (agentState) {
-          case 'listening':
-            setVoiceState('LISTENING')
-            break
-          case 'thinking':
-            setVoiceState('THINKING')
-            break
-          case 'speaking':
-            setVoiceState('SPEAKING')
-            break
-          default:
-            setVoiceState('IDLE')
-        }
+      const agentState = participant.attributes?.['lk.agent.state']
+      if (agentState === undefined) return
+
+      // Lock in the agent identity the first time we see their state attribute
+      if (!agentIdentityRef.current) {
+        agentIdentityRef.current = participant.identity
+        console.log('[livekit-voice] agent identified via attributes:', participant.identity)
+      }
+
+      switch (agentState) {
+        case 'listening':
+          setVoiceState('LISTENING')
+          break
+        case 'thinking':
+          setVoiceState('THINKING')
+          break
+        case 'speaking':
+          setVoiceState('SPEAKING')
+          break
+        default:
+          setVoiceState('IDLE')
       }
     })
 
@@ -203,8 +211,9 @@ export function useLiveKitVoice(opts: {
     // The agent may have joined before us (room was pre-created + dispatched
     // before the client connected). Check existing participants immediately.
     for (const participant of room.remoteParticipants.values()) {
-      if (participant.identity.includes('agent')) {
+      if (participant.attributes?.['lk.agent.state'] !== undefined || participant.identity.includes('agent')) {
         agentIdentityRef.current = participant.identity
+        console.log('[livekit-voice] agent found in existing participants:', participant.identity)
       }
       // Attach any already-published audio tracks
       for (const pub of participant.trackPublications.values()) {
