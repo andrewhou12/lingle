@@ -222,7 +222,7 @@ export function useLiveKitVoice(opts: {
       console.log('[dbg] ParticipantAttributesChanged:', p.identity, 'changed=', changed, 'all=', p.attributes)
     })
     room.on(RoomEvent.TrackSubscribed, (track, _pub, p) => {
-      console.log('[dbg] TrackSubscribed:', p.identity, track.kind, track.id)
+      console.log('[dbg] TrackSubscribed:', p.identity, track.kind)
     })
     room.on(RoomEvent.TranscriptionReceived, (segments, p) => {
       console.log('[dbg] TranscriptionReceived from:', p?.identity, 'agentRef=', agentIdentityRef.current, segments.map(s => s.text))
