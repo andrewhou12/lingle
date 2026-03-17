@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { AccessToken } from 'livekit-server-sdk'
+import { AccessToken, RoomServiceClient, AgentDispatchClient } from 'livekit-server-sdk'
 import { withAuth } from '@/lib/api-helpers'
 
 export const POST = withAuth(async (request: NextRequest, { userId }) => {
@@ -16,18 +16,22 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
     )
   }
 
-  // Room name is based on session ID for uniqueness
   const roomName = `lingle-${sessionId || crypto.randomUUID()}`
   const identity = userId || `user-${crypto.randomUUID().slice(0, 8)}`
 
-  // Create an access token for the browser participant
-  // Agent metadata is embedded in the token so the auto-dispatched agent
-  // can read it from ctx.job.metadata when it joins the room.
-  const token = new AccessToken(apiKey, apiSecret, {
-    identity,
+  // Create the room explicitly BEFORE dispatching the agent.
+  // Dispatch requires the room to exist — if we dispatch first and the room
+  // doesn't exist yet, the job is dropped.
+  const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret)
+  await roomService.createRoom({ name: roomName })
+
+  // Dispatch the agent now that the room exists.
+  const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret)
+  await dispatchClient.createDispatch(roomName, 'lingle-agent', {
     metadata: JSON.stringify(metadata || {}),
   })
 
+  const token = new AccessToken(apiKey, apiSecret, { identity })
   token.addGrant({
     room: roomName,
     roomJoin: true,
@@ -38,9 +42,5 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
 
   const jwt = await token.toJwt()
 
-  return NextResponse.json({
-    token: jwt,
-    url: livekitUrl,
-    roomName,
-  })
+  return NextResponse.json({ token: jwt, url: livekitUrl, roomName })
 })

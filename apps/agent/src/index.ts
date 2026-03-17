@@ -119,16 +119,8 @@ export default defineAgent({
   },
 
   entry: async (ctx: JobContext) => {
-    console.log('[agent] entry started, room:', ctx.room.name)
-    // With auto-dispatch, job metadata is empty. Read metadata from the
-    // first human participant's token metadata instead.
-    console.log('[agent] waiting for participant...')
-    await ctx.waitForParticipant()
-    console.log('[agent] participant joined')
-    const participant = [...ctx.room.remoteParticipants.values()][0]
-    const rawMetadata = participant?.metadata ?? ctx.job.metadata
-    console.log('[agent] participant metadata:', rawMetadata)
-    const metadata = parseAgentMetadata(rawMetadata)
+    console.log('[agent] entry started, job metadata:', ctx.job.metadata)
+    const metadata = parseAgentMetadata(ctx.job.metadata)
 
     const targetLang = metadata.targetLanguage || 'Japanese'
     console.log(`[agent] language=${targetLang}`)
@@ -247,5 +239,5 @@ export default defineAgent({
 // Boot the agent worker when run directly
 const thisFile = fileURLToPath(import.meta.url)
 if (resolve(process.argv[1]) === thisFile) {
-  cli.runApp(new WorkerOptions({ agent: thisFile }))
+  cli.runApp(new WorkerOptions({ agent: thisFile, agentName: 'lingle-agent' }))
 }
