@@ -199,9 +199,23 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
-    // Resume AudioContext — this must be called from a user gesture handler.
-    // Both voice-session-overlay and voice-test-view now require an explicit
-    // "Join" button click before calling connectToRoom, so this is safe.
+    // The agent may have joined before us (room was pre-created + dispatched
+    // before the client connected). Check existing participants immediately.
+    for (const participant of room.remoteParticipants.values()) {
+      if (participant.identity.includes('agent')) {
+        agentIdentityRef.current = participant.identity
+      }
+      // Attach any already-published audio tracks
+      for (const pub of participant.trackPublications.values()) {
+        if (pub.track && pub.track.kind === Track.Kind.Audio) {
+          const audioEl = pub.track.attach()
+          audioEl.id = 'livekit-agent-audio'
+          document.body.appendChild(audioEl)
+        }
+      }
+    }
+
+    // Resume AudioContext — called from the Join button click (user gesture).
     await room.startAudio()
 
     // Enable microphone
