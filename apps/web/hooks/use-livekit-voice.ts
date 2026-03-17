@@ -153,6 +153,23 @@ export function useLiveKitVoice(opts: {
       setConnectedRoom(null)
     })
 
+    // Log ALL room events to diagnose why agent never appears
+    const allRoomEvents = Object.values(RoomEvent) as RoomEvent[]
+    for (const evt of allRoomEvents) {
+      room.on(evt, (...args: unknown[]) => {
+        // Serialize args safely
+        const safe = args.map((a) => {
+          if (a == null) return null
+          if (typeof a !== 'object') return a
+          try {
+            const o = a as Record<string, unknown>
+            return { kind: o.kind, identity: o.identity, sid: o.sid, state: o.state, name: o.name }
+          } catch { return '[object]' }
+        })
+        console.log('[dbg-event]', evt, ...safe)
+      })
+    }
+
     // Connect to the room
     await room.connect(url, token)
 
