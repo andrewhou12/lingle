@@ -210,30 +210,20 @@ export default defineAgent({
       }
     })
 
-    // Connect to the room explicitly — must happen before session.start()
-    // or waitForParticipant(), and ensures the room join is fully complete.
-    console.log('[agent] connecting to room...')
-    await ctx.connect()
-    console.log('[agent] room connected, waiting for participant...')
-
-    // Wait for the human participant to be in the room before starting.
-    // This prevents generating a greeting into an empty room.
-    await ctx.waitForParticipant()
-    console.log('[agent] participant present, starting session...')
-
-    // Start the agent session (room is already connected, so session.start
-    // skips the internal ctx.connect() call).
+    // Start the agent session. session.start() internally calls ctx.connect()
+    // concurrently with _updateActivity() (which publishes the audio track).
+    // Both must run together — awaiting ctx.connect() standalone hangs because
+    // the native rtc-node WebRTC negotiation only completes once a local track
+    // is published.
     const agent = new LingleAgent(metadata)
-    try {
-      await session.start({
-        room: ctx.room,
-        agent,
-      })
-    } catch (err) {
-      console.error('[agent] session.start FAILED:', err)
-      throw err
-    }
-    console.log('[agent] session started')
+    console.log('[agent] calling session.start...')
+    await session.start({ room: ctx.room, agent })
+    console.log('[agent] session started, waiting for participant...')
+
+    // Wait for the human participant before generating the greeting.
+    // This prevents speaking into an empty room.
+    await ctx.waitForParticipant()
+    console.log('[agent] participant present, generating greeting...')
 
     // Listen for text messages from the client via data channel
     ctx.room.on('dataReceived', (payload: Uint8Array) => {
@@ -249,8 +239,7 @@ export default defineAgent({
       }
     })
 
-    // Generate the initial greeting
-    console.log('[agent] generating initial greeting...')
+    // Generate the initial greeting now that a participant is confirmed present
     session.generateReply()
   },
 })
