@@ -16,37 +16,54 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
     )
   }
 
-  // Use a stable, user-scoped room name so the agent always connects to the
-  // same room the client is in — regardless of how many times the user rejoins.
   const identity = userId || `user-${crypto.randomUUID().slice(0, 8)}`
   const roomName = `lingle-${identity}`
 
   console.log(`[livekit-token] room=${roomName} url=${livekitUrl} keyPrefix=${apiKey?.slice(0, 8)}`)
 
   const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret)
+  const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret)
 
-  // Delete any existing room first so old dispatches/agents are evicted.
-  // This ensures the new dispatch always goes to a fresh room.
+  // Check if the room already has an active agent dispatch / agent participant.
+  // If the room exists and an agent is already present, just return a token —
+  // no need to redispatch. If no agent is present (e.g. first join, or the
+  // previous agent session ended), create the room and dispatch a fresh agent.
+  let needsDispatch = true
   try {
-    await roomService.deleteRoom(roomName)
-    console.log(`[livekit-token] deleted existing room`)
+    const rooms = await roomService.listRooms([roomName])
+    if (rooms.length > 0) {
+      // Room exists — check if there's already an active agent dispatch.
+      const dispatches = await dispatchClient.listDispatch(roomName)
+      if (dispatches.length > 0) {
+        console.log(`[livekit-token] room exists with ${dispatches.length} active dispatch(es), reusing`)
+        needsDispatch = false
+      } else {
+        console.log(`[livekit-token] room exists but no active dispatch, redispatching`)
+      }
+    } else {
+      console.log(`[livekit-token] room does not exist, creating`)
+    }
   } catch {
-    // Room didn't exist — that's fine
+    console.log(`[livekit-token] error checking room state, will create fresh`)
   }
 
-  // Small delay to let the room deletion propagate before re-creating.
-  await new Promise((r) => setTimeout(r, 500))
+  if (needsDispatch) {
+    // Delete any stale room so we start from a clean slate.
+    try {
+      await roomService.deleteRoom(roomName)
+      console.log(`[livekit-token] deleted stale room`)
+    } catch {
+      // Room didn't exist — fine
+    }
 
-  // Create the room explicitly BEFORE dispatching the agent.
-  await roomService.createRoom({ name: roomName })
-  console.log(`[livekit-token] room created`)
+    await roomService.createRoom({ name: roomName })
+    console.log(`[livekit-token] room created`)
 
-  // Dispatch the agent now that the room exists.
-  const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret)
-  const dispatch = await dispatchClient.createDispatch(roomName, 'lingle-agent', {
-    metadata: JSON.stringify(metadata || {}),
-  })
-  console.log(`[livekit-token] dispatch created`, JSON.stringify(dispatch))
+    const dispatch = await dispatchClient.createDispatch(roomName, 'lingle-agent', {
+      metadata: JSON.stringify(metadata || {}),
+    })
+    console.log(`[livekit-token] dispatch created`, JSON.stringify(dispatch))
+  }
 
   const token = new AccessToken(apiKey, apiSecret, { identity })
   token.addGrant({

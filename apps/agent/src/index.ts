@@ -16,6 +16,14 @@ import { dirname, resolve } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: resolve(__dirname, '../../../.env') })
 
+// Polyfill WebSocket for Node.js < 22 (required by @soniox/node which uses the browser WS API)
+if (typeof globalThis.WebSocket === 'undefined') {
+  // @ts-ignore - ws is a transitive dep; no types needed for this one-liner polyfill
+  const { WebSocket } = await import('ws')
+  // @ts-ignore
+  globalThis.WebSocket = WebSocket
+}
+
 import { defineAgent, cli, WorkerOptions, type JobContext, type JobProcess } from '@livekit/agents'
 import { voice, tts } from '@livekit/agents'
 import * as silero from '@livekit/agents-plugin-silero'
