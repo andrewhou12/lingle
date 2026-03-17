@@ -31,7 +31,7 @@ export const POST = withAuth(async (request: NextRequest, { userId }) => {
   const dispatch = await dispatchClient.createDispatch(roomName, 'lingle-agent', {
     metadata: JSON.stringify(metadata || {}),
   })
-  console.log(`[livekit-token] dispatch created id=${dispatch.dispatchId}`)
+  console.log(`[livekit-token] dispatch created`, JSON.stringify(dispatch))
 
   const token = new AccessToken(apiKey, apiSecret, { identity })
   token.addGrant({
