@@ -108,22 +108,13 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
 }
 
 export default defineAgent({
-  prewarm: async (proc: JobProcess) => {
-    // Pre-load Silero VAD model during warmup
-    proc.userData.vad = await silero.VAD.load({
-      // Higher threshold = less likely to trigger on background noise (default: 0.5)
-      activationThreshold: 0.65,
-      // Require more speech before triggering (default: 50ms)
-      minSpeechDuration: 150,
-    })
-
-    // Warm the OpenAI TCP+TLS connection so the first real LLM call
-    // doesn't pay ~150ms handshake overhead
-    new OpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 1,
-      messages: [{ role: 'user', content: '.' }],
-    }).catch(() => {}) // best-effort, don't block on failure
+  prewarm: async (_proc: JobProcess) => {
+    // Intentionally lightweight — do NOT load heavy models here.
+    // A new idle process spawns immediately after each dispatch and its prewarm
+    // runs concurrently with the active job's WebRTC DTLS handshake. Loading the
+    // Silero ONNX model during prewarm spikes CPU to ~0.85, causing the DTLS
+    // handshake to time out and room.connect() to fail silently.
+    // VAD is loaded in entry() instead, before session.start().
   },
 
   entry: async (ctx: JobContext) => {
@@ -133,11 +124,21 @@ export default defineAgent({
     const targetLang = metadata.targetLanguage || 'Japanese'
     console.log(`[agent] language=${targetLang}`)
 
+    // Load VAD here (not in prewarm) so it doesn't race with the idle-process
+    // prewarm that spawns concurrently. By the time session.start() is called,
+    // the idle process prewarm has finished and CPU is free for WebRTC.
+    console.log('[agent] loading VAD model...')
+    const vad = await silero.VAD.load({
+      activationThreshold: 0.65,
+      minSpeechDuration: 150,
+    })
+    console.log('[agent] VAD model loaded')
+
     // Create the voice agent session
     // LLM: GPT-4o mini for conversation (290ms median TTFT vs ~600ms+ Claude Haiku)
     // Analysis still uses Claude Haiku (async, not latency-critical)
     const session = new voice.AgentSession({
-      vad: ctx.proc.userData.vad as silero.VAD,
+      vad,
       stt: buildStt(metadata),
       llm: new openai.LLM({
         model: 'gpt-4o-mini',
