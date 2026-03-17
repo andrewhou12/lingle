@@ -210,12 +210,25 @@ export default defineAgent({
       }
     })
 
+    // Log job context details (no secrets)
+    const jobRoom = ctx.job.room
+    console.log(`[agent] job.room.name=${jobRoom?.name} job.room.sid=${jobRoom?.sid}`)
+    console.log(`[agent] ctx.room.isConnected=${ctx.room.isConnected} ctx.room.name=${(ctx.room as unknown as { name?: string }).name ?? '?'}`)
+
     // Start the agent with a room connection
     const agent = new LingleAgent(metadata)
-    await session.start({
-      room: ctx.room,
-      agent,
-    })
+    console.log('[agent] calling session.start...')
+    try {
+      await session.start({
+        room: ctx.room,
+        agent,
+      })
+    } catch (err) {
+      console.error('[agent] session.start FAILED:', err)
+      throw err
+    }
+    console.log(`[agent] session.start completed. localParticipant.identity=${ctx.room.localParticipant?.identity ?? '?'}`)
+    console.log(`[agent] remoteParticipants after start: ${[...ctx.room.remoteParticipants.values()].map(p => p.identity).join(', ') || '(none)'}`)
 
     // Listen for text messages from the client via data channel
     ctx.room.on('dataReceived', (payload: Uint8Array) => {
@@ -231,7 +244,14 @@ export default defineAgent({
       }
     })
 
+    // Log when participants join
+    ctx.room.on('participantConnected' as Parameters<typeof ctx.room.on>[0], (p: unknown) => {
+      const participant = p as { identity?: string; kind?: number }
+      console.log(`[agent] participantConnected: identity=${participant?.identity} kind=${participant?.kind}`)
+    })
+
     // Generate the initial greeting
+    console.log('[agent] generating initial greeting...')
     session.generateReply()
   },
 })
