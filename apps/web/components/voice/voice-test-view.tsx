@@ -35,6 +35,7 @@ export function VoiceTestView() {
   const voice = useLiveKitVoice({})
 
   const handleJoin = useCallback(async () => {
+    try { new AudioContext().resume() } catch {}
     setJoined(true)
     await voice.startDirect({
       sessionMode: 'conversation',

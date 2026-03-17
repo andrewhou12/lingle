@@ -171,6 +171,10 @@ function SessionOverlayInner({
   }, [sessionSettings.introduceNewItems])
 
   const handleJoin = useCallback(async () => {
+    // Unlock AudioContext synchronously while still in the user gesture.
+    // room.startAudio() is called later (after awaits), but the browser
+    // considers audio unlocked once any AudioContext is created+resumed in a gesture.
+    try { new AudioContext().resume() } catch {}
     setJoined(true)
     setIsStarting(true)
     try {
