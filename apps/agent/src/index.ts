@@ -215,43 +215,54 @@ export default defineAgent({
       }
     })
 
-    // Start the agent session. session.start() internally calls ctx.connect()
-    // concurrently with _updateActivity() (which publishes the audio track).
-    // Both must run together — awaiting ctx.connect() standalone hangs because
-    // the native rtc-node WebRTC negotiation only completes once a local track
-    // is published.
-    // Log the URL the agent uses to connect (from job context)
-    console.log(`[agent] connect url=${('url' in ctx.info ? (ctx.info as Record<string, unknown>).url : 'n/a')}`)
+    // The Go SDK inside rtc-node makes an HTTP GET to /settings/regions when given an https:// URL.
+    // This HTTP request fails from inside LiveKit Cloud OCI containers (network routing issue).
+    // Fix: convert https:// → wss:// so the Go SDK connects directly via WebSocket, skipping
+    // the region detection HTTP request.
+    const rawUrl = String((ctx.info as unknown as Record<string, unknown>).url ?? '')
+    const connectUrl = rawUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+    const connectToken = String((ctx.info as unknown as Record<string, unknown>).token ?? '')
+    console.log(`[agent] connecting direct wss: ${connectUrl} (was: ${rawUrl})`)
 
     // Track room connection state changes in real time
-    const roomAny = ctx.room as unknown as { on?: (e: string, cb: (...a: unknown[]) => void) => void, connectionState?: unknown }
+    const roomAny = ctx.room as unknown as {
+      connect: (url: string, token: string, opts?: Record<string, unknown>) => Promise<void>
+      on?: (e: string, cb: (...a: unknown[]) => void) => void
+      connectionState?: unknown
+    }
     if (roomAny.on) {
       roomAny.on('connectionStateChanged', (state: unknown) => {
         console.log(`[agent] connectionStateChanged: ${state} room=${ctx.room.name ?? 'undefined'} remoteCount=${ctx.room.remoteParticipants.size}`)
       })
     }
 
+    // Connect directly with wss:// URL to bypass failing region-detection HTTP request
+    console.log('[agent] calling room.connect() with wss URL...')
+    try {
+      await roomAny.connect(connectUrl, connectToken, { autoSubscribe: true, dynacast: false })
+    } catch (err) {
+      console.error(`[agent] room.connect() FAILED:`, err instanceof Error ? err.message : String(err))
+      // Disconnect so the room emits 'Disconnected', which lets the SDK cleanly exit this job
+      // process (otherwise the idle process hangs forever waiting for the closeEvent).
+      try { await ctx.room.disconnect() } catch {}
+      throw err
+    }
+    console.log(`[agent] room connected! room=${ctx.room.name} connectionState=${roomAny.connectionState} remoteCount=${ctx.room.remoteParticipants.size}`)
+
     const agent = new LingleAgent(metadata)
     console.log('[agent] calling session.start...')
     await session.start({ room: ctx.room, agent })
     console.log(
-      `[agent] session started — room=${ctx.room.name} sid=${'sid' in ctx.room ? (ctx.room as Record<string, unknown>).sid : 'n/a'}` +
+      `[agent] session started — room=${ctx.room.name}` +
       ` localIdentity=${ctx.room.localParticipant?.identity ?? 'none'}` +
       ` remoteCount=${ctx.room.remoteParticipants.size}` +
       ` connectionState=${roomAny.connectionState ?? 'n/a'}`,
     )
 
-    // Poll room state every 2s for 20s to catch late JoinResponse
-    let pollCount = 0
-    const pollTimer = setInterval(() => {
-      console.log(`[agent] poll#${++pollCount} room=${ctx.room.name ?? 'undefined'} remoteCount=${ctx.room.remoteParticipants.size} connectionState=${roomAny.connectionState ?? 'n/a'}`)
-      if (pollCount >= 10) clearInterval(pollTimer)
-    }, 2000)
-
     // Wait for the human participant before generating the greeting.
     // This prevents speaking into an empty room.
+    console.log('[agent] waiting for participant...')
     await ctx.waitForParticipant()
-    clearInterval(pollTimer)
     console.log('[agent] participant present, generating greeting...')
 
     // Listen for text messages from the client via data channel
