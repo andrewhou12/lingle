@@ -226,7 +226,11 @@ export default defineAgent({
     const agent = new LingleAgent(metadata)
     console.log('[agent] calling session.start...')
     await session.start({ room: ctx.room, agent })
-    console.log('[agent] session started, waiting for participant...')
+    console.log(
+      `[agent] session started — room=${ctx.room.name} sid=${'sid' in ctx.room ? (ctx.room as Record<string, unknown>).sid : 'n/a'}` +
+      ` localIdentity=${ctx.room.localParticipant?.identity ?? 'none'}` +
+      ` remoteCount=${ctx.room.remoteParticipants.size}`,
+    )
 
     // Wait for the human participant before generating the greeting.
     // This prevents speaking into an empty room.
@@ -255,5 +259,13 @@ export default defineAgent({
 // Boot the agent worker when run directly
 const thisFile = fileURLToPath(import.meta.url)
 if (resolve(process.argv[1]) === thisFile) {
-  cli.runApp(new WorkerOptions({ agent: thisFile, agentName: 'lingle-agent' }))
+  cli.runApp(new WorkerOptions({
+    agent: thisFile,
+    agentName: 'lingle-agent',
+    // Limit to 1 idle process to avoid CPU spike above the 0.70 cloud threshold.
+    // Default is 3 concurrent prewarm processes which pushes CPU to ~0.79 and
+    // causes the worker to mark itself unavailable right after registration,
+    // dropping incoming dispatches on the floor.
+    numIdleProcesses: 1,
+  }))
 }

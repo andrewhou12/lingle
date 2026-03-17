@@ -66,7 +66,7 @@ export function useLiveKitVoice(opts: {
 
   // ── Room connection ──
 
-  const connectToRoom = useCallback(async (token: string, url: string) => {
+  const connectToRoom = useCallback(async (token: string, url: string, roomName: string, metadata: Record<string, unknown>) => {
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -176,8 +176,20 @@ export function useLiveKitVoice(opts: {
     }, 1000)
     setTimeout(() => clearInterval(pollTimer), 60000)
 
-    // Connect to the room
+    // Connect to the room — this creates the room on the correct regional node
     await room.connect(url, token)
+
+    // Dispatch the agent NOW that the room exists on the correct node
+    try {
+      await fetch('/api/voice/start-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ roomName, metadata }),
+      })
+    } catch (err) {
+      console.error('[livekit-voice] start-agent failed:', err)
+    }
 
     console.log('[livekit-voice] connected, setting connectedRoom. state=', room.state, 'remoteParticipants=', [...room.remoteParticipants.values()].map(p => ({ id: p.identity, kind: p.kind })))
     setConnectedRoom(room)
@@ -230,8 +242,15 @@ export function useLiveKitVoice(opts: {
           throw new Error('Failed to get LiveKit token')
         }
 
-        const { token, url } = await tokenRes.json()
-        await connectToRoom(token, url)
+        const { token, url, roomName } = await tokenRes.json()
+        const metadata = {
+          sessionId: newSessionId,
+          sessionPlan: result.plan,
+          sessionMode: mode,
+          basePrompt: prompt,
+          analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
+        }
+        await connectToRoom(token, url, roomName, metadata)
       } catch (err) {
         console.error('[livekit-voice] Failed to start session:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -283,8 +302,15 @@ export function useLiveKitVoice(opts: {
           throw new Error('Failed to get LiveKit token')
         }
 
-        const { token, url } = await tokenRes.json()
-        await connectToRoom(token, url)
+        const { token, url, roomName } = await tokenRes.json()
+        const metadata = {
+          sessionId: existingSessionId,
+          sessionPlan: existingPlan,
+          sessionMode: 'conversation',
+          basePrompt: messageText,
+          analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
+        }
+        await connectToRoom(token, url, roomName, metadata)
       } catch (err) {
         console.error('[livekit-voice] Failed to start with existing plan:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -329,8 +355,8 @@ export function useLiveKitVoice(opts: {
           throw new Error(body.error || `Failed to get LiveKit token (${tokenRes.status})`)
         }
 
-        const { token, url } = await tokenRes.json()
-        await connectToRoom(token, url)
+        const { token, url, roomName } = await tokenRes.json()
+        await connectToRoom(token, url, roomName, metadata)
       } catch (err) {
         console.error('[livekit-voice] Failed to start direct session:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -372,8 +398,8 @@ export function useLiveKitVoice(opts: {
       return
     }
 
-    const { token, url } = await tokenRes.json()
-    await connectToRoom(token, url)
+    const { token, url, roomName } = await tokenRes.json()
+    await connectToRoom(token, url, roomName, { sessionId: sessionIdRef.current })
   }, [connectToRoom])
 
   const endSession = useCallback(async () => {
