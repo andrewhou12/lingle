@@ -31,11 +31,15 @@ function AgentStateBridge({ onAgentState, onAgentIdentity }: {
 }) {
   const { state, agent } = useVoiceAssistant()
 
+  console.log('[bridge] AgentStateBridge render — state:', state, 'agent:', agent?.identity ?? null)
+
   useEffect(() => {
+    console.log('[bridge] state effect —', state)
     onAgentState(state)
   }, [state, onAgentState])
 
   useEffect(() => {
+    console.log('[bridge] agent effect —', agent?.identity ?? null)
     if (agent?.identity) {
       onAgentIdentity(agent.identity)
     }

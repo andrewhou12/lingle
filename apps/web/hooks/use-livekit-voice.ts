@@ -156,6 +156,7 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
+    console.log('[livekit-voice] connected, setting connectedRoom. state=', room.state, 'remoteParticipants=', [...room.remoteParticipants.values()].map(p => ({ id: p.identity, kind: p.kind })))
     setConnectedRoom(room)
 
     // Enable microphone
