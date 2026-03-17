@@ -154,21 +154,27 @@ export function useLiveKitVoice(opts: {
     })
 
     // Log ALL room events to diagnose why agent never appears
+    const serializeParticipant = (p: unknown): unknown => {
+      if (p == null) return null
+      if (Array.isArray(p)) return p.map(serializeParticipant)
+      if (typeof p !== 'object') return p
+      const o = p as Record<string, unknown>
+      return { kind: o.kind, identity: o.identity, sid: o.sid, state: o.state, name: o.name }
+    }
     const allRoomEvents = Object.values(RoomEvent) as RoomEvent[]
     for (const evt of allRoomEvents) {
       room.on(evt, (...args: unknown[]) => {
-        // Serialize args safely
-        const safe = args.map((a) => {
-          if (a == null) return null
-          if (typeof a !== 'object') return a
-          try {
-            const o = a as Record<string, unknown>
-            return { kind: o.kind, identity: o.identity, sid: o.sid, state: o.state, name: o.name }
-          } catch { return '[object]' }
-        })
+        const safe = args.map(serializeParticipant)
         console.log('[dbg-event]', evt, ...safe)
       })
     }
+
+    // Poll remoteParticipants every second for 60s
+    const pollTimer = setInterval(() => {
+      const participants = [...room.remoteParticipants.values()]
+      console.log('[dbg-poll] remoteParticipants:', participants.map(p => ({ identity: p.identity, kind: p.kind, sid: p.sid })))
+    }, 1000)
+    setTimeout(() => clearInterval(pollTimer), 60000)
 
     // Connect to the room
     await room.connect(url, token)
