@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1
+# Build context: monorepo root
+# Run: lk agent deploy --config livekit.toml . (from monorepo root)
+
+ARG NODE_VERSION=22
+FROM node:${NODE_VERSION}-slim AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN apt-get update -qq && apt-get install --no-install-recommends -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN npm install -g pnpm@10
+
+# --- Build stage ---
+FROM base AS build
+
+WORKDIR /app
+
+# Copy root manifests for frozen lockfile install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy only the packages the agent needs
+COPY packages/shared ./packages/shared
+COPY apps/agent ./apps/agent
+
+# Install deps for the agent and its workspace dependencies only
+RUN pnpm install --frozen-lockfile --filter @lingle/agent...
+
+# Download Silero ONNX model into the image so idle processes don't fetch it at runtime
+RUN cd apps/agent && node --import tsx src/index.ts download-files 2>/dev/null || true
+
+# Prune dev deps
+RUN pnpm prune --prod --filter @lingle/agent...
+
+# --- Production stage ---
+FROM base
+
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/app" \
+    --shell "/sbin/nologin" \
+    --uid "${UID}" \
+    appuser
+
+WORKDIR /app
+
+COPY --from=build --chown=appuser:appuser /app /app
+
+USER appuser
+
+ENV NODE_ENV=production
+
+CMD ["node", "--import", "tsx", "apps/agent/src/index.ts", "start"]

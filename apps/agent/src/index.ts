@@ -26,12 +26,11 @@ if (typeof globalThis.WebSocket === 'undefined') {
 
 import { defineAgent, cli, WorkerOptions, type JobContext, type JobProcess } from '@livekit/agents'
 import { voice, tts } from '@livekit/agents'
-import * as silero from '@livekit/agents-plugin-silero'
 import * as deepgram from '@livekit/agents-plugin-deepgram'
 import * as cartesia from '@livekit/agents-plugin-cartesia'
 import * as rime from '@livekit/agents-plugin-rime'
 import * as openai from '@livekit/agents-plugin-openai'
-import { turnDetector } from '@livekit/agents-plugin-livekit'
+
 import OpenAIClient from 'openai'
 import { LingleAgent } from './lingle-agent.js'
 import {
@@ -128,7 +127,8 @@ export default defineAgent({
     // prewarm that spawns concurrently. By the time session.start() is called,
     // the idle process prewarm has finished and CPU is free for WebRTC.
     console.log('[agent] loading VAD model...')
-    const vad = await silero.VAD.load({
+    const { VAD } = await import('@livekit/agents-plugin-silero')
+    const vad = await VAD.load({
       activationThreshold: 0.65,
       minSpeechDuration: 150,
     })
@@ -145,17 +145,13 @@ export default defineAgent({
         maxCompletionTokens: 300,
       }),
       tts: buildTts(metadata),
-      // Context-aware turn detection: uses a multilingual model to predict
-      // end-of-turn based on linguistic context, not just silence duration.
-      // Critical for language learners who pause mid-sentence while thinking.
-      turnDetection: new turnDetector.MultilingualModel(),
+      // MultilingualModel removed: its 396MB ONNX loads concurrently with
+      // DTLS inside session.start(), spiking CPU above the 0.7 threshold and
+      // killing the room connection. Using VAD-based turn detection for now.
       voiceOptions: {
         preemptiveGeneration: true,
-        // Balance: low min lets the turn detector fire early when confident,
-        // high max gives learners time to think. The MultilingualModel handles
-        // the intelligence — these are just bounds.
-        minEndpointingDelay: 0.3,
-        maxEndpointingDelay: 2.0,
+        minEndpointingDelay: 0.5,
+        maxEndpointingDelay: 3.0,
         minInterruptionDuration: 0.3,
         minInterruptionWords: 1,
       },
@@ -224,18 +220,38 @@ export default defineAgent({
     // Both must run together — awaiting ctx.connect() standalone hangs because
     // the native rtc-node WebRTC negotiation only completes once a local track
     // is published.
+    // Log the URL the agent uses to connect (from job context)
+    console.log(`[agent] connect url=${('url' in ctx.info ? (ctx.info as Record<string, unknown>).url : 'n/a')}`)
+
+    // Track room connection state changes in real time
+    const roomAny = ctx.room as unknown as { on?: (e: string, cb: (...a: unknown[]) => void) => void, connectionState?: unknown }
+    if (roomAny.on) {
+      roomAny.on('connectionStateChanged', (state: unknown) => {
+        console.log(`[agent] connectionStateChanged: ${state} room=${ctx.room.name ?? 'undefined'} remoteCount=${ctx.room.remoteParticipants.size}`)
+      })
+    }
+
     const agent = new LingleAgent(metadata)
     console.log('[agent] calling session.start...')
     await session.start({ room: ctx.room, agent })
     console.log(
       `[agent] session started — room=${ctx.room.name} sid=${'sid' in ctx.room ? (ctx.room as Record<string, unknown>).sid : 'n/a'}` +
       ` localIdentity=${ctx.room.localParticipant?.identity ?? 'none'}` +
-      ` remoteCount=${ctx.room.remoteParticipants.size}`,
+      ` remoteCount=${ctx.room.remoteParticipants.size}` +
+      ` connectionState=${roomAny.connectionState ?? 'n/a'}`,
     )
+
+    // Poll room state every 2s for 20s to catch late JoinResponse
+    let pollCount = 0
+    const pollTimer = setInterval(() => {
+      console.log(`[agent] poll#${++pollCount} room=${ctx.room.name ?? 'undefined'} remoteCount=${ctx.room.remoteParticipants.size} connectionState=${roomAny.connectionState ?? 'n/a'}`)
+      if (pollCount >= 10) clearInterval(pollTimer)
+    }, 2000)
 
     // Wait for the human participant before generating the greeting.
     // This prevents speaking into an empty room.
     await ctx.waitForParticipant()
+    clearInterval(pollTimer)
     console.log('[agent] participant present, generating greeting...')
 
     // Listen for text messages from the client via data channel
