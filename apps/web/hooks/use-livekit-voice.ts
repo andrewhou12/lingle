@@ -53,6 +53,7 @@ export function useLiveKitVoice(opts: {
   const [partialText, setPartialText] = useState('')
 
   const roomRef = useRef<Room | null>(null)
+  const connectingRef = useRef(false)
   const sessionIdRef = useRef(sessionId)
   sessionIdRef.current = sessionId
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -208,6 +209,26 @@ export function useLiveKitVoice(opts: {
     // Connect to the room
     await room.connect(url, token)
 
+    // ── DEBUG: log all remote participants + register catch-all listeners ──
+    console.log('[dbg] connected. remoteParticipants:', [...room.remoteParticipants.values()].map(p => ({
+      identity: p.identity,
+      attributes: p.attributes,
+      tracks: [...p.trackPublications.values()].map(t => ({ kind: t.kind, subscribed: !!t.track })),
+    })))
+    room.on(RoomEvent.ParticipantConnected, (p) => {
+      console.log('[dbg] ParticipantConnected:', p.identity, p.attributes)
+    })
+    room.on(RoomEvent.ParticipantAttributesChanged, (changed, p) => {
+      console.log('[dbg] ParticipantAttributesChanged:', p.identity, 'changed=', changed, 'all=', p.attributes)
+    })
+    room.on(RoomEvent.TrackSubscribed, (track, _pub, p) => {
+      console.log('[dbg] TrackSubscribed:', p.identity, track.kind, track.id)
+    })
+    room.on(RoomEvent.TranscriptionReceived, (segments, p) => {
+      console.log('[dbg] TranscriptionReceived from:', p?.identity, 'agentRef=', agentIdentityRef.current, segments.map(s => s.text))
+    })
+    // ── END DEBUG ──
+
     // The agent may have joined before us (room was pre-created + dispatched
     // before the client connected). Check existing participants immediately.
     for (const participant of room.remoteParticipants.values()) {
@@ -346,6 +367,11 @@ export function useLiveKitVoice(opts: {
    */
   const startDirect = useCallback(
     async (metadata: Record<string, unknown>) => {
+      if (connectingRef.current) {
+        console.warn('[livekit-voice] startDirect called while already connecting — ignoring')
+        return
+      }
+      connectingRef.current = true
       setError(null)
       try {
         setSessionId(null)
@@ -381,6 +407,8 @@ export function useLiveKitVoice(opts: {
           clearInterval(durationIntervalRef.current)
           durationIntervalRef.current = null
         }
+      } finally {
+        connectingRef.current = false
       }
     },
     [connectToRoom],
