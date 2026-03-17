@@ -210,14 +210,20 @@ export default defineAgent({
       }
     })
 
-    // Log job context details (no secrets)
-    const jobRoom = ctx.job.room
-    console.log(`[agent] job.room.name=${jobRoom?.name} job.room.sid=${jobRoom?.sid}`)
-    console.log(`[agent] ctx.room.isConnected=${ctx.room.isConnected} ctx.room.name=${(ctx.room as unknown as { name?: string }).name ?? '?'}`)
+    // Connect to the room explicitly — must happen before session.start()
+    // or waitForParticipant(), and ensures the room join is fully complete.
+    console.log('[agent] connecting to room...')
+    await ctx.connect()
+    console.log('[agent] room connected, waiting for participant...')
 
-    // Start the agent with a room connection
+    // Wait for the human participant to be in the room before starting.
+    // This prevents generating a greeting into an empty room.
+    await ctx.waitForParticipant()
+    console.log('[agent] participant present, starting session...')
+
+    // Start the agent session (room is already connected, so session.start
+    // skips the internal ctx.connect() call).
     const agent = new LingleAgent(metadata)
-    console.log('[agent] calling session.start...')
     try {
       await session.start({
         room: ctx.room,
@@ -227,8 +233,7 @@ export default defineAgent({
       console.error('[agent] session.start FAILED:', err)
       throw err
     }
-    console.log(`[agent] session.start completed. localParticipant.identity=${ctx.room.localParticipant?.identity ?? '?'}`)
-    console.log(`[agent] remoteParticipants after start: ${[...ctx.room.remoteParticipants.values()].map(p => p.identity).join(', ') || '(none)'}`)
+    console.log('[agent] session started')
 
     // Listen for text messages from the client via data channel
     ctx.room.on('dataReceived', (payload: Uint8Array) => {
@@ -242,12 +247,6 @@ export default defineAgent({
       } catch {
         // Not JSON or not a chat message — ignore
       }
-    })
-
-    // Log when participants join
-    ctx.room.on('participantConnected' as Parameters<typeof ctx.room.on>[0], (p: unknown) => {
-      const participant = p as { identity?: string; kind?: number }
-      console.log(`[agent] participantConnected: identity=${participant?.identity} kind=${participant?.kind}`)
     })
 
     // Generate the initial greeting
