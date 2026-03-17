@@ -3,6 +3,7 @@
 import { useMemo, useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
+import { LiveKitBridge } from './livekit-bridge'
 import { VoiceAuraOrb } from './voice-aura-orb'
 import { toAgentState } from './voice-aura-orb'
 import { LingleControlBar } from './lingle-control-bar'
@@ -86,6 +87,13 @@ export function VoiceTestView() {
 
   return (
     <div className="fixed inset-0 bg-bg flex flex-col items-center justify-between z-50">
+      {voice.connectedRoom && (
+        <LiveKitBridge
+          room={voice.connectedRoom}
+          onAgentState={voice.handleAgentStateChange}
+          onAgentIdentity={voice.handleAgentIdentity}
+        />
+      )}
       {/* Top bar */}
       <div className="w-full flex items-center justify-between px-6 py-4">
         <div className="text-[13px] text-text-secondary font-medium">

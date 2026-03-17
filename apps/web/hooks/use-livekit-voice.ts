@@ -4,9 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   Room,
   RoomEvent,
-  Track,
   type RemoteParticipant,
-  type RemoteTrackPublication,
 } from 'livekit-client'
 import { api } from '@/lib/api'
 import type { SessionPlan } from '@/lib/session-plan'
@@ -35,7 +33,11 @@ export function useLiveKitVoice(opts: {
   sessionId?: string | null
   sessionPlan?: SessionPlan | null
   onPlanUpdate?: (plan: SessionPlan) => void
-}): UseVoiceConversationReturn {
+}): UseVoiceConversationReturn & {
+  connectedRoom: Room | null
+  handleAgentStateChange: (state: string) => void
+  handleAgentIdentity: (identity: string) => void
+} {
   const [voiceState, setVoiceState] = useState<VoiceState>('IDLE')
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [isActive, setIsActive] = useState(false)
@@ -51,6 +53,7 @@ export function useLiveKitVoice(opts: {
   const [spokenSentences, setSpokenSentences] = useState<string[]>([])
   const [currentSentence, setCurrentSentence] = useState<string | null>(null)
   const [partialText, setPartialText] = useState('')
+  const [connectedRoom, setConnectedRoom] = useState<Room | null>(null)
 
   const roomRef = useRef<Room | null>(null)
   const connectingRef = useRef(false)
@@ -70,15 +73,6 @@ export function useLiveKitVoice(opts: {
     })
 
     roomRef.current = room
-
-    // Listen for agent participant joining — identify by agent state attribute,
-    // not by identity string (agent identity is a UUID that doesn't contain 'agent')
-    room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-      if (participant.attributes?.['lk.agent.state'] !== undefined || participant.identity.includes('agent')) {
-        agentIdentityRef.current = participant.identity
-        console.log('[livekit-voice] agent joined:', participant.identity)
-      }
-    })
 
     // Listen for transcription events
     room.on(RoomEvent.TranscriptionReceived, (segments, participant) => {
@@ -108,33 +102,6 @@ export function useLiveKitVoice(opts: {
             setPartialText(displayText)
           }
         }
-      }
-    })
-
-    // Listen for agent state changes — use lk.agent.state attribute presence
-    // to identify the agent rather than matching by identity string
-    room.on(RoomEvent.ParticipantAttributesChanged, (_changed, participant) => {
-      const agentState = participant.attributes?.['lk.agent.state']
-      if (agentState === undefined) return
-
-      // Lock in the agent identity the first time we see their state attribute
-      if (!agentIdentityRef.current) {
-        agentIdentityRef.current = participant.identity
-        console.log('[livekit-voice] agent identified via attributes:', participant.identity)
-      }
-
-      switch (agentState) {
-        case 'listening':
-          setVoiceState('LISTENING')
-          break
-        case 'thinking':
-          setVoiceState('THINKING')
-          break
-        case 'speaking':
-          setVoiceState('SPEAKING')
-          break
-        default:
-          setVoiceState('IDLE')
       }
     })
 
@@ -180,84 +147,16 @@ export function useLiveKitVoice(opts: {
       }
     })
 
-    // Handle track subscriptions for audio playback
-    room.on(
-      RoomEvent.TrackSubscribed,
-      (track, _pub: RemoteTrackPublication, _participant: RemoteParticipant) => {
-        if (track.kind === Track.Kind.Audio) {
-          const audioEl = track.attach()
-          audioEl.id = 'livekit-agent-audio'
-          document.body.appendChild(audioEl)
-          // Browsers block <audio autoplay> unless .play() is called explicitly.
-          // This is a separate policy from AudioContext autoplay.
-          audioEl.play().catch((err) => console.warn('[livekit-voice] audio.play() blocked:', err))
-        }
-      },
-    )
-
-    room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      if (track.kind === Track.Kind.Audio) {
-        track.detach().forEach((el) => el.remove())
-      }
-    })
-
     room.on(RoomEvent.Disconnected, () => {
       setIsActive(false)
       setVoiceState('IDLE')
+      setConnectedRoom(null)
     })
 
     // Connect to the room
     await room.connect(url, token)
 
-    // ── DEBUG: poll remoteParticipants every second for 30s ──
-    console.log('[dbg] connected. remoteParticipants:', [...room.remoteParticipants.values()].map(p => ({
-      identity: p.identity, attributes: p.attributes,
-    })))
-    const pollInterval = setInterval(() => {
-      const participants = [...room.remoteParticipants.values()]
-      if (participants.length > 0) {
-        console.log('[dbg] poll — remoteParticipants:', participants.map(p => ({
-          identity: p.identity, attributes: p.attributes,
-          tracks: [...p.trackPublications.values()].map(t => ({ kind: t.kind, subscribed: !!t.track })),
-        })))
-        clearInterval(pollInterval)
-      }
-    }, 1000)
-    setTimeout(() => clearInterval(pollInterval), 30000)
-    room.on(RoomEvent.ParticipantConnected, (p) => {
-      console.log('[dbg] ParticipantConnected:', p.identity, p.attributes)
-    })
-    room.on(RoomEvent.ParticipantAttributesChanged, (changed, p) => {
-      console.log('[dbg] ParticipantAttributesChanged:', p.identity, 'changed=', changed, 'all=', p.attributes)
-    })
-    room.on(RoomEvent.TrackSubscribed, (track, _pub, p) => {
-      console.log('[dbg] TrackSubscribed:', p.identity, track.kind)
-    })
-    room.on(RoomEvent.TranscriptionReceived, (segments, p) => {
-      console.log('[dbg] TranscriptionReceived from:', p?.identity, 'agentRef=', agentIdentityRef.current, segments.map(s => s.text))
-    })
-    // ── END DEBUG ──
-
-    // The agent may have joined before us (room was pre-created + dispatched
-    // before the client connected). Check existing participants immediately.
-    for (const participant of room.remoteParticipants.values()) {
-      if (participant.attributes?.['lk.agent.state'] !== undefined || participant.identity.includes('agent')) {
-        agentIdentityRef.current = participant.identity
-        console.log('[livekit-voice] agent found in existing participants:', participant.identity)
-      }
-      // Attach any already-published audio tracks
-      for (const pub of participant.trackPublications.values()) {
-        if (pub.track && pub.track.kind === Track.Kind.Audio) {
-          const audioEl = pub.track.attach()
-          audioEl.id = 'livekit-agent-audio'
-          document.body.appendChild(audioEl)
-          audioEl.play().catch((err) => console.warn('[livekit-voice] audio.play() blocked (existing):', err))
-        }
-      }
-    }
-
-    // Resume AudioContext — called from the Join button click (user gesture).
-    await room.startAudio()
+    setConnectedRoom(room)
 
     // Enable microphone
     await room.localParticipant.setMicrophoneEnabled(true)
@@ -466,9 +365,7 @@ export function useLiveKitVoice(opts: {
       roomRef.current = null
     }
 
-    // Clean up audio elements
-    const audioEl = document.getElementById('livekit-agent-audio')
-    if (audioEl) audioEl.remove()
+    setConnectedRoom(null)
 
     if (sessionIdRef.current) {
       try {
@@ -562,6 +459,21 @@ export function useLiveKitVoice(opts: {
     })
   }, [])
 
+  // ── Agent state/identity callbacks (used by LiveKitBridge) ──
+
+  const handleAgentStateChange = useCallback((state: string) => {
+    switch (state) {
+      case 'listening': setVoiceState('LISTENING'); break
+      case 'thinking': setVoiceState('THINKING'); break
+      case 'speaking': setVoiceState('SPEAKING'); break
+      default: setVoiceState('IDLE')
+    }
+  }, [])
+
+  const handleAgentIdentity = useCallback((identity: string) => {
+    agentIdentityRef.current = identity
+  }, [])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -572,8 +484,6 @@ export function useLiveKitVoice(opts: {
         roomRef.current.disconnect()
         roomRef.current = null
       }
-      const audioEl = document.getElementById('livekit-agent-audio')
-      if (audioEl) audioEl.remove()
     }
   }, [])
 
@@ -581,6 +491,9 @@ export function useLiveKitVoice(opts: {
 
   return {
     room: roomRef.current,
+    connectedRoom,
+    handleAgentStateChange,
+    handleAgentIdentity,
     voiceState,
     transcript,
     partialText,

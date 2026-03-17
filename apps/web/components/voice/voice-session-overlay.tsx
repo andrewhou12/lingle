@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 
 import { useVoiceConversation, type UseVoiceConversationReturn } from '@/hooks/use-voice-conversation'
 import { useLiveKitVoice } from '@/hooks/use-livekit-voice'
+import { LiveKitBridge } from './livekit-bridge'
 import { getVoiceProvider } from '@/lib/voice/voice-provider-config'
 import type { SessionPlan } from '@/lib/session-plan'
 import { isConversationPlan } from '@/lib/session-plan'
@@ -79,15 +80,24 @@ function LiveKitVoiceSession(props: VoiceSessionOverlayProps) {
   })
 
   return (
-    <SessionOverlayInner
-      voice={voice}
-      prompt={prompt}
-      mode={mode}
-      existingSessionId={existingSessionId}
-      existingPlan={existingPlan}
-      steeringNotes={steeringNotes}
-      onEnd={onEnd}
-    />
+    <>
+      {voice.connectedRoom && (
+        <LiveKitBridge
+          room={voice.connectedRoom}
+          onAgentState={voice.handleAgentStateChange}
+          onAgentIdentity={voice.handleAgentIdentity}
+        />
+      )}
+      <SessionOverlayInner
+        voice={voice}
+        prompt={prompt}
+        mode={mode}
+        existingSessionId={existingSessionId}
+        existingPlan={existingPlan}
+        steeringNotes={steeringNotes}
+        onEnd={onEnd}
+      />
+    </>
   )
 }
 
