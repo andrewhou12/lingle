@@ -1,7 +1,7 @@
 import WebSocket from 'ws'
 
 const RIME_API_KEY = process.env.RIME_API_KEY || ''
-const RIME_VOICE_ID = process.env.RIME_VOICE_ID || 'cove'
+const RIME_VOICE_ID = process.env.RIME_VOICE_ID || 'luna'
 const RIME_MODEL_ID = process.env.RIME_MODEL_ID || 'arcana'
 const RIME_LANG = process.env.RIME_LANG || ''
 

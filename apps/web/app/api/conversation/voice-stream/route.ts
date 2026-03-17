@@ -51,6 +51,15 @@ function getCartesiaVoice(langCode: string): string | undefined {
   return process.env[envKey]
 }
 
+/** Map sttCode to Rime language code. Returns null if Rime doesn't handle this language. */
+function getRimeLangCode(langCode: string): string | null {
+  const map: Record<string, string> = {
+    en: 'eng',
+    ja: 'jpn',
+  }
+  return map[langCode] ?? null
+}
+
 // Detect if a sentence is predominantly English vs the target language.
 // For CJK targets, Latin text = English. For Latin-script targets (es, fr, de, etc.),
 // we can't distinguish by script, so always assume target language.
@@ -215,9 +224,10 @@ export const POST = withAuth(async (request, { userId }) => {
             }
           }
 
-          // English sentences → Rime TTS (24kHz PCM)
-          if (sentenceLang === 'en') {
-            const { readable: rimeReadable } = getRimeWs().synthesizeStream(cleaned, undefined, 'eng')
+          // Rime-routed languages (English + Japanese) → Rime TTS (24kHz PCM)
+          const rimeLangCode = getRimeLangCode(sentenceLang)
+          if (rimeLangCode !== null) {
+            const { readable: rimeReadable } = getRimeWs().synthesizeStream(cleaned, undefined, rimeLangCode)
             const rimeReader = rimeReadable.getReader()
             while (true) {
               const { done, value } = await rimeReader.read()

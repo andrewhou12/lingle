@@ -51,7 +51,10 @@ export function buildSystemPrompt({
 
   // Build tool docs section — only describe tools that are available, with mode-specific overrides
   const toolNames = availableTools ?? Object.keys(TOOL_DOCS)
-  const toolDocLines = toolNames
+  const voiceToolNames = voiceMode
+    ? toolNames.filter((n) => n === 'updateSessionPlan')
+    : toolNames
+  const toolDocLines = voiceToolNames
     .filter((name) => name in TOOL_DOCS)
     .map((name) => {
       const modeOverride = MODE_TOOL_DOCS[name]?.[mode]
@@ -91,13 +94,13 @@ export function buildSystemPrompt({
 
 ═══ MODE: ${mode.toUpperCase()} ═══
 
-${getModeBlock(mode, targetLanguage)}
-
+${getModeBlock(mode, targetLanguage, voiceMode)}
+${voiceMode ? '' : `
 ═══ FORMATTING ═══
 
 ${langConfig?.annotationInstruction ? `- ${langConfig.annotationInstruction}\n` : ''}- NEVER use roleplay narration (*action text*, stage directions, scene descriptions, character actions). This is a language learning product, not a roleplay chat.
 - NEVER include meta-commentary about your own strategy, reasoning, or intentions (e.g. "*Starting simple to gauge your level*", "*Introducing a new topic*"). Just speak. The learner should never see your internal thought process.
-
+`}
 ═══ TOOLS ═══
 
 You have tools that render interactive UI cards inline. Use them naturally:
@@ -115,25 +118,25 @@ ${voiceMode ? level.behaviorBlock.split('\n').filter(line => !line.startsWith('E
 ${rulesBlock}`
 }
 
-function getModeBlock(mode: string, targetLanguage?: string): string {
+function getModeBlock(mode: string, targetLanguage?: string, voiceMode?: boolean): string {
   const langConfig = targetLanguage ? getLanguageById(targetLanguage) : undefined
   switch (mode) {
     case 'conversation':
       return `You are a conversation partner — like texting a friend who happens to be a native speaker.
 
 Use your session plan as context — the topic, persona, and tone should shape how you talk. Embody the persona naturally. Don't announce the topic — just start talking like that person would.
-
+${voiceMode ? '' : `
 PERSONALITY: You are a real person with opinions, not a language-learning chatbot. Act like it:
 - DISAGREE sometimes. If the learner says something you wouldn't agree with, push back. "Hmm, I don't really think so" is a valid response.
 - DON'T validate everything. Real friends don't say "great point!" after every sentence. React honestly — surprise, skepticism, confusion, amusement.
 - CHALLENGE them. Ask "why?" or "really?" when they make a claim. Tease them lightly if they say something funny. Have your own take.
 - NEVER be sycophantic. No "That's a great question!", no "Wow, your [language] is so good!", no hollow encouragement. If they said something well, just keep talking — that IS the compliment.
 - Share your own opinions and preferences without being asked. Volunteer stories. Interrupt with "oh that reminds me..." — that's what real people do.
-
+`}
 DEPTH: Don't stay surface-level. Real conversations go deep — share opinions, ask follow-ups, react to what the learner says, go on tangents when something interesting comes up. If they say something surprising, dig into it. If they give a short answer, don't just accept it — ask why, push back, share your own take.
-
+${voiceMode ? '' : `
 No roleplay narration. No *asterisk actions*. No stage directions. No "settling into chairs" or "looking at menus." Write like a real person in a messaging app — just words.
-
+`}
 When the learner makes an error, correct via recasting: use the correct form naturally in your next message. Don't break flow to lecture unless the error causes miscommunication.`
 
     case 'tutor':
