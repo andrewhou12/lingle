@@ -176,11 +176,12 @@ export function useLiveKitVoice(opts: {
       RoomEvent.TrackSubscribed,
       (track, _pub: RemoteTrackPublication, _participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
-          // LiveKit client SDK handles audio playback automatically
-          // when we attach the track to an audio element
           const audioEl = track.attach()
           audioEl.id = 'livekit-agent-audio'
           document.body.appendChild(audioEl)
+          // Browsers block <audio autoplay> unless .play() is called explicitly.
+          // This is a separate policy from AudioContext autoplay.
+          audioEl.play().catch((err) => console.warn('[livekit-voice] audio.play() blocked:', err))
         }
       },
     )
@@ -211,6 +212,7 @@ export function useLiveKitVoice(opts: {
           const audioEl = pub.track.attach()
           audioEl.id = 'livekit-agent-audio'
           document.body.appendChild(audioEl)
+          audioEl.play().catch((err) => console.warn('[livekit-voice] audio.play() blocked (existing):', err))
         }
       }
     }
