@@ -311,7 +311,7 @@ export default defineAgent({
       tts: ttsInstance,
       voiceOptions: {
         preemptiveGeneration: true,
-        minEndpointingDelay: 0.5,
+        minEndpointingDelay: 0.3,
         maxEndpointingDelay: 3.0,
         minInterruptionDuration: 0.3,
         minInterruptionWords: 1,

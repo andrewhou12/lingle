@@ -32,7 +32,7 @@ const DEFAULT_OPTS: Required<Pick<SonioxSTTOptions, 'model' | 'sampleRate' | 'nu
   sampleRate: 24000,
   numChannels: 1,
   enableEndpointDetection: true,
-  maxEndpointDelayMs: 2000,
+  maxEndpointDelayMs: 1000,
 }
 
 export class STT extends stt.STT {
