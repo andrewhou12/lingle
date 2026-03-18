@@ -38,7 +38,7 @@ export class LingleAgent extends voice.Agent {
   }
 
   override async onEnter(): Promise<void> {
-    console.log('[LingleAgent] Agent entered, session started')
+    // Session started — no-op, lifecycle managed by AgentSession
   }
 
   override async onUserTurnCompleted(

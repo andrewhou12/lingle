@@ -79,7 +79,6 @@ export function useLiveKitVoice(opts: {
       for (const segment of segments) {
         const role = participant?.identity === agentIdentityRef.current ? 'assistant' : 'user'
 
-        // Skip garbage transcripts (e.g. ".." from background noise)
         if (role === 'user' && isGarbageTranscript(segment.text)) continue
 
         if (segment.final) {
@@ -88,14 +87,12 @@ export function useLiveKitVoice(opts: {
             ...prev,
             { role, text: displayText, isFinal: true, timestamp: Date.now() },
           ])
-          // Clear partial text when final
           if (role === 'assistant') {
             setSpokenSentences((prev) => [...prev, displayText])
             setCurrentSentence(null)
             setPartialText('')
           }
         } else {
-          // Update partial text for non-final segments
           if (role === 'assistant') {
             const displayText = stripSSML(segment.text)
             setCurrentSentence(displayText)
@@ -137,13 +134,13 @@ export function useLiveKitVoice(opts: {
               setSectionTracking(analysisData.sectionTracking)
             }
           } catch {
-            // Partial NDJSON — ignore parse errors for incomplete chunks
+            // Partial JSON — ignore
           } finally {
             setIsAnalyzing(false)
           }
         }
       } catch {
-        // Not JSON data — ignore
+        // Not JSON — ignore
       }
     })
 
@@ -153,55 +150,69 @@ export function useLiveKitVoice(opts: {
       setConnectedRoom(null)
     })
 
-    // Log ALL room events to diagnose why agent never appears
-    const serializeParticipant = (p: unknown): unknown => {
-      if (p == null) return null
-      if (Array.isArray(p)) return p.map(serializeParticipant)
-      if (typeof p !== 'object') return p
-      const o = p as Record<string, unknown>
-      return { kind: o.kind, identity: o.identity, sid: o.sid, state: o.state, name: o.name }
-    }
-    const allRoomEvents = Object.values(RoomEvent) as RoomEvent[]
-    for (const evt of allRoomEvents) {
-      room.on(evt, (...args: unknown[]) => {
-        const safe = args.map(serializeParticipant)
-        console.log('[dbg-event]', evt, ...safe)
-      })
-    }
-
-    // Poll remoteParticipants every second for 60s
-    const pollTimer = setInterval(() => {
-      const participants = [...room.remoteParticipants.values()]
-      console.log('[dbg-poll] remoteParticipants:', participants.map(p => ({ identity: p.identity, kind: p.kind, sid: p.sid })))
-    }, 1000)
-    setTimeout(() => clearInterval(pollTimer), 60000)
-
-    // Connect to the room — this creates the room on the correct regional node
+    // Connect to the room
     await room.connect(url, token)
 
-    // Dispatch the agent NOW that the room exists on the correct node
-    try {
-      await fetch('/api/voice/start-agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ roomName, metadata }),
-      })
-    } catch (err) {
-      console.error('[livekit-voice] start-agent failed:', err)
+    // Dispatch the agent now that the room exists
+    const dispatchRes = await fetch('/api/voice/start-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ roomName, metadata }),
+    })
+    if (!dispatchRes.ok) {
+      const body = await dispatchRes.json().catch(() => ({}))
+      console.error('[livekit-voice] start-agent failed:', body.error || dispatchRes.status)
     }
 
-    console.log('[livekit-voice] connected, setting connectedRoom. state=', room.state, 'remoteParticipants=', [...room.remoteParticipants.values()].map(p => ({ id: p.identity, kind: p.kind })))
     setConnectedRoom(room)
 
     // Enable microphone
     await room.localParticipant.setMicrophoneEnabled(true)
   }, [])
 
+  // ── Shared helper: fetch token and connect ──
+
+  const fetchTokenAndConnect = useCallback(async (metadata: Record<string, unknown>) => {
+    const tokenRes = await fetch('/api/voice/livekit-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ metadata }),
+    })
+
+    if (!tokenRes.ok) {
+      const body = await tokenRes.json().catch(() => ({}))
+      throw new Error(body.error || `Failed to get LiveKit token (${tokenRes.status})`)
+    }
+
+    const { token, url, roomName } = await tokenRes.json()
+    await connectToRoom(token, url, roomName, metadata)
+  }, [connectToRoom])
+
+  // ── Shared session setup ──
+
+  const setupSession = useCallback(() => {
+    setTranscript([])
+    setSpokenSentences([])
+    setIsActive(true)
+    setDuration(0)
+    setAnalysisResults({})
+
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current)
+    }
+    durationIntervalRef.current = setInterval(() => {
+      setDuration((d) => d + 1)
+    }, 1000)
+  }, [])
+
   // ── Session lifecycle ──
 
   const startNewSession = useCallback(
     async (prompt: string, mode: string) => {
+      if (connectingRef.current) return
+      connectingRef.current = true
       setError(null)
       try {
         const result = await api.conversationPlan(
@@ -212,68 +223,39 @@ export function useLiveKitVoice(opts: {
         const newSessionId = result._sessionId ?? null
         setSessionId(newSessionId)
         setSessionPlan(result.plan ?? null)
-        setTranscript([])
-        setSpokenSentences([])
-        setIsActive(true)
-        setDuration(0)
-        setAnalysisResults({})
+        setupSession()
 
-        durationIntervalRef.current = setInterval(() => {
-          setDuration((d) => d + 1)
-        }, 1000)
-
-        // Get LiveKit token
-        const tokenRes = await fetch('/api/voice/livekit-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: newSessionId,
-            metadata: {
-              sessionId: newSessionId,
-              sessionPlan: result.plan,
-              sessionMode: mode,
-              basePrompt: prompt,
-              analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
-            },
-          }),
-        })
-
-        if (!tokenRes.ok) {
-          throw new Error('Failed to get LiveKit token')
-        }
-
-        const { token, url, roomName } = await tokenRes.json()
-        const metadata = {
+        await fetchTokenAndConnect({
           sessionId: newSessionId,
           sessionPlan: result.plan,
           sessionMode: mode,
           basePrompt: prompt,
           analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
-        }
-        await connectToRoom(token, url, roomName, metadata)
+        })
       } catch (err) {
         console.error('[livekit-voice] Failed to start session:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
+        setIsActive(false)
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current)
+          durationIntervalRef.current = null
+        }
+      } finally {
+        connectingRef.current = false
       }
     },
-    [connectToRoom],
+    [fetchTokenAndConnect, setupSession],
   )
 
   const startWithExistingPlan = useCallback(
     async (existingSessionId: string, existingPlan: SessionPlan, prompt: string, steeringNotes?: string[]) => {
+      if (connectingRef.current) return
+      connectingRef.current = true
       setError(null)
       try {
         setSessionId(existingSessionId)
         setSessionPlan(existingPlan)
-        setTranscript([])
-        setSpokenSentences([])
-        setIsActive(true)
-        setDuration(0)
-        setAnalysisResults({})
-
-        durationIntervalRef.current = setInterval(() => {
-          setDuration((d) => d + 1)
-        }, 1000)
+        setupSession()
 
         let messageText = prompt
         if (steeringNotes?.length) {
@@ -282,81 +264,38 @@ export function useLiveKitVoice(opts: {
             steeringNotes.map((n) => `- ${n}`).join('\n')
         }
 
-        // Get LiveKit token
-        const tokenRes = await fetch('/api/voice/livekit-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: existingSessionId,
-            metadata: {
-              sessionId: existingSessionId,
-              sessionPlan: existingPlan,
-              sessionMode: 'conversation',
-              basePrompt: messageText,
-              analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
-            },
-          }),
-        })
-
-        if (!tokenRes.ok) {
-          throw new Error('Failed to get LiveKit token')
-        }
-
-        const { token, url, roomName } = await tokenRes.json()
-        const metadata = {
+        await fetchTokenAndConnect({
           sessionId: existingSessionId,
           sessionPlan: existingPlan,
           sessionMode: 'conversation',
           basePrompt: messageText,
           analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
-        }
-        await connectToRoom(token, url, roomName, metadata)
+        })
       } catch (err) {
         console.error('[livekit-voice] Failed to start with existing plan:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
+        setIsActive(false)
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current)
+          durationIntervalRef.current = null
+        }
+      } finally {
+        connectingRef.current = false
       }
     },
-    [connectToRoom],
+    [fetchTokenAndConnect, setupSession],
   )
 
-  /**
-   * Start a session directly with provided metadata — skips plan generation.
-   * Useful for quick testing of the LiveKit agent.
-   */
   const startDirect = useCallback(
     async (metadata: Record<string, unknown>) => {
-      if (connectingRef.current) {
-        console.warn('[livekit-voice] startDirect called while already connecting — ignoring')
-        return
-      }
+      if (connectingRef.current) return
       connectingRef.current = true
       setError(null)
       try {
         setSessionId(null)
         setSessionPlan(null)
-        setTranscript([])
-        setSpokenSentences([])
-        setIsActive(true)
-        setDuration(0)
-        setAnalysisResults({})
-
-        durationIntervalRef.current = setInterval(() => {
-          setDuration((d) => d + 1)
-        }, 1000)
-
-        const tokenRes = await fetch('/api/voice/livekit-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ metadata }),
-        })
-
-        if (!tokenRes.ok) {
-          const body = await tokenRes.json().catch(() => ({}))
-          throw new Error(body.error || `Failed to get LiveKit token (${tokenRes.status})`)
-        }
-
-        const { token, url, roomName } = await tokenRes.json()
-        await connectToRoom(token, url, roomName, metadata)
+        setupSession()
+        await fetchTokenAndConnect(metadata)
       } catch (err) {
         console.error('[livekit-voice] Failed to start direct session:', err)
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -369,38 +308,28 @@ export function useLiveKitVoice(opts: {
         connectingRef.current = false
       }
     },
-    [connectToRoom],
+    [fetchTokenAndConnect, setupSession],
   )
 
   const startSession = useCallback(async () => {
-    if (!sessionIdRef.current) return
-    setIsActive(true)
-    setDuration(0)
-    setAnalysisResults({})
-
-    durationIntervalRef.current = setInterval(() => {
-      setDuration((d) => d + 1)
-    }, 1000)
-
-    const tokenRes = await fetch('/api/voice/livekit-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: sessionIdRef.current,
-        metadata: {
-          sessionId: sessionIdRef.current,
-        },
-      }),
-    })
-
-    if (!tokenRes.ok) {
-      setError('Failed to get LiveKit token')
-      return
+    if (!sessionIdRef.current || connectingRef.current) return
+    connectingRef.current = true
+    setError(null)
+    try {
+      setupSession()
+      await fetchTokenAndConnect({ sessionId: sessionIdRef.current })
+    } catch (err) {
+      console.error('[livekit-voice] Failed to start session:', err)
+      setError(err instanceof Error ? err.message : 'Failed to start session')
+      setIsActive(false)
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current)
+        durationIntervalRef.current = null
+      }
+    } finally {
+      connectingRef.current = false
     }
-
-    const { token, url, roomName } = await tokenRes.json()
-    await connectToRoom(token, url, roomName, { sessionId: sessionIdRef.current })
-  }, [connectToRoom])
+  }, [fetchTokenAndConnect, setupSession])
 
   const endSession = useCallback(async () => {
     setIsActive(false)
@@ -409,7 +338,6 @@ export function useLiveKitVoice(opts: {
       durationIntervalRef.current = null
     }
 
-    // Disconnect from LiveKit room
     if (roomRef.current) {
       roomRef.current.disconnect()
       roomRef.current = null
@@ -442,13 +370,11 @@ export function useLiveKitVoice(opts: {
   const sendTextMessage = useCallback((text: string) => {
     if (!text.trim() || !roomRef.current) return
 
-    // Add to local transcript so it appears in the chat panel immediately
     setTranscript((prev) => [
       ...prev,
       { role: 'user', text: text.trim(), isFinal: true, timestamp: Date.now() },
     ])
 
-    // Send via data channel (topic: 'lingle-chat') — the agent listens for this
     const encoder = new TextEncoder()
     const payload = encoder.encode(JSON.stringify({ type: 'chat', text: text.trim() }))
     roomRef.current.localParticipant
@@ -490,7 +416,6 @@ export function useLiveKitVoice(opts: {
 
   const cancelTalking = useCallback(() => {
     setIsTalking(false)
-    // Briefly mute to cancel the current utterance
     const room = roomRef.current
     if (room) {
       room.localParticipant.setMicrophoneEnabled(false)
