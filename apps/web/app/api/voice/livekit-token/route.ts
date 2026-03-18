@@ -33,14 +33,17 @@ export const POST = withAuth(async (_request: NextRequest, { userId }) => {
   const identity = userId
   const roomName = `lingle-${identity}`
 
-  // Pin room to agent's node so dispatch reaches it
+  // Delete any existing room then re-create on the agent's node.
+  // Without this, a stale room on a different node swallows dispatches
+  // because createRoom silently fails when the room already exists.
   if (nodeId) {
     const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret)
     try {
-      await roomService.createRoom({ name: roomName, nodeId, emptyTimeout: 300 })
+      await roomService.deleteRoom(roomName)
     } catch {
-      // Room already exists — fine
+      // Room doesn't exist — fine
     }
+    await roomService.createRoom({ name: roomName, nodeId, emptyTimeout: 300 })
   }
 
   const token = new AccessToken(apiKey, apiSecret, { identity })
