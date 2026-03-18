@@ -2,13 +2,13 @@ app = "lingle-agent"
 primary_region = "sjc"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "Dockerfile.agent"
 
 [env]
   # Non-secret env vars go here. Secrets (API keys) are set via: fly secrets set KEY=value
 
 [[vm]]
-  size = "shared-cpu-2x"
+  size = "shared-cpu-4x"
   memory = "2gb"
 
 [http_service]

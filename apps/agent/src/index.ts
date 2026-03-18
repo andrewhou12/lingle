@@ -215,39 +215,20 @@ export default defineAgent({
       }
     })
 
-    // The Go SDK inside rtc-node makes an HTTP GET to /settings/regions when given an https:// URL.
-    // This HTTP request fails from inside LiveKit Cloud OCI containers (network routing issue).
-    // Fix: convert https:// → wss:// so the Go SDK connects directly via WebSocket, skipping
-    // the region detection HTTP request.
+    // Connect to the room via the SDK's ctx.connect().
+    // The Go SDK inside rtc-node makes an HTTPS request to /settings/regions for region detection;
+    // this requires CA certificates in the container. Dockerfile.agent installs ca-certificates
+    // so this works on Fly.io. It failed on LiveKit Cloud OCI because their auto-generated
+    // Dockerfile omitted ca-certs (or had network restrictions).
     const rawUrl = String((ctx.info as unknown as Record<string, unknown>).url ?? '')
-    const connectUrl = rawUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
-    const connectToken = String((ctx.info as unknown as Record<string, unknown>).token ?? '')
-    console.log(`[agent] connecting direct wss: ${connectUrl} (was: ${rawUrl})`)
-
-    // Track room connection state changes in real time
-    const roomAny = ctx.room as unknown as {
-      connect: (url: string, token: string, opts?: Record<string, unknown>) => Promise<void>
-      on?: (e: string, cb: (...a: unknown[]) => void) => void
-      connectionState?: unknown
-    }
-    if (roomAny.on) {
-      roomAny.on('connectionStateChanged', (state: unknown) => {
-        console.log(`[agent] connectionStateChanged: ${state} room=${ctx.room.name ?? 'undefined'} remoteCount=${ctx.room.remoteParticipants.size}`)
-      })
-    }
-
-    // Connect directly with wss:// URL to bypass failing region-detection HTTP request
-    console.log('[agent] calling room.connect() with wss URL...')
+    console.log(`[agent] connecting to room: ${rawUrl}`)
     try {
-      await roomAny.connect(connectUrl, connectToken, { autoSubscribe: true, dynacast: false })
+      await ctx.connect()
     } catch (err) {
-      console.error(`[agent] room.connect() FAILED:`, err instanceof Error ? err.message : String(err))
-      // Disconnect so the room emits 'Disconnected', which lets the SDK cleanly exit this job
-      // process (otherwise the idle process hangs forever waiting for the closeEvent).
-      try { await ctx.room.disconnect() } catch {}
+      console.error('[agent] ctx.connect() FAILED:', err instanceof Error ? err.message : String(err))
       throw err
     }
-    console.log(`[agent] room connected! room=${ctx.room.name} connectionState=${roomAny.connectionState} remoteCount=${ctx.room.remoteParticipants.size}`)
+    console.log(`[agent] room connected: ${ctx.room.name} remoteCount=${ctx.room.remoteParticipants.size}`)
 
     const agent = new LingleAgent(metadata)
     console.log('[agent] calling session.start...')
@@ -255,8 +236,7 @@ export default defineAgent({
     console.log(
       `[agent] session started — room=${ctx.room.name}` +
       ` localIdentity=${ctx.room.localParticipant?.identity ?? 'none'}` +
-      ` remoteCount=${ctx.room.remoteParticipants.size}` +
-      ` connectionState=${roomAny.connectionState ?? 'n/a'}`,
+      ` remoteCount=${ctx.room.remoteParticipants.size}`,
     )
 
     // Wait for the human participant before generating the greeting.
