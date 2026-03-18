@@ -9,8 +9,6 @@
  */
 import { voice, llm } from '@livekit/agents'
 import Anthropic from '@anthropic-ai/sdk'
-import { buildVoiceSystemPrompt } from '@lingle/shared/conversation-prompt'
-import type { ScenarioMode } from '@lingle/shared/scenario-mode'
 import { resolveAgentTtsProvider, type AgentMetadata } from './config.js'
 
 const anthropic = new Anthropic()
@@ -279,13 +277,31 @@ function extractText(message: llm.ChatMessage): string {
 
 function buildSystemPrompt(metadata: AgentMetadata): string {
   const basePrompt = metadata.basePrompt || 'You are a language conversation partner.'
-  const sessionMode = (metadata.sessionMode || 'conversation') as ScenarioMode
+  const targetLang = metadata.targetLanguage || 'the target language'
+  const ttsProvider = resolveAgentTtsProvider(metadata)
 
-  return buildVoiceSystemPrompt(basePrompt, {
-    sessionPlan: metadata.sessionPlan,
-    sessionMode,
-    voiceMode: true,
-    targetLanguage: metadata.targetLanguage,
-    ttsProvider: resolveAgentTtsProvider(metadata),
-  })
+  let prompt = basePrompt
+
+  // Add session plan context if available
+  if (metadata.sessionPlan && typeof metadata.sessionPlan === 'object') {
+    const plan = metadata.sessionPlan as Record<string, unknown>
+    if (plan.topic) prompt += `\n\nSession topic: ${plan.topic}`
+    if (plan.persona) prompt += `\nPersona: ${JSON.stringify(plan.persona)}`
+    if (plan.register) prompt += `\nRegister: ${plan.register}`
+  }
+
+  // Voice-specific instructions
+  prompt += `\n\nIMPORTANT VOICE MODE RULES:
+- You are speaking out loud in a real-time voice conversation. Keep responses concise and conversational.
+- Speak primarily in ${targetLang}. Use the learner's native language only for brief clarifications.
+- Do NOT use markdown, bullet points, or other formatting — this is spoken language.
+- When the learner makes errors, recast naturally (use the correct form in your response) rather than explicitly correcting.
+- Keep turns short — 1-3 sentences is ideal for natural conversation flow.`
+
+  // TTS-specific hints
+  if (ttsProvider === 'cartesia') {
+    prompt += `\n- You may use <break time="0.5s"/> for natural pauses.`
+  }
+
+  return prompt
 }

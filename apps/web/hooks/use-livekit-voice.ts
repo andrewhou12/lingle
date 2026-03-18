@@ -7,9 +7,22 @@ import {
   type RemoteParticipant,
 } from 'livekit-client'
 import { api } from '@/lib/api'
-import type { SessionPlan } from '@/lib/session-plan'
-import type { VoiceState, TranscriptLine, VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
-import type { UseVoiceConversationReturn, SectionTracking } from './use-voice-conversation'
+import type { UseVoiceConversationReturn, VoiceState, TranscriptLine, SectionTracking } from './use-voice-conversation'
+
+type SessionPlan = Record<string, unknown> | null
+
+interface VoiceAnalysisResult {
+  corrections: unknown[]
+  vocabularyCards: unknown[]
+  grammarNotes: unknown[]
+  naturalnessFeedback: unknown[]
+  registerMismatches: unknown[]
+  l1Interference: unknown[]
+  alternativeExpressions: unknown[]
+  conversationalTips: unknown[]
+  takeaways: unknown[]
+  sectionTracking?: SectionTracking | null
+}
 
 /** Strip Cartesia SSML/prosody tags and filler tags from text for display */
 function stripSSML(text: string): string {

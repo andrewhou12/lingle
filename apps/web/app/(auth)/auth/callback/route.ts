@@ -5,7 +5,7 @@ import { prisma } from '@lingle/db'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/conversation'
+  const next = searchParams.get('next') ?? '/conversation/voice/test'
 
   if (code) {
     const supabase = await createClient()
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       })
 
       if (!user?.onboardingCompleted) {
-        return NextResponse.redirect(`${origin}/onboarding`)
+        return NextResponse.redirect(`${origin}/conversation/voice/test`)
       }
 
       return NextResponse.redirect(`${origin}${next}`)

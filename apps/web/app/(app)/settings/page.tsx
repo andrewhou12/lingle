@@ -2,13 +2,23 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon, SpeakerWaveIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon } from '@heroicons/react/24/outline'
 import type { LearnerProfile } from '@lingle/shared/types'
-import { Spinner } from '@/components/spinner'
 import { api } from '@/lib/api'
-import { DIFFICULTY_LEVELS } from '@/lib/difficulty-levels'
 import { useLanguage } from '@/hooks/use-language'
-import { getVoiceProvider, setVoiceProvider, type VoiceProviderType } from '@/lib/voice/voice-provider-config'
+
+const DIFFICULTY_LEVELS = [
+  { level: 1, label: 'Absolute Beginner (A1)', shortDescription: 'No prior knowledge' },
+  { level: 2, label: 'Beginner (A1-A2)', shortDescription: 'Basic words and phrases' },
+  { level: 3, label: 'Elementary (A2)', shortDescription: 'Simple conversations' },
+  { level: 4, label: 'Pre-Intermediate (A2-B1)', shortDescription: 'Everyday topics' },
+  { level: 5, label: 'Intermediate (B1)', shortDescription: 'Most situations' },
+  { level: 6, label: 'Upper Intermediate (B1-B2)', shortDescription: 'Complex discussions' },
+  { level: 7, label: 'Advanced (B2)', shortDescription: 'Fluent conversations' },
+  { level: 8, label: 'Upper Advanced (B2-C1)', shortDescription: 'Nuanced expression' },
+  { level: 9, label: 'Near-Native (C1)', shortDescription: 'Professional level' },
+  { level: 10, label: 'Native-Level (C2)', shortDescription: 'Full mastery' },
+]
 
 const DAILY_GOAL_OPTIONS = [
   { minutes: 10, label: '10 min', description: 'Light' },
@@ -23,7 +33,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<LearnerProfile | null>(() => api.peekCache<LearnerProfile>('/profile') ?? null)
   const [isLoading, setIsLoading] = useState(() => !api.peekCache('/profile'))
   const [isSaving, setIsSaving] = useState(false)
-  const [voiceEngine, setVoiceEngine] = useState<VoiceProviderType>(() => getVoiceProvider())
+
   useEffect(() => {
     setIsLoading(true)
     api.profileGet().then((p) => {
@@ -64,7 +74,6 @@ export default function SettingsPage() {
     return (
       <div className="max-w-[640px] mx-auto">
         <div className="flex items-center gap-3 mt-6 justify-center">
-          <Spinner size={18} />
           <span className="text-[13px] text-text-muted">Loading settings...</span>
         </div>
       </div>
@@ -162,43 +171,6 @@ export default function SettingsPage() {
               >
                 <div className="text-[15px] font-semibold text-text-primary">{option.label}</div>
                 <div className="text-[11px] text-text-muted">{option.description}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <span className="text-[11px] font-medium text-text-muted block mb-3">
-        Voice
-      </span>
-
-      <div className="rounded-xl border border-border bg-bg mb-6">
-        <div className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
-              <SpeakerWaveIcon className="w-4 h-4" />
-            </div>
-            <span className="text-[13px] font-medium">Voice engine</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              { value: 'livekit' as const, label: 'LiveKit', description: 'Low latency, hands-free' },
-              { value: 'default' as const, label: 'Classic', description: 'Push-to-talk' },
-            ]).map((opt) => (
-              <button
-                key={opt.value}
-                className={`px-3 py-2.5 rounded-lg border text-center cursor-pointer transition-all ${
-                  voiceEngine === opt.value
-                    ? 'border-accent-brand bg-bg-hover'
-                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
-                }`}
-                onClick={() => {
-                  setVoiceEngine(opt.value)
-                  setVoiceProvider(opt.value)
-                }}
-              >
-                <div className="text-[15px] font-semibold text-text-primary">{opt.label}</div>
-                <div className="text-[11px] text-text-muted">{opt.description}</div>
               </button>
             ))}
           </div>

@@ -1,5 +1,4 @@
 import type { LearnerProfile, UsageInfo, SubscriptionInfo } from '@lingle/shared/types'
-import type { SessionPlan } from '@/lib/session-plan'
 
 export class UsageLimitError extends Error {
   usedSeconds: number
@@ -83,90 +82,13 @@ class LingleApiClient {
   userGetMe = () => this.request<{ id: string; email: string | null; name: string | null; avatarUrl: string | null }>('/user/me')
 
   // Conversation
-  conversationList = () =>
-    this.request<{ id: string; timestamp: string; durationSeconds: number | null; mode: string; inputMode: string | null; sessionFocus: string }[]>('/conversation/list')
   conversationPlan = (prompt?: string, mode?: string, inputMode?: string) =>
-    this.request<{ _sessionId: string; sessionFocus: string; plan: SessionPlan; remainingSeconds?: number; userPlan?: string }>('/conversation/plan', {
+    this.request<{ _sessionId: string; sessionFocus: string; plan: Record<string, unknown>; remainingSeconds?: number; userPlan?: string }>('/conversation/plan', {
       method: 'POST',
       body: JSON.stringify({ ...(prompt ? { prompt } : {}), ...(mode ? { mode } : {}), ...(inputMode ? { inputMode } : {}) }),
     })
-  conversationPlanUpdate = (sessionId: string, updates: Partial<SessionPlan>) =>
-    this.request<{ plan: SessionPlan }>('/conversation/plan/update', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId, updates }),
-    })
-  conversationGet = (id: string) =>
-    this.request<{
-      id: string
-      timestamp: string
-      durationSeconds: number | null
-      transcript: { role: string; content: string; timestamp?: string }[]
-      sessionPlan: Record<string, unknown> | null
-      systemPrompt: string | null
-    }>(`/conversation/${id}`)
   conversationEnd = (sessionId: string) =>
     this.request<null>('/conversation/end', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId }),
-    })
-
-  // Stats
-  statsToday = () => this.request<{ minutesToday: number }>('/stats/today')
-  statsSummary = () =>
-    this.request<{
-      totalSessions: number
-      totalMinutes: number
-      currentStreak: number
-      longestStreak: number
-      averageSessionMinutes: number
-    }>('/stats/summary')
-  statsAnalysis = () =>
-    this.request<{
-      status: 'ok' | 'insufficient_data'
-      sessionCount?: number
-      analysis?: {
-        levelAssessment: {
-          currentLevel: string
-          confidence: 'low' | 'medium' | 'high'
-          summary: string
-          evidencePoints: string[]
-        }
-        strengths: { area: string; detail: string }[]
-        mistakesAndHabits: {
-          pattern: string
-          detail: string
-          severity: 'minor' | 'notable' | 'persistent'
-        }[]
-        skillScores: {
-          vocabularyRange: number
-          grammarAccuracy: number
-          naturalness: number
-          complexity: number
-        }
-      }
-    }>('/stats/analysis')
-  statsSessionAnalysis = (sessionId: string) =>
-    this.request<{
-      status: 'ok' | 'insufficient_data' | 'requires_pro'
-      analysis?: {
-        overallRating: 'excellent' | 'good' | 'developing' | 'needs_work'
-        summary: string
-        targetLanguageUsage: { percentage: number; assessment: string }
-        vocabularyUsed: { word: string; reading?: string; meaning: string; usedWell: boolean }[]
-        grammarPoints: { pattern: string; example: string; correct: boolean; note?: string }[]
-        errors: { original: string; corrected: string; type: string; explanation: string }[]
-        strengths: string[]
-        suggestions: string[]
-        skillScores: {
-          reading: number
-          listening: number
-          speaking: number
-          writing: number
-          vocabulary: number
-          grammar: number
-        }
-      }
-    }>('/stats/session-analysis', {
       method: 'POST',
       body: JSON.stringify({ sessionId }),
     })

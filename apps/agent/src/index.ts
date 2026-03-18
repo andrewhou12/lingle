@@ -104,7 +104,7 @@ function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
     log(`STT=soniox hints=${hints.join(',')}`)
     return new SonioxSTT({
       languageHints: hints,
-      sampleRate: 48000,
+      sampleRate: 24000,
       enableEndpointDetection: true,
       maxEndpointDelayMs: 2000,
     })
