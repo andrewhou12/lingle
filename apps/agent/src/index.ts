@@ -95,6 +95,89 @@ function log(msg: string) {
   console.log(`[agent +${elapsed}s] ${msg}`)
 }
 
+// ── Per-turn latency tracker ──
+// Collects timestamps at each pipeline stage and prints a consolidated breakdown.
+class TurnLatencyTracker {
+  private turnId = 0
+  private eouTs = 0        // end-of-utterance detected (VAD)
+  private sttFinalTs = 0   // STT final transcript received
+  private llmFirstTs = 0   // LLM first token
+  private ttsFirstTs = 0   // TTS first audio byte
+  private eouDelayMs = 0   // VAD's internal EOU delay
+  private llmTtftMs = 0    // LLM TTFT from its own metrics
+  private ttsTtfbMs = 0    // TTS TTFB from its own metrics
+  private llmTotalMs = 0
+  private llmTokens = 0
+  private ttsTotalMs = 0
+
+  /** Called when user speech ends (EOU detected by VAD) */
+  markEOU(delayMs: number) {
+    this.turnId++
+    this.eouTs = Date.now()
+    this.eouDelayMs = delayMs
+    this.sttFinalTs = 0
+    this.llmFirstTs = 0
+    this.ttsFirstTs = 0
+    this.llmTtftMs = 0
+    this.ttsTtfbMs = 0
+    this.llmTotalMs = 0
+    this.llmTokens = 0
+    this.ttsTotalMs = 0
+    log(`[latency] ──── TURN ${this.turnId} START ────`)
+    log(`[latency] EOU detected (VAD delay=${delayMs.toFixed(0)}ms)`)
+  }
+
+  /** Called when STT emits final transcript */
+  markSTTFinal(transcript: string) {
+    this.sttFinalTs = Date.now()
+    const sinceEou = this.eouTs ? this.sttFinalTs - this.eouTs : 0
+    log(`[latency] STT final: +${sinceEou}ms after EOU — "${transcript.slice(0, 60)}"`)
+  }
+
+  /** Called when LLM metrics arrive */
+  markLLM(ttftMs: number, totalMs: number, tokens: number) {
+    this.llmFirstTs = this.llmFirstTs || Date.now()
+    this.llmTtftMs = ttftMs
+    this.llmTotalMs = totalMs
+    this.llmTokens = tokens
+    const sinceEou = this.eouTs ? Date.now() - this.eouTs : 0
+    log(`[latency] LLM: ttft=${ttftMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms tokens=${tokens} (+${sinceEou}ms since EOU)`)
+  }
+
+  /** Called when TTS metrics arrive */
+  markTTS(ttfbMs: number, totalMs: number) {
+    this.ttsFirstTs = this.ttsFirstTs || Date.now()
+    this.ttsTtfbMs = ttfbMs
+    this.ttsTotalMs = totalMs
+    const sinceEou = this.eouTs ? Date.now() - this.eouTs : 0
+    log(`[latency] TTS: ttfb=${ttfbMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms (+${sinceEou}ms since EOU)`)
+    this.printSummary()
+  }
+
+  /** Print consolidated turn breakdown */
+  private printSummary() {
+    if (!this.eouTs) return
+
+    // Estimated end-to-end: EOU delay + STT processing + LLM TTFT + TTS TTFB
+    const sttProcessing = this.sttFinalTs && this.eouTs ? this.sttFinalTs - this.eouTs : 0
+    const estimatedE2E = this.eouDelayMs + this.llmTtftMs + this.ttsTtfbMs
+
+    log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
+    log(`[latency]   VAD EOU delay:    ${this.eouDelayMs.toFixed(0)}ms`)
+    log(`[latency]   EOU → STT final:  ${sttProcessing}ms`)
+    log(`[latency]   LLM TTFT:         ${this.llmTtftMs.toFixed(0)}ms`)
+    log(`[latency]   LLM total:        ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
+    log(`[latency]   TTS TTFB:         ${this.ttsTtfbMs.toFixed(0)}ms`)
+    log(`[latency]   TTS total:        ${this.ttsTotalMs.toFixed(0)}ms`)
+    log(`[latency]   ─────────────────────────`)
+    log(`[latency]   Estimated E2E*:   ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
+    log(`[latency]   * does not include WebRTC transport or audio playout delay`)
+    log(`[latency] ──── END TURN ${this.turnId} ────`)
+  }
+}
+
+const turnTracker = new TurnLatencyTracker()
+
 function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
   const provider = resolveAgentSttProvider(metadata)
   const targetLang = metadata.targetLanguage || 'Japanese'
@@ -240,11 +323,11 @@ export default defineAgent({
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        log(`[metrics] EOU delay=${m.endOfUtteranceDelayMs.toFixed(0)}ms`)
+        turnTracker.markEOU(m.endOfUtteranceDelayMs)
       } else if (m.type === 'llm_metrics') {
-        log(`[metrics] LLM ttft=${m.ttftMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms tokens=${m.completionTokens}`)
+        turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {
-        log(`[metrics] TTS ttfb=${m.ttfbMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms`)
+        turnTracker.markTTS(m.ttfbMs, m.durationMs)
       }
     })
 
@@ -254,7 +337,11 @@ export default defineAgent({
 
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {
       const transcript = (ev as unknown as { transcript?: string }).transcript ?? ''
-      log(`[event] user transcribed: "${transcript.slice(0, 100)}"`)
+      const isFinal = (ev as unknown as { isFinal?: boolean }).isFinal ?? false
+      log(`[event] user transcribed (final=${isFinal}): "${transcript.slice(0, 100)}"`)
+      if (isFinal && transcript.trim()) {
+        turnTracker.markSTTFinal(transcript)
+      }
     })
 
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {

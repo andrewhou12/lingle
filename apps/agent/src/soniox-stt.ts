@@ -66,6 +66,8 @@ class SpeechStream extends stt.SpeechStream {
   #opts: SonioxSTTOptions & typeof DEFAULT_OPTS
   #speechStarted = false
   #requestId = 0
+  #firstAudioSentTs = 0    // timestamp of first audio frame sent to Soniox
+  #lastAudioSentTs = 0     // timestamp of last audio frame sent to Soniox
 
   constructor(
     sttInstance: STT,
@@ -100,7 +102,6 @@ class SpeechStream extends stt.SpeechStream {
       sample_rate: this.#opts.sampleRate,
       num_channels: this.#opts.numChannels,
       enable_endpoint_detection: this.#opts.enableEndpointDetection,
-      max_endpoint_delay_ms: this.#opts.maxEndpointDelayMs,
       enable_language_identification: true,
     }
 
@@ -186,6 +187,9 @@ class SpeechStream extends stt.SpeechStream {
             if (session.state === 'connected') {
               session.sendAudio(Buffer.from(frame.data.buffer))
               audioFrameCount++
+              const now = Date.now()
+              if (audioFrameCount === 1) this.#firstAudioSentTs = now
+              this.#lastAudioSentTs = now
               if (audioFrameCount === 1 || audioFrameCount % 100 === 0) {
                 console.log(`[soniox] sent ${audioFrameCount} audio frames to soniox`)
               }
@@ -219,9 +223,10 @@ class SpeechStream extends stt.SpeechStream {
     const text = result.tokens.map((t) => t.text).join('')
     if (!text.trim()) return
 
-    console.log(`[soniox] transcript: "${text.trim().slice(0, 80)}" final=${result.tokens.some((t) => t.is_final)}`)
-
     const isFinal = result.tokens.some((t) => t.is_final)
+    const now = Date.now()
+    const sinceLastAudio = this.#lastAudioSentTs ? now - this.#lastAudioSentTs : 0
+    console.log(`[soniox] transcript: "${text.trim().slice(0, 80)}" final=${isFinal} sinceLastAudio=${sinceLastAudio}ms`)
 
     if (!this.#speechStarted) {
       this.#speechStarted = true
