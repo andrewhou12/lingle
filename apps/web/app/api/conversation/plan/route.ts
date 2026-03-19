@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server'
-import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
-
-export const maxDuration = 60
 import { withUsageCheck, getUsageInfo } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
-import { getLanguageById } from '@/lib/languages'
 import {
   getVocabTargets,
   getNextGrammarFocus,
@@ -17,26 +11,7 @@ import {
 import { searchMemories } from '@/lib/memory'
 import type { Prisma } from '@prisma/client'
 
-// --- Plan schema ---
-
-function buildConversationPlanSchema(registerOptions: string) {
-  return z.object({
-    topic: z.string().describe('What the conversation is about'),
-    persona: z.object({
-      name: z.string().optional(),
-      relationship: z.string(),
-      personality: z.string(),
-    }),
-    register: z.string().describe(registerOptions),
-    tone: z.string(),
-    setting: z.string().optional(),
-    sections: z.array(z.object({
-      id: z.string(),
-      label: z.string(),
-      description: z.string(),
-    })).describe('3-6 ordered conversation sections'),
-  })
-}
+export const maxDuration = 60
 
 // --- Helpers ---
 
@@ -51,29 +26,6 @@ function getCefrLabel(score: number): string {
   if (score < 5.5) return 'Upper Advanced (B2-C1)'
   if (score < 6.0) return 'Near-Native (C1)'
   return 'Native-Level (C2)'
-}
-
-type SessionPlan = Record<string, unknown>
-
-function normalizePlan(obj: Record<string, unknown>): SessionPlan {
-  return { ...obj, _mode: 'conversation' }
-}
-
-function getFallbackPlan(sessionFocus: string): SessionPlan {
-  return normalizePlan({
-    topic: sessionFocus,
-    persona: {
-      relationship: 'conversation partner',
-      personality: 'friendly and helpful',
-    },
-    register: 'polite',
-    tone: 'lighthearted',
-    sections: [
-      { id: 'greeting', label: 'Greeting', description: 'Warm greeting and set the scene' },
-      { id: 'main-topic', label: 'Main Topic', description: 'Explore the main conversation topic' },
-      { id: 'wrap-up', label: 'Wrap-up', description: 'Wind down and say goodbye naturally' },
-    ],
-  })
 }
 
 export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
@@ -129,54 +81,18 @@ export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   }))
   const reviewPatterns = errorPatterns.slice(0, 3).map((ep) => ep.rule)
 
-  // ── Generate conversation plan ──
+  // ── Build plan from curriculum data (no LLM call) ──
 
-  const langConfig = getLanguageById(targetLanguage)
-  const registerOpts = langConfig?.registerOptions || '"casual", "polite", or "mixed"'
-  const schema = buildConversationPlanSchema(registerOpts)
-
-  let plan: SessionPlan
-  try {
-    const planPrompt = `You are a session planner for a language learning app.
-
-User prompt: "${sessionFocus}"
-Mode: ${resolvedMode}
-Difficulty: ${levelLabel}
-Target language: ${targetLanguage}
-Native language: ${nativeLanguage}
-Domain focus: ${domain}
-
-Target vocabulary to work into conversation: ${vocabTargets.join(', ') || 'none'}
-Grammar focus: ${grammarFocus?.displayName || 'general practice'}
-Error patterns to address: ${reviewPatterns.join(', ') || 'none'}
-
-Generate a scene card for a natural conversation:
-- topic: what the conversation is about (be specific and engaging, incorporate the domain)
-- persona: { relationship, personality } — who the AI is playing
-- register: ${registerOpts}
-- tone: the emotional quality
-- setting: where the conversation takes place (optional)
-- sections: 3-6 ordered sections forming a conversation skeleton
-
-Make the plan specific to the user's prompt. Naturally incorporate opportunities for the target vocabulary and grammar.`
-
-    const { object } = await generateObject({
-      model: anthropic('claude-haiku-4-5-20251001'),
-      schema,
-      prompt: planPrompt,
-    })
-    plan = normalizePlan(object)
-  } catch (err) {
-    console.error('[plan] Failed to generate session plan:', err)
-    plan = getFallbackPlan(sessionFocus)
+  const plan: Record<string, unknown> = {
+    _mode: resolvedMode,
+    domain,
+    targetVocab: vocabTargets,
+    grammarFocus: grammarFocus ? grammarFocus.displayName : null,
+    reviewPatterns,
+    level: levelLabel,
   }
 
-  // Attach curriculum data to plan for the agent
-  plan.targetVocab = vocabTargets
-  plan.grammarFocus = grammarFocus ? [grammarFocus.displayName] : []
-  plan.reviewPatterns = reviewPatterns
-
-  const systemPrompt = `You are a ${targetLanguage} conversation partner at ${levelLabel} level.`
+  const systemPrompt = `You are a ${targetLanguage} language tutor at ${levelLabel} level.`
 
   // ── Create Lesson + update user ──
 
@@ -209,7 +125,6 @@ Make the plan specific to the user's prompt. Naturally incorporate opportunities
   // ── Build expanded metadata for the agent ──
 
   const agentMetadata = {
-    // Learner model summary
     learnerModel: user.learnerModel
       ? {
           cefrGrammar: user.learnerModel.cefrGrammar,
@@ -220,24 +135,19 @@ Make the plan specific to the user's prompt. Naturally incorporate opportunities
             : undefined,
         }
       : undefined,
-    // Error patterns
     errorPatterns: errorPatterns.length > 0 ? errorPatterns : undefined,
-    // Lesson plan for system prompt
     lessonPlan: {
-      warmupTopic: (plan.sections as { description: string }[])?.[0]?.description || 'greeting',
-      mainActivity: (plan.topic as string) || sessionFocus,
+      warmupTopic: sessionFocus,
+      mainActivity: sessionFocus,
       targetVocab: vocabTargets,
       grammarFocus: grammarFocus ? [grammarFocus.displayName] : [],
       reviewPatterns,
     },
-    // Difficulty constraints
     difficultyConstraints: {
       grammarStructuresInScope: grammarInScope.slice(0, 15),
     },
-    // User preferences
     correctionStyle: user.correctionStyle || 'recast',
     personalNotes: user.personalNotes || undefined,
-    // Episodic memories (Slot 4)
     memories: memoriesText || undefined,
   }
 

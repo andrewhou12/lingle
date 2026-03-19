@@ -73,7 +73,7 @@ import * as cartesia from '@livekit/agents-plugin-cartesia'
 import * as rime from '@livekit/agents-plugin-rime'
 import * as openai from '@livekit/agents-plugin-openai'
 import * as google from '@livekit/agents-plugin-google'
-import * as livekit from '@livekit/agents-plugin-livekit'
+// import * as livekit from '@livekit/agents-plugin-livekit'
 
 import { LingleAgent } from './lingle-agent.js'
 import { ClaudeLLM } from './claude-llm.js'
@@ -104,7 +104,8 @@ function log(msg: string) {
 class TurnLatencyTracker {
   private turnId = 0
   private eouTs = 0              // end-of-utterance committed
-  private vadSilenceTs = 0       // VAD detected silence (before turn detector)
+  private lastSpeakingTs = 0     // when user actually stopped speaking (from eou_metrics)
+  private speakingTs = 0         // agent state → speaking (first audio sent to room)
   private sttFinalTs = 0         // STT final transcript received
   private llmFirstTs = 0         // LLM first token
   private ttsFirstTs = 0         // TTS first audio byte
@@ -116,27 +117,33 @@ class TurnLatencyTracker {
   private llmTokens = 0
   private ttsTotalMs = 0
 
-  /** Called when VAD detects silence (user stopped speaking) */
-  markVADSilence() {
-    this.vadSilenceTs = Date.now()
+  /** Called when agent state transitions to speaking (first audio going out) */
+  markSpeaking() {
+    this.speakingTs = Date.now()
+    if (this.lastSpeakingTs) {
+      const wallClockE2E = this.speakingTs - this.lastSpeakingTs
+      log(`[latency] WALL-CLOCK E2E: ${wallClockE2E}ms  (user silent → agent speaking)`)
+    }
   }
 
   /** Called when EOU is committed (after turn detector decision + endpointing delay) */
-  markEOU(eouDelayMs: number, transcriptionDelayMs: number) {
+  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number) {
     this.turnId++
     this.eouTs = Date.now()
+    this.lastSpeakingTs = lastSpeakingTimeMs || Date.now() - eouDelayMs  // fallback: approximate from eouDelay
     this.eouDelayMs = eouDelayMs
     this.transcriptionDelayMs = transcriptionDelayMs
     this.sttFinalTs = 0
     this.llmFirstTs = 0
     this.ttsFirstTs = 0
+    this.speakingTs = 0
     this.llmTtftMs = 0
     this.ttsTtfbMs = 0
     this.llmTotalMs = 0
     this.llmTokens = 0
     this.ttsTotalMs = 0
     log(`[latency] ──── TURN ${this.turnId} START ────`)
-    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms)`)
+    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
   }
 
   /** Called when STT emits final transcript */
@@ -172,6 +179,7 @@ class TurnLatencyTracker {
 
     const sttProcessing = this.sttFinalTs && this.eouTs ? this.sttFinalTs - this.eouTs : 0
     const estimatedE2E = this.eouDelayMs + this.llmTtftMs + this.ttsTtfbMs
+    const wallClockE2E = this.lastSpeakingTs && this.speakingTs ? this.speakingTs - this.lastSpeakingTs : 0
 
     log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
     log(`[latency]   EOU delay:          ${this.eouDelayMs.toFixed(0)}ms  (VAD silence + turn detector + endpointing)`)
@@ -182,8 +190,11 @@ class TurnLatencyTracker {
     log(`[latency]   TTS TTFB:           ${this.ttsTtfbMs.toFixed(0)}ms`)
     log(`[latency]   TTS total:          ${this.ttsTotalMs.toFixed(0)}ms`)
     log(`[latency]   ─────────────────────────`)
-    log(`[latency]   Estimated E2E*:     ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
-    log(`[latency]   * does not include WebRTC transport or audio playout delay`)
+    if (wallClockE2E) {
+      log(`[latency]   🎯 WALL-CLOCK E2E:  ${wallClockE2E}ms  (VAD silence → agent speaking)`)
+    }
+    log(`[latency]   Sum E2E (stages):   ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
+    log(`[latency]   * neither includes WebRTC transport or client-side audio playout`)
     log(`[latency] ──── END TURN ${this.turnId} ────`)
   }
 }
@@ -201,7 +212,7 @@ function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
       languageHints: hints,
       sampleRate: 24000,
       enableEndpointDetection: true,
-      maxEndpointDelayMs: 2000,
+      maxEndpointDelayMs: 500,
     })
   }
 
@@ -390,7 +401,7 @@ export default defineAgent({
 
     // LLM provider selection via AGENT_LLM_PROVIDER env var.
     // Options: claude (default), openai, openai-nano, gemini
-    const llmProvider = process.env.AGENT_LLM_PROVIDER || 'gemini'
+    const llmProvider = process.env.AGENT_LLM_PROVIDER || 'claude'
     let llm: InstanceType<typeof ClaudeLLM> | openai.LLM | google.LLM
     let llmLabel: string
 
@@ -404,8 +415,8 @@ export default defineAgent({
         llmLabel = 'openai/gpt-4.1-nano'
         break
       case 'gemini':
-        llm = new google.LLM({ model: 'gemini-3-flash-preview', maxOutputTokens: 300 })
-        llmLabel = 'google/gemini-3-flash-preview'
+        llm = new google.LLM({ model: 'gemini-2.5-flash', maxOutputTokens: 300 })
+        llmLabel = 'google/gemini-2.5-flash'
         break
       default:
         llm = new ClaudeLLM({ model: 'claude-haiku-4-5-20251001', maxTokens: 200 })
@@ -415,17 +426,17 @@ export default defineAgent({
 
     log(`step 3: providers created (stt=${stt.constructor.name} llm=${llmLabel} tts=${ttsInstance.constructor.name})`)
 
-    // Load turn detector model — predicts whether user is done speaking
-    // based on transcript context. Prevents false interruptions on pauses.
-    const turnDetector = new livekit.turnDetector.MultilingualModel()
-    log(`step 3: turn detector loaded (MultilingualModel)`)
+    // Turn detector (MultilingualModel) is available but adds ~200ms to EOU
+    // because it waits for the transcript before predicting end-of-turn.
+    // Enable it when false interruptions become a bigger problem than latency:
+    //   const turnDetector = new livekit.turnDetector.MultilingualModel()
+    //   turnDetection: turnDetector,
 
     const session = new voice.AgentSession({
       vad,
       stt,
       llm,
       tts: ttsInstance,
-      turnDetection: turnDetector,
       voiceOptions: {
         preemptiveGeneration: true,
         minEndpointingDelay: 0.15,
@@ -434,15 +445,13 @@ export default defineAgent({
         minInterruptionWords: 1,
       },
     })
-    log(`step 3: AgentSession created (with turn detector)`)
+    log(`step 3: AgentSession created`)
 
     // ── Metrics + error logging ──
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
-      if (m.type === 'vad_metrics') {
-        turnTracker.markVADSilence()
-      } else if (m.type === 'eou_metrics') {
-        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs)
+      if (m.type === 'eou_metrics') {
+        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs)
       } else if (m.type === 'llm_metrics') {
         turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {
@@ -451,7 +460,12 @@ export default defineAgent({
     })
 
     session.on(voice.AgentSessionEventTypes.AgentStateChanged, (ev) => {
-      log(`[event] agent state: ${(ev as unknown as { oldState?: string }).oldState ?? '?'} → ${(ev as unknown as { newState?: string }).newState ?? '?'}`)
+      const oldState = (ev as unknown as { oldState?: string }).oldState ?? '?'
+      const newState = (ev as unknown as { newState?: string }).newState ?? '?'
+      log(`[event] agent state: ${oldState} → ${newState}`)
+      if (newState === 'speaking') {
+        turnTracker.markSpeaking()
+      }
     })
 
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {

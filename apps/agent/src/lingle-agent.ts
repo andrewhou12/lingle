@@ -4,8 +4,7 @@
  * Handles:
  * - System prompt construction from learner profile + session plan
  * - Context management: summarizes old turns to keep context window lean
- * - Post-turn analysis via Claude Haiku (runs in-process, no HTTP round-trip)
- * - Data channel messages for analysis results
+ * - Data channel messages for whiteboard content
  */
 import { voice, llm } from '@livekit/agents'
 import Anthropic from '@anthropic-ai/sdk'
@@ -106,12 +105,6 @@ export class LingleAgent extends voice.Agent {
     // Context management: summarize old turns when context grows too large
     await this.maybeCompressContext(chatCtx)
 
-    // Fire post-turn analysis asynchronously (in-process via Claude Haiku)
-    if (this.metadata.sessionId) {
-      this.runAnalysis(chatCtx, userText).catch((err) => {
-        console.error('[LingleAgent] Analysis failed:', err)
-      })
-    }
   }
 
   /**
@@ -223,126 +216,6 @@ export class LingleAgent extends voice.Agent {
     }
   }
 
-  /**
-   * Run post-turn analysis directly via Claude Haiku (no HTTP round-trip).
-   * Results are streamed to the browser via LiveKit data channel.
-   */
-  private async runAnalysis(chatCtx: llm.ChatContext, userText: string): Promise<void> {
-    const { sessionId, targetLanguage, nativeLanguage } = this.metadata
-    if (!sessionId) return
-
-    // Build recent history from chat context
-    const recentMessages = chatCtx.items
-      .filter((item) => item.type === 'message')
-      .slice(-10)
-      .map((item) => {
-        const msg = item as llm.ChatMessage
-        return { role: msg.role, content: msg.textContent || '' }
-      })
-
-    // Get the last assistant message
-    const lastAssistant = [...recentMessages].reverse().find((m) => m.role === 'assistant')
-    const assistantText = lastAssistant?.content || ''
-
-    const langName = targetLanguage || 'Japanese'
-    const analysisPrompt = `Analyze this exchange from a ${langName} language learning conversation.
-
-User said: "${userText}"
-Assistant responded: "${assistantText}"
-
-Recent history for context:
-${recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n')}
-
-Return a JSON object with these fields (omit empty arrays):
-{
-  "corrections": [{"original": "...", "corrected": "...", "explanation": "...", "grammarPoint": "..."}],
-  "naturalnessFeedback": [{"original": "...", "suggestion": "...", "explanation": "..."}],
-  "alternativeExpressions": [{"original": "...", "alternative": "...", "explanation": "..."}],
-  "registerMismatches": [{"original": "...", "suggestion": "...", "expected": "...", "explanation": "..."}],
-  "l1Interference": [{"original": "...", "issue": "...", "suggestion": "..."}],
-  "conversationalTips": [{"tip": "...", "explanation": "..."}],
-  "takeaways": ["..."]
-}
-
-Rules:
-- Only flag genuine learner errors, NOT speech-to-text transcription artifacts.
-- For ${langName}, do NOT flag natural spoken features as errors (e.g., dropped particles in casual speech, contracted forms).
-- Be concise. Each explanation should be 1-2 sentences max.
-- If the user's ${langName} was correct, return mostly empty arrays — don't invent issues.`
-
-    try {
-      const stream = anthropic.messages.stream({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: analysisPrompt }],
-        system: `You are a ${langName} language analysis engine. Output only valid JSON. The learner's native language is ${nativeLanguage || 'English'}.`,
-      })
-
-      let fullText = ''
-      let lastEmitTime = 0
-
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          fullText += event.delta.text
-
-          // Try to parse and emit periodically
-          const now = Date.now()
-          if (now - lastEmitTime < 200) continue
-          lastEmitTime = now
-
-          try {
-            // Attempt to parse partial JSON (may fail for incomplete)
-            const parsed = JSON.parse(fullText)
-            this.publishAnalysis(parsed)
-          } catch {
-            // Incomplete JSON — wait for more
-          }
-        }
-      }
-
-      // Final parse and emit
-      try {
-        // Strip markdown code fences if present
-        let cleaned = fullText.trim()
-        if (cleaned.startsWith('```')) {
-          cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-        }
-        const parsed = JSON.parse(cleaned)
-        this.publishAnalysis(parsed)
-        console.log('[LingleAgent] Analysis complete for turn', this.turnIndex)
-      } catch {
-        console.error('[LingleAgent] Failed to parse final analysis JSON')
-      }
-    } catch (err) {
-      console.error('[LingleAgent] Analysis stream failed:', err)
-    }
-  }
-
-  private publishAnalysis(data: Record<string, unknown>): void {
-    try {
-      const activity = this.getActivityOrThrow()
-      const room = (activity as unknown as {
-        room?: {
-          localParticipant?: {
-            publishData: (data: Uint8Array, opts: { reliable: boolean }) => void
-          }
-        }
-      }).room
-      if (room?.localParticipant) {
-        const encoder = new TextEncoder()
-        const payload = encoder.encode(
-          JSON.stringify({
-            type: 'analysis',
-            turnIndex: this.turnIndex,
-            data: JSON.stringify(data),
-          }),
-        )
-        room.localParticipant.publishData(payload, { reliable: true })
-      }
-    } catch {
-      // No activity or room — skip
-    }
-  }
 }
 
 function extractText(message: llm.ChatMessage): string {
@@ -395,10 +268,6 @@ function buildSystemPrompt(metadata: AgentMetadata): string {
 - When the learner makes errors, recast naturally (use the correct form in your response) rather than explicitly correcting.
 - Keep turns short — 1-3 sentences is ideal for natural conversation flow.`
 
-    if (ttsProvider === 'cartesia') {
-      prompt += `\n- You may use <break time="0.5s"/> for natural pauses.`
-    }
-
     return prompt
   }
 
@@ -425,7 +294,7 @@ VOICE MODE RULES:
 - Do NOT use markdown, bullet points, numbered lists, or any text formatting — this is spoken language.
 - Do NOT narrate your actions ("Let me log that error" / "I'm noting your progress").
 - Do NOT explicitly announce lesson phases or transitions.
-- Respond naturally to what the learner says. If they go off-topic, gently guide back.${ttsProvider === 'cartesia' ? '\n- You may use <break time="0.5s"/> for natural pauses.' : ''}
+- Respond naturally to what the learner says. If they go off-topic, gently guide back.
 
 TOOL USAGE RULES:
 - Call logError for EVERY grammar, vocabulary, pronunciation, or register error you notice.

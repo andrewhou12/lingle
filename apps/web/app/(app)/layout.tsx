@@ -12,6 +12,7 @@ import {
   ChevronRightIcon,
   Bars3Icon,
   PhoneIcon,
+  HomeIcon,
 } from '@heroicons/react/24/outline'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -49,7 +50,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Practice',
     items: [
-      { id: 'voice-test', href: '/conversation/voice/test', icon: <PhoneIcon className={IC} />, label: 'Voice Session' },
+      { id: 'dashboard', href: '/dashboard', icon: <HomeIcon className={IC} />, label: 'Dashboard' },
+      { id: 'new-session', href: '/conversation/voice', icon: <PhoneIcon className={IC} />, label: 'New Session' },
     ],
   },
   {
@@ -64,7 +66,9 @@ const NAV_SECTIONS: NavSection[] = [
 /* ── Breadcrumb label map ── */
 
 const BREADCRUMB_MAP: Record<string, string> = {
-  '/conversation/voice/test': 'Voice Session',
+  '/dashboard': 'Dashboard',
+  '/conversation/voice': 'New Session',
+  '/conversation/voice/test': 'Voice Test',
   '/settings': 'Settings',
   '/upgrade': 'Plan',
 }
@@ -255,9 +259,11 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
 
   const breadcrumb = BREADCRUMB_MAP[pathname] ?? ''
   const isVoiceRoute = pathname.startsWith('/conversation/voice')
+  const isOnboardingRoute = pathname.startsWith('/onboarding')
+  const isFullscreen = isVoiceRoute || isOnboardingRoute
 
-  // Voice mode is full-screen — render children with no shell
-  if (isVoiceRoute) {
+  // Voice/onboarding mode is full-screen — render children with no shell
+  if (isFullscreen) {
     return <div style={{ fontFamily: "'Geist Sans', var(--font-sans)" }}>{children}</div>
   }
 

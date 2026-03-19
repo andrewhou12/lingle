@@ -13,6 +13,25 @@ interface ProfileResponse {
   sessionsCompleted: number
 }
 
+export interface PostSessionResult {
+  cefrDelta?: { grammarDelta: number; fluencyDelta: number }
+  errorsCount?: number
+  correctionsCount?: number
+  correctionsDoc?: string | null
+}
+
+export interface LessonSummary {
+  id: string
+  summary: string | null
+  lessonGoal: string | null
+  startedAt: string
+  endedAt: string | null
+  durationMinutes: number | null
+  errorsCount: number
+  correctionsDoc: string | null
+  targetLanguage: string
+}
+
 export class UsageLimitError extends Error {
   usedSeconds: number
   limitSeconds: number
@@ -101,7 +120,7 @@ class LingleApiClient {
       body: JSON.stringify({ ...(prompt ? { prompt } : {}), ...(mode ? { mode } : {}), ...(inputMode ? { inputMode } : {}) }),
     })
   conversationEnd = (sessionId: string) =>
-    this.request<{ cefrDelta?: { grammarDelta: number; fluencyDelta: number }; errorsCount?: number; correctionsCount?: number } | null>('/conversation/end', {
+    this.request<PostSessionResult | null>('/conversation/end', {
       method: 'POST',
       body: JSON.stringify({ sessionId }),
     })
@@ -110,6 +129,10 @@ class LingleApiClient {
       method: 'POST',
       body: JSON.stringify({ targetLanguage, nativeLanguage }),
     })
+
+  // Lessons
+  lessonsGet = () =>
+    this.request<{ lessons: LessonSummary[] }>('/lessons')
 
   // Profile
   profileGet = () => this.request<ProfileResponse>('/profile')

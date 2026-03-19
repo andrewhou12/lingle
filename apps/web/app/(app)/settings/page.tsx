@@ -1,16 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeftIcon, GlobeAltIcon, LanguageIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, GlobeAltIcon, LanguageIcon, CheckIcon } from '@heroicons/react/24/outline'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 type ProfileData = Awaited<ReturnType<typeof api.profileGet>>
+
+const CORRECTION_STYLES = [
+  { value: 'recast', label: 'Recast', description: 'Correct form used naturally in response' },
+  { value: 'explicit', label: 'Explicit', description: 'Errors pointed out and explained' },
+  { value: 'none', label: 'None', description: 'No corrections unless miscommunication' },
+]
+
+const SESSION_LENGTHS = [
+  { value: 15, label: '15 min' },
+  { value: 20, label: '20 min' },
+  { value: 30, label: '30 min' },
+]
+
+const LESSON_STYLES = [
+  { value: 'conversational', label: 'Conversational', description: 'Natural free-flowing conversation' },
+  { value: 'structured', label: 'Structured', description: 'Focused drills and exercises' },
+  { value: 'mixed', label: 'Mixed', description: 'A balance of both approaches' },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [savedField, setSavedField] = useState<string | null>(null)
 
   useEffect(() => {
     setIsLoading(true)
@@ -19,6 +39,18 @@ export default function SettingsPage() {
       setIsLoading(false)
     })
   }, [])
+
+  const updateField = useCallback(async (field: string, value: unknown) => {
+    if (!profile) return
+    setProfile({ ...profile, [field]: value })
+    try {
+      await api.profilePatch({ [field]: value })
+      setSavedField(field)
+      setTimeout(() => setSavedField(null), 1500)
+    } catch (err) {
+      console.error('[Settings] Failed to update:', err)
+    }
+  }, [profile])
 
   if (isLoading || !profile) {
     return (
@@ -55,33 +87,84 @@ export default function SettingsPage() {
       </div>
 
       <span className="text-[11px] font-medium text-text-muted block mb-3">
-        Session
+        Session Preferences
       </span>
 
       <div className="rounded-xl border border-border bg-bg mb-6">
         <div className="flex flex-col">
-          <SettingsRow icon={<span className="text-[12px]">⏱</span>} label="Session Length" value={`${profile.sessionLengthMinutes} min`} />
+          {/* Correction Style */}
+          <SettingsSelect
+            icon={<span className="text-[12px]">&#9998;</span>}
+            label="Correction Style"
+            saved={savedField === 'correctionStyle'}
+            options={CORRECTION_STYLES}
+            value={profile.correctionStyle}
+            onChange={(v) => updateField('correctionStyle', v)}
+          />
           <hr className="border-t border-border m-0" />
-          <SettingsRow icon={<span className="text-[12px]">✏️</span>} label="Correction Style" value={profile.correctionStyle} />
+
+          {/* Session Length */}
+          <div className="py-3 px-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+                <span className="text-[12px]">&#9201;</span>
+              </div>
+              <span className="text-[13px] font-medium flex-1">Session Length</span>
+              {savedField === 'sessionLengthMinutes' && (
+                <span className="text-[11px] text-green font-medium flex items-center gap-1">
+                  <CheckIcon className="w-3 h-3" /> Saved
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2 ml-10">
+              {SESSION_LENGTHS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => updateField('sessionLengthMinutes', opt.value)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-[13px] font-medium cursor-pointer border transition-colors',
+                    profile.sessionLengthMinutes === opt.value
+                      ? 'bg-accent-brand text-white border-accent-brand'
+                      : 'bg-bg-pure text-text-secondary border-border hover:border-border-strong hover:bg-bg-hover',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <hr className="border-t border-border m-0" />
-          <SettingsRow icon={<span className="text-[12px]">📊</span>} label="Sessions Completed" value={String(profile.sessionsCompleted)} />
+
+          {/* Lesson Style */}
+          <SettingsSelect
+            icon={<span className="text-[12px]">&#128218;</span>}
+            label="Lesson Style"
+            saved={savedField === 'lessonStylePreference'}
+            options={LESSON_STYLES}
+            value={profile.lessonStylePreference}
+            onChange={(v) => updateField('lessonStylePreference', v)}
+          />
         </div>
       </div>
 
-      {profile.cefrGrammar != null && (
-        <>
-          <span className="text-[11px] font-medium text-text-muted block mb-3">
-            CEFR Scores
-          </span>
-          <div className="rounded-xl border border-border bg-bg mb-6">
-            <div className="flex flex-col">
-              <SettingsRow icon={<span className="text-[12px]">📝</span>} label="Grammar" value={profile.cefrGrammar.toFixed(1)} />
+      {/* Stats (read-only) */}
+      <span className="text-[11px] font-medium text-text-muted block mb-3">
+        Progress
+      </span>
+
+      <div className="rounded-xl border border-border bg-bg mb-6">
+        <div className="flex flex-col">
+          <SettingsRow icon={<span className="text-[12px]">&#128202;</span>} label="Sessions Completed" value={String(profile.sessionsCompleted)} />
+          {profile.cefrGrammar != null && (
+            <>
               <hr className="border-t border-border m-0" />
-              <SettingsRow icon={<span className="text-[12px]">🗣</span>} label="Fluency" value={(profile.cefrFluency ?? 0).toFixed(1)} />
-            </div>
-          </div>
-        </>
-      )}
+              <SettingsRow icon={<span className="text-[12px]">&#128221;</span>} label="Grammar (CEFR)" value={profile.cefrGrammar.toFixed(1)} />
+              <hr className="border-t border-border m-0" />
+              <SettingsRow icon={<span className="text-[12px]">&#128483;</span>} label="Fluency (CEFR)" value={(profile.cefrFluency ?? 0).toFixed(1)} />
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -96,6 +179,60 @@ function SettingsRow({ icon, label, value }: { icon: React.ReactNode; label: str
         <span className="text-[13px] font-medium">{label}</span>
       </div>
       <span className="text-[13px] text-text-secondary">{value}</span>
+    </div>
+  )
+}
+
+function SettingsSelect({
+  icon,
+  label,
+  options,
+  value,
+  onChange,
+  saved,
+}: {
+  icon: React.ReactNode
+  label: string
+  options: { value: string; label: string; description: string }[]
+  value: string
+  onChange: (value: string) => void
+  saved?: boolean
+}) {
+  return (
+    <div className="py-3 px-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+          {icon}
+        </div>
+        <span className="text-[13px] font-medium flex-1">{label}</span>
+        {saved && (
+          <span className="text-[11px] text-green font-medium flex items-center gap-1">
+            <CheckIcon className="w-3 h-3" /> Saved
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5 ml-10">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'flex flex-col text-left px-3 py-2 rounded-lg cursor-pointer border transition-colors',
+              value === opt.value
+                ? 'bg-accent-brand/5 border-accent-brand/30'
+                : 'bg-bg-pure border-border hover:border-border-strong hover:bg-bg-hover',
+            )}
+          >
+            <span className={cn(
+              'text-[13px] font-medium',
+              value === opt.value ? 'text-text-primary' : 'text-text-secondary',
+            )}>
+              {opt.label}
+            </span>
+            <span className="text-[11px] text-text-muted">{opt.description}</span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -14,24 +14,6 @@ export interface TranscriptLine {
   timestamp: number
 }
 
-export interface VoiceAnalysisResult {
-  corrections: unknown[]
-  vocabularyCards: unknown[]
-  grammarNotes: unknown[]
-  naturalnessFeedback: unknown[]
-  registerMismatches: unknown[]
-  l1Interference: unknown[]
-  alternativeExpressions: unknown[]
-  conversationalTips: unknown[]
-  takeaways: unknown[]
-  sectionTracking?: SectionTracking | null
-}
-
-export interface SectionTracking {
-  currentSectionId: string
-  completedSectionIds: string[]
-}
-
 export type InputMode = 'ptt' | 'vad'
 
 type SessionPlan = Record<string, unknown> | null
@@ -67,9 +49,6 @@ export interface UseVoiceConversationReturn {
   currentSentence: string | null
   currentProgress: number
   ttsPlaying: boolean
-  analysisResults: Record<number, VoiceAnalysisResult>
   retryLast: () => void
-  sectionTracking: SectionTracking | null
-  isAnalyzing: boolean
   inputMode: InputMode
 }

@@ -68,6 +68,7 @@ class SpeechStream extends stt.SpeechStream {
   #requestId = 0
   #firstAudioSentTs = 0    // timestamp of first audio frame sent to Soniox
   #lastAudioSentTs = 0     // timestamp of last audio frame sent to Soniox
+  #lastPreflightTs = 0     // throttle PREFLIGHT_TRANSCRIPT to avoid spamming LLM
 
   constructor(
     sttInstance: STT,
@@ -248,8 +249,24 @@ class SpeechStream extends stt.SpeechStream {
     }
 
     this.#requestId++
+    // PREFLIGHT_TRANSCRIPT triggers preemptive LLM generation; INTERIM only updates UI.
+    // Throttle PREFLIGHT to at most once per 500ms to avoid spamming cancelled LLM requests.
+    let eventType: stt.SpeechEventType
+    if (isFinal) {
+      eventType = stt.SpeechEventType.FINAL_TRANSCRIPT
+      this.#lastPreflightTs = 0  // reset throttle for next utterance
+    } else {
+      const now = Date.now()
+      const sinceLast = now - this.#lastPreflightTs
+      if (sinceLast >= 500 && text.trim().split(/\s+/).length >= 2) {
+        eventType = stt.SpeechEventType.PREFLIGHT_TRANSCRIPT
+        this.#lastPreflightTs = now
+      } else {
+        eventType = stt.SpeechEventType.INTERIM_TRANSCRIPT
+      }
+    }
     this.queue.put({
-      type: isFinal ? stt.SpeechEventType.FINAL_TRANSCRIPT : stt.SpeechEventType.INTERIM_TRANSCRIPT,
+      type: eventType,
       alternatives: [speechData],
       requestId: `soniox-${this.#requestId}`,
     })

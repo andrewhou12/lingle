@@ -147,5 +147,6 @@ export const POST = withAuth(async (request, { userId }) => {
     cefrDelta: cefrResult,
     errorsCount: sessionState?.errorsLogged.length ?? 0,
     correctionsCount: sessionState?.corrections.length ?? 0,
+    correctionsDoc: correctionsDoc || null,
   })
 })

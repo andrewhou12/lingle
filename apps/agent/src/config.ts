@@ -151,7 +151,6 @@ export interface AgentMetadata {
   sessionPlan?: unknown
   sessionMode?: string
   basePrompt?: string
-  analyzeEndpoint?: string
   ttsProvider?: AgentTtsProvider
   sttProvider?: AgentSttProvider
   // Extended fields for full session mode
