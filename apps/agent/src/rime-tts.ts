@@ -6,6 +6,10 @@
  *
  * Uses the /ws3 JSON endpoint: wss://users-ws.rime.ai/ws3
  * Docs: https://docs.rime.ai/api-reference/arcana/websockets-json
+ *
+ * Key design: uses segment=never so Rime buffers all text until we explicitly
+ * send { operation: "flush" }. We flush at sentence boundaries so each
+ * synthesized audio segment has natural prosody.
  */
 import { tts, AudioByteStream } from '@livekit/agents'
 import type { APIConnectOptions } from '@livekit/agents'
@@ -18,7 +22,6 @@ export interface RimeTTSOptions {
   speaker: string
   lang?: string
   samplingRate?: number
-  segment?: 'immediate' | 'bySentence' | 'never'
   speedAlpha?: number
 }
 
@@ -26,7 +29,6 @@ const DEFAULTS = {
   modelId: 'arcana',
   lang: 'eng',
   samplingRate: 24000,
-  segment: 'immediate' as const,
 }
 
 /** Shared persistent WebSocket connection for all streams in a session */
@@ -41,7 +43,7 @@ function nextContextId(): string {
 
 export class TTS extends tts.TTS {
   readonly label = 'rime-persistent'
-  #opts: Required<Pick<RimeTTSOptions, 'modelId' | 'lang' | 'samplingRate' | 'segment'>> & RimeTTSOptions
+  #opts: Required<Pick<RimeTTSOptions, 'modelId' | 'lang' | 'samplingRate'>> & RimeTTSOptions
 
   constructor(opts: RimeTTSOptions) {
     super(opts.samplingRate || DEFAULTS.samplingRate, 1, { streaming: true })
@@ -68,7 +70,7 @@ const messageHandlers = new Map<string, MessageHandler>()
 let currentHandler: MessageHandler | null = null
 
 interface RimeMessage {
-  type: string        // "chunk" | "timestamps" | "error"
+  type: string        // "chunk" | "timestamps" | "error" | "done"
   data?: string       // base64 audio (for "chunk")
   contextId?: string | null
   message?: string    // error message
@@ -85,7 +87,6 @@ function getOrCreateWebSocket(opts: {
   speaker: string
   lang: string
   samplingRate: number
-  segment: string
   speedAlpha?: number
 }): Promise<WebSocket> {
   const params = new URLSearchParams({
@@ -94,7 +95,8 @@ function getOrCreateWebSocket(opts: {
     audioFormat: 'pcm',
     lang: opts.lang,
     samplingRate: String(opts.samplingRate),
-    segment: opts.segment,
+    // segment=never: Rime buffers all text, only synthesizes on flush
+    segment: 'never',
   })
   if (opts.speedAlpha !== undefined) {
     params.set('speedAlpha', String(opts.speedAlpha))
@@ -164,6 +166,9 @@ function getOrCreateWebSocket(opts: {
   return sharedWsReady.then(() => sharedWs!)
 }
 
+/** Sentence-ending punctuation pattern */
+const SENTENCE_END = /[.!?。！？]\s*$/
+
 class SynthesizeStream extends tts.SynthesizeStream {
   readonly label = 'rime-persistent'
   #opts: TTS['opts']
@@ -189,7 +194,6 @@ class SynthesizeStream extends tts.SynthesizeStream {
         speaker: this.#opts.speaker,
         lang: this.#opts.lang,
         samplingRate: this.#opts.samplingRate,
-        segment: this.#opts.segment,
         speedAlpha: this.#opts.speedAlpha,
       })
     } catch (err) {
@@ -202,7 +206,7 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
     let lastFrame: ReturnType<AudioByteStream['flush']>[number] | undefined
     let done = false
-    let eosReceived = false
+    let inputDone = false
 
     const sendLastFrame = (final: boolean) => {
       if (lastFrame && !this.queue.closed) {
@@ -217,11 +221,11 @@ class SynthesizeStream extends tts.SynthesizeStream {
     }
 
     // Register message handler for this context
-    const messagePromises: RimeMessage[] = []
+    const messageQueue: RimeMessage[] = []
     let messageResolve: (() => void) | null = null
 
     const handler: MessageHandler = (msg) => {
-      messagePromises.push(msg)
+      messageQueue.push(msg)
       if (messageResolve) {
         messageResolve()
         messageResolve = null
@@ -231,18 +235,45 @@ class SynthesizeStream extends tts.SynthesizeStream {
     messageHandlers.set(contextId, handler)
     currentHandler = handler
 
-    // Process incoming messages
+    // ── Receive task ──
+    // Rime doesn't send a "done" message after flush — we detect completion
+    // by waiting for chunks to stop arriving after all input is flushed.
+    const IDLE_TIMEOUT_MS = 300
+    const FIRST_CHUNK_TIMEOUT_MS = 3000
+    let lastChunkTs = 0
+    let receivedAnyChunk = false
+
     const recvTask = async () => {
       while (!done && !this.closed && !this.abortSignal.aborted) {
-        if (messagePromises.length === 0) {
-          await new Promise<void>((resolve) => {
-            messageResolve = resolve
-            if (this.abortSignal.aborted) resolve()
-          })
+        if (messageQueue.length === 0) {
+          if (inputDone) {
+            // Draining — wait for chunks with timeout
+            const timeout = receivedAnyChunk ? IDLE_TIMEOUT_MS : FIRST_CHUNK_TIMEOUT_MS
+            const elapsed = Date.now() - lastChunkTs
+            const remaining = timeout - elapsed
+            if (remaining <= 0) break
+
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, remaining)
+              messageResolve = () => { clearTimeout(timer); resolve() }
+              if (this.abortSignal.aborted) { clearTimeout(timer); resolve() }
+            })
+
+            if (messageQueue.length === 0) {
+              if (Date.now() - lastChunkTs >= timeout) break
+              continue
+            }
+          } else {
+            // Still receiving input — block until a message arrives
+            await new Promise<void>((resolve) => {
+              messageResolve = resolve
+              if (this.abortSignal.aborted) resolve()
+            })
+          }
         }
 
-        while (messagePromises.length > 0) {
-          const msg = messagePromises.shift()!
+        while (messageQueue.length > 0) {
+          const msg = messageQueue.shift()!
 
           if (msg.type === 'error') {
             console.error('[rime-persistent] error:', msg.message)
@@ -250,6 +281,8 @@ class SynthesizeStream extends tts.SynthesizeStream {
           }
 
           if (msg.type === 'chunk' && msg.data) {
+            lastChunkTs = Date.now()
+            receivedAnyChunk = true
             const audioBuffer = Buffer.from(msg.data, 'base64')
             const audioData = audioBuffer.buffer.slice(
               audioBuffer.byteOffset,
@@ -259,81 +292,75 @@ class SynthesizeStream extends tts.SynthesizeStream {
               sendLastFrame(false)
               lastFrame = frame
             }
-          } else if (msg.type === 'timestamps') {
-            // We don't use word timestamps currently, but could in the future
           }
-        }
-
-        // After processing all messages, check if EOS was sent and no more audio is coming
-        if (eosReceived && messagePromises.length === 0) {
-          // Give a small window for final chunks to arrive
-          await new Promise<void>((resolve) => setTimeout(resolve, 100))
-          if (messagePromises.length === 0) {
-            // Flush remaining audio
-            for (const frame of bstream.flush()) {
-              sendLastFrame(false)
-              lastFrame = frame
-            }
-            sendLastFrame(true)
-            if (!this.queue.closed) {
-              this.queue.put(SynthesizeStream.END_OF_STREAM)
-            }
-            done = true
-          }
+          // timestamps — ignored for now
         }
       }
+
+      // Flush remaining audio in buffer
+      for (const frame of bstream.flush()) {
+        sendLastFrame(false)
+        lastFrame = frame
+      }
+      sendLastFrame(true)
+      if (!this.queue.closed) {
+        this.queue.put(SynthesizeStream.END_OF_STREAM)
+      }
+      done = true
     }
 
-    // Process text input and send to Rime
+    // ── Input task ──
+    // Stream LLM tokens to Rime, flush at sentence boundaries.
+    // With segment=never, Rime buffers all text until we flush, so each
+    // flushed segment is a complete sentence with natural prosody.
     const inputTask = async () => {
       let buffer = ''
-      const MIN_WORDS = 2
 
       const sendText = (text: string) => {
         if (ws.readyState !== WebSocket.OPEN) return
         ws.send(JSON.stringify({ text, contextId }))
       }
 
-      const sendOperation = (op: 'flush' | 'clear' | 'eos') => {
+      const flush = () => {
         if (ws.readyState !== WebSocket.OPEN) return
-        ws.send(JSON.stringify({ operation: op }))
+        ws.send(JSON.stringify({ operation: 'flush' }))
       }
 
       for await (const data of this.input) {
         if (this.abortSignal.aborted) break
 
         if (data === SynthesizeStream.FLUSH_SENTINEL) {
+          // Framework flush — send buffered text and trigger synthesis
           if (buffer.trim()) {
             sendText(buffer)
             buffer = ''
           }
-          sendOperation('flush')
+          flush()
           continue
         }
 
+        // Accumulate LLM token
         buffer += data
 
-        // Send when we have enough words
-        const words = buffer.trim().split(/\s+/)
-        if (words.length >= MIN_WORDS && /[.!?。！？、,;:\n]/.test(buffer)) {
-          sendText(buffer)
-          buffer = ''
-        } else if (words.length >= 8) {
+        // Send text to Rime's buffer token-by-token (Rime holds it until flush)
+        // But we send in chunks to reduce WebSocket message count
+        if (buffer.length >= 2) {
           sendText(buffer)
           buffer = ''
         }
       }
 
-      // Send remaining buffer
+      // Send any remaining text
       if (buffer.trim()) {
         sendText(buffer)
       }
 
-      // Signal end of stream — flush remaining audio but don't close the connection
-      sendOperation('flush')
-      eosReceived = true
+      // Final flush to synthesize everything remaining
+      flush()
+      inputDone = true
+      if (!lastChunkTs) lastChunkTs = Date.now()
 
-      // Wake up the recv task
+      // Wake recv task
       if (messageResolve) {
         messageResolve()
         messageResolve = null

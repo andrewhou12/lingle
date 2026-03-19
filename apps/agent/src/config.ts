@@ -106,11 +106,6 @@ export function resolveAgentTtsProvider(metadata: AgentMetadata): AgentTtsProvid
   if (metadata.ttsProvider === 'rime' || metadata.ttsProvider === 'cartesia') {
     return metadata.ttsProvider
   }
-  // Env override (global switch — set AGENT_TTS_PROVIDER=cartesia or rime)
-  const envProvider = process.env.AGENT_TTS_PROVIDER
-  if (envProvider === 'rime' || envProvider === 'cartesia') {
-    return envProvider
-  }
   // Language-based default: Rime for English, Cartesia for everything else
   if (metadata.targetLanguage === 'English') return 'rime'
   return 'cartesia'
