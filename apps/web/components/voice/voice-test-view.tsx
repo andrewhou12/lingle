@@ -10,6 +10,7 @@ import { LingleControlBar } from './lingle-control-bar'
 import { LingleChatTranscript, type LingleTranscriptEntry } from './lingle-chat-transcript'
 import { VoiceLiveSubtitles } from './voice-live-subtitles'
 import { Whiteboard } from './whiteboard'
+import { DevToolsPanel } from './dev-tools-panel'
 import { cn } from '@/lib/utils'
 
 const TEST_PROMPTS: Record<string, string> = {
@@ -88,6 +89,13 @@ export function VoiceTestView() {
 
   return (
     <div className="fixed inset-0 bg-bg flex flex-col items-center justify-between z-50">
+      <DevToolsPanel
+        sessionId={voice.sessionId}
+        voiceState={voice.voiceState}
+        duration={voice.duration}
+        isActive={voice.isActive}
+        transcript={voice.transcript}
+      />
       <Whiteboard
         isOpen={voice.whiteboard.isOpen}
         onClose={() => voice.whiteboard.setIsOpen(false)}

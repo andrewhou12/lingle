@@ -242,7 +242,7 @@ function extractText(message: llm.ChatMessage): string {
  * Slot 5 — Conversation window: managed by context compression above
  * Slot 6 — Current utterance: handled by LiveKit framework
  */
-function buildSystemPrompt(metadata: AgentMetadata): string {
+export function buildSystemPrompt(metadata: AgentMetadata): string {
   const targetLang = metadata.targetLanguage || 'the target language'
   const nativeLang = metadata.nativeLanguage || 'English'
   const ttsProvider = resolveAgentTtsProvider(metadata)
