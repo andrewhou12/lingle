@@ -78,6 +78,7 @@ import * as google from '@livekit/agents-plugin-google'
 import { LingleAgent } from './lingle-agent.js'
 import { ClaudeLLM } from './claude-llm.js'
 import { TTS as CartesiaPersistentTTS } from './cartesia-tts.js'
+import { TTS as RimePersistentTTS } from './rime-tts.js'
 import {
   parseAgentMetadata,
   getCartesiaVoiceId,
@@ -228,15 +229,13 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
   if (provider === 'rime') {
     const rimeLang = getRimeLanguage(targetLang)
     const speaker = metadata.voiceId || getRimeVoiceId(rimeLang)
-    log(`TTS=rime speaker=${speaker} lang=${rimeLang}`)
-    return new rime.TTS({
-      modelId: 'arcana',
+    log(`TTS=rime-persistent speaker=${speaker} lang=${rimeLang}`)
+    return new RimePersistentTTS({
       speaker,
       lang: rimeLang,
-      speedAlpha: 1.0,
       samplingRate: 24000,
-      temperature: 0.3,
-      repetition_penalty: 1.1,
+      segment: 'immediate',
+      speedAlpha: 1.0,
     })
   }
 

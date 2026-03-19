@@ -111,8 +111,8 @@ export function resolveAgentTtsProvider(metadata: AgentMetadata): AgentTtsProvid
   if (envProvider === 'rime' || envProvider === 'cartesia') {
     return envProvider
   }
-  // Language-based default
-  if (metadata.targetLanguage === 'English' || metadata.targetLanguage === 'Japanese') return 'cartesia'
+  // Language-based default: Rime for English, Cartesia for everything else
+  if (metadata.targetLanguage === 'English') return 'rime'
   return 'cartesia'
 }
 
