@@ -7,6 +7,7 @@ import {
   type RemoteParticipant,
 } from 'livekit-client'
 import { api } from '@/lib/api'
+import { useWhiteboard } from '@/components/voice/whiteboard'
 import type { UseVoiceConversationReturn, VoiceState, TranscriptLine, SectionTracking } from './use-voice-conversation'
 
 type SessionPlan = Record<string, unknown> | null
@@ -50,6 +51,7 @@ export function useLiveKitVoice(opts: {
   connectedRoom: Room | null
   handleAgentStateChange: (state: string) => void
   handleAgentIdentity: (identity: string) => void
+  whiteboard: ReturnType<typeof useWhiteboard>
 } {
   const [voiceState, setVoiceState] = useState<VoiceState>('IDLE')
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
@@ -67,6 +69,8 @@ export function useLiveKitVoice(opts: {
   const [currentSentence, setCurrentSentence] = useState<string | null>(null)
   const [partialText, setPartialText] = useState('')
   const [connectedRoom, setConnectedRoom] = useState<Room | null>(null)
+
+  const whiteboard = useWhiteboard()
 
   const roomRef = useRef<Room | null>(null)
   const connectingRef = useRef(false)
@@ -151,6 +155,11 @@ export function useLiveKitVoice(opts: {
           } finally {
             setIsAnalyzing(false)
           }
+        }
+
+        // Whiteboard messages from agent tools
+        if (typeof message.type === 'string' && message.type.startsWith('whiteboard_')) {
+          whiteboard.handleMessage(message)
         }
       } catch {
         // Not JSON — ignore
@@ -244,6 +253,7 @@ export function useLiveKitVoice(opts: {
           sessionMode: mode,
           basePrompt: prompt,
           analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
+          ...(result.agentMetadata ?? {}),
         })
       } catch (err) {
         console.error('[livekit-voice] Failed to start session:', err)
@@ -516,5 +526,6 @@ export function useLiveKitVoice(opts: {
     sectionTracking,
     isAnalyzing,
     inputMode: 'vad' as const,
+    whiteboard,
   }
 }

@@ -72,8 +72,12 @@ import * as deepgram from '@livekit/agents-plugin-deepgram'
 import * as cartesia from '@livekit/agents-plugin-cartesia'
 import * as rime from '@livekit/agents-plugin-rime'
 import * as openai from '@livekit/agents-plugin-openai'
+import * as google from '@livekit/agents-plugin-google'
+import * as livekit from '@livekit/agents-plugin-livekit'
 
 import { LingleAgent } from './lingle-agent.js'
+import { ClaudeLLM } from './claude-llm.js'
+import { TTS as CartesiaPersistentTTS } from './cartesia-tts.js'
 import {
   parseAgentMetadata,
   getCartesiaVoiceId,
@@ -99,22 +103,30 @@ function log(msg: string) {
 // Collects timestamps at each pipeline stage and prints a consolidated breakdown.
 class TurnLatencyTracker {
   private turnId = 0
-  private eouTs = 0        // end-of-utterance detected (VAD)
-  private sttFinalTs = 0   // STT final transcript received
-  private llmFirstTs = 0   // LLM first token
-  private ttsFirstTs = 0   // TTS first audio byte
-  private eouDelayMs = 0   // VAD's internal EOU delay
-  private llmTtftMs = 0    // LLM TTFT from its own metrics
-  private ttsTtfbMs = 0    // TTS TTFB from its own metrics
+  private eouTs = 0              // end-of-utterance committed
+  private vadSilenceTs = 0       // VAD detected silence (before turn detector)
+  private sttFinalTs = 0         // STT final transcript received
+  private llmFirstTs = 0         // LLM first token
+  private ttsFirstTs = 0         // TTS first audio byte
+  private eouDelayMs = 0         // total EOU delay (VAD silence + turn detector + endpointing)
+  private transcriptionDelayMs = 0 // time to get transcript after speech ended
+  private llmTtftMs = 0          // LLM TTFT from its own metrics
+  private ttsTtfbMs = 0          // TTS TTFB from its own metrics
   private llmTotalMs = 0
   private llmTokens = 0
   private ttsTotalMs = 0
 
-  /** Called when user speech ends (EOU detected by VAD) */
-  markEOU(delayMs: number) {
+  /** Called when VAD detects silence (user stopped speaking) */
+  markVADSilence() {
+    this.vadSilenceTs = Date.now()
+  }
+
+  /** Called when EOU is committed (after turn detector decision + endpointing delay) */
+  markEOU(eouDelayMs: number, transcriptionDelayMs: number) {
     this.turnId++
     this.eouTs = Date.now()
-    this.eouDelayMs = delayMs
+    this.eouDelayMs = eouDelayMs
+    this.transcriptionDelayMs = transcriptionDelayMs
     this.sttFinalTs = 0
     this.llmFirstTs = 0
     this.ttsFirstTs = 0
@@ -124,7 +136,7 @@ class TurnLatencyTracker {
     this.llmTokens = 0
     this.ttsTotalMs = 0
     log(`[latency] ──── TURN ${this.turnId} START ────`)
-    log(`[latency] EOU detected (VAD delay=${delayMs.toFixed(0)}ms)`)
+    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms)`)
   }
 
   /** Called when STT emits final transcript */
@@ -158,19 +170,19 @@ class TurnLatencyTracker {
   private printSummary() {
     if (!this.eouTs) return
 
-    // Estimated end-to-end: EOU delay + STT processing + LLM TTFT + TTS TTFB
     const sttProcessing = this.sttFinalTs && this.eouTs ? this.sttFinalTs - this.eouTs : 0
     const estimatedE2E = this.eouDelayMs + this.llmTtftMs + this.ttsTtfbMs
 
     log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
-    log(`[latency]   VAD EOU delay:    ${this.eouDelayMs.toFixed(0)}ms`)
-    log(`[latency]   EOU → STT final:  ${sttProcessing}ms`)
-    log(`[latency]   LLM TTFT:         ${this.llmTtftMs.toFixed(0)}ms`)
-    log(`[latency]   LLM total:        ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
-    log(`[latency]   TTS TTFB:         ${this.ttsTtfbMs.toFixed(0)}ms`)
-    log(`[latency]   TTS total:        ${this.ttsTotalMs.toFixed(0)}ms`)
+    log(`[latency]   EOU delay:          ${this.eouDelayMs.toFixed(0)}ms  (VAD silence + turn detector + endpointing)`)
+    log(`[latency]   Transcription delay: ${this.transcriptionDelayMs.toFixed(0)}ms`)
+    log(`[latency]   EOU → STT final:    ${sttProcessing}ms`)
+    log(`[latency]   LLM TTFT:           ${this.llmTtftMs.toFixed(0)}ms`)
+    log(`[latency]   LLM total:          ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
+    log(`[latency]   TTS TTFB:           ${this.ttsTtfbMs.toFixed(0)}ms`)
+    log(`[latency]   TTS total:          ${this.ttsTotalMs.toFixed(0)}ms`)
     log(`[latency]   ─────────────────────────`)
-    log(`[latency]   Estimated E2E*:   ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
+    log(`[latency]   Estimated E2E*:     ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
     log(`[latency]   * does not include WebRTC transport or audio playout delay`)
     log(`[latency] ──── END TURN ${this.turnId} ────`)
   }
@@ -219,15 +231,62 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
 
   const cartesiaLang = getCartesiaLanguage(targetLang)
   const voiceId = metadata.voiceId || getCartesiaVoiceId(cartesiaLang)
-  log(`TTS=cartesia voice=${voiceId} lang=${cartesiaLang}`)
-  return new cartesia.TTS({
+  log(`TTS=cartesia-persistent voice=${voiceId} lang=${cartesiaLang}`)
+  return new CartesiaPersistentTTS({
     model: 'sonic-3',
     voice: voiceId,
     language: cartesiaLang,
     speed: cartesiaLang === 'ja' ? 0.8 : 1.15,
     sampleRate: 24000,
-    wordTimestamps: cartesiaLang === 'en',
+    wordTimestamps: false,
   })
+}
+
+// ── Network RTT probe ──
+// Measures baseline round-trip time to each external service.
+async function probeNetworkLatency(): Promise<void> {
+  const targets: { name: string; url: string }[] = [
+    { name: 'OpenAI', url: 'https://api.openai.com/v1/models' },
+    { name: 'Cartesia', url: 'https://api.cartesia.ai/' },
+    { name: 'Soniox', url: 'https://api.soniox.com/' },
+    { name: 'Anthropic', url: 'https://api.anthropic.com/' },
+  ]
+
+  const results: string[] = []
+  await Promise.all(
+    targets.map(async ({ name, url }) => {
+      const start = Date.now()
+      try {
+        await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) })
+        results.push(`${name}=${Date.now() - start}ms`)
+      } catch {
+        results.push(`${name}=ERR(${Date.now() - start}ms)`)
+      }
+    }),
+  )
+
+  // Try to detect agent region from metadata endpoint (works on most cloud providers)
+  let region = 'unknown'
+  try {
+    // GCP
+    const res = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/zone', {
+      headers: { 'Metadata-Flavor': 'Google' },
+      signal: AbortSignal.timeout(1000),
+    })
+    if (res.ok) region = (await res.text()).split('/').pop() || 'gcp-unknown'
+  } catch {
+    try {
+      // AWS
+      const res = await fetch('http://169.254.169.254/latest/meta-data/placement/region', {
+        signal: AbortSignal.timeout(1000),
+      })
+      if (res.ok) region = await res.text()
+    } catch {
+      // Not on GCP or AWS — that's fine
+    }
+  }
+
+  log(`[network] RTT: ${results.join('  ')}  agent_region=${region}`)
 }
 
 export default defineAgent({
@@ -241,6 +300,34 @@ export default defineAgent({
     const targetLang = metadata.targetLanguage || 'Japanese'
     log(`entry START — lang=${targetLang} pid=${process.pid}`)
     log(`job.id=${ctx.job.id ?? 'none'} metadata=${ctx.job.metadata?.slice(0, 200) ?? 'none'}`)
+
+    // Probe network latency to external services (non-blocking)
+    probeNetworkLatency().catch(() => {})
+
+    // Raw Haiku TTFT test — bare API call, no framework overhead
+    ;(async () => {
+      try {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk')
+        const client = new Anthropic()
+        const t = Date.now()
+        const stream = client.messages.stream({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 50,
+          stream: true,
+          messages: [{ role: 'user', content: 'Say hello in one sentence.' }],
+        })
+        let ttft = 0
+        for await (const event of stream) {
+          if (!ttft && event.type === 'content_block_delta') {
+            ttft = Date.now() - t
+          }
+        }
+        const total = Date.now() - t
+        log(`[haiku-probe] raw TTFT=${ttft}ms total=${total}ms (no framework)`)
+      } catch (err) {
+        log(`[haiku-probe] failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    })()
 
     // Log environment state
     log(`env: OPENAI_API_KEY=${process.env.OPENAI_API_KEY ? 'set' : 'MISSING'}`)
@@ -289,8 +376,10 @@ export default defineAgent({
     const vadStart = Date.now()
     const { VAD } = await import('@livekit/agents-plugin-silero')
     const vad = await VAD.load({
-      activationThreshold: 0.65,
-      minSpeechDuration: 150,
+      activationThreshold: 0.5,
+      minSpeechDuration: 100,
+      minSilenceDuration: 200,
+      prefixPaddingDuration: 200,
     })
     log(`step 2: VAD loaded in ${Date.now() - vadStart}ms`)
 
@@ -298,32 +387,62 @@ export default defineAgent({
     log(`step 3: creating AgentSession...`)
     const stt = buildStt(metadata)
     const ttsInstance = buildTts(metadata)
-    const llm = new openai.LLM({
-      model: 'gpt-4o-mini',
-      maxCompletionTokens: 300,
-    })
-    log(`step 3: providers created (stt=${stt.constructor.name} llm=gpt-4o-mini tts=${ttsInstance.constructor.name})`)
+
+    // LLM provider selection via AGENT_LLM_PROVIDER env var.
+    // Options: claude (default), openai, openai-nano, gemini
+    const llmProvider = process.env.AGENT_LLM_PROVIDER || 'gemini'
+    let llm: InstanceType<typeof ClaudeLLM> | openai.LLM | google.LLM
+    let llmLabel: string
+
+    switch (llmProvider) {
+      case 'openai':
+        llm = new openai.LLM({ model: 'gpt-4.1-mini', maxCompletionTokens: 300 })
+        llmLabel = 'openai/gpt-4.1-mini'
+        break
+      case 'openai-nano':
+        llm = new openai.LLM({ model: 'gpt-4.1-nano', maxCompletionTokens: 300 })
+        llmLabel = 'openai/gpt-4.1-nano'
+        break
+      case 'gemini':
+        llm = new google.LLM({ model: 'gemini-3-flash-preview', maxOutputTokens: 300 })
+        llmLabel = 'google/gemini-3-flash-preview'
+        break
+      default:
+        llm = new ClaudeLLM({ model: 'claude-haiku-4-5-20251001', maxTokens: 200 })
+        llmLabel = 'claude-haiku-4.5'
+        break
+    }
+
+    log(`step 3: providers created (stt=${stt.constructor.name} llm=${llmLabel} tts=${ttsInstance.constructor.name})`)
+
+    // Load turn detector model — predicts whether user is done speaking
+    // based on transcript context. Prevents false interruptions on pauses.
+    const turnDetector = new livekit.turnDetector.MultilingualModel()
+    log(`step 3: turn detector loaded (MultilingualModel)`)
 
     const session = new voice.AgentSession({
       vad,
       stt,
       llm,
       tts: ttsInstance,
+      turnDetection: turnDetector,
       voiceOptions: {
         preemptiveGeneration: true,
-        minEndpointingDelay: 0.3,
+        minEndpointingDelay: 0.15,
         maxEndpointingDelay: 3.0,
         minInterruptionDuration: 0.3,
         minInterruptionWords: 1,
       },
     })
-    log(`step 3: AgentSession created`)
+    log(`step 3: AgentSession created (with turn detector)`)
 
     // ── Metrics + error logging ──
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
-      if (m.type === 'eou_metrics') {
-        turnTracker.markEOU(m.endOfUtteranceDelayMs)
+      if (m.type === 'vad_metrics') {
+        turnTracker.markVADSilence()
+      } else if (m.type === 'eou_metrics') {
+        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs)
       } else if (m.type === 'llm_metrics') {
         turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {

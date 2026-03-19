@@ -1,4 +1,17 @@
-import type { LearnerProfile, UsageInfo, SubscriptionInfo } from '@lingle/shared/types'
+import type { UsageInfo, SubscriptionInfo } from '@lingle/shared/types'
+
+// Profile response shape from /api/profile GET
+interface ProfileResponse {
+  targetLanguage: string | null
+  nativeLanguage: string | null
+  sessionLengthMinutes: number
+  correctionStyle: string
+  lessonStylePreference: string
+  totalLessons: number
+  cefrGrammar: number | null
+  cefrFluency: number | null
+  sessionsCompleted: number
+}
 
 export class UsageLimitError extends Error {
   usedSeconds: number
@@ -83,20 +96,25 @@ class LingleApiClient {
 
   // Conversation
   conversationPlan = (prompt?: string, mode?: string, inputMode?: string) =>
-    this.request<{ _sessionId: string; sessionFocus: string; plan: Record<string, unknown>; remainingSeconds?: number; userPlan?: string }>('/conversation/plan', {
+    this.request<{ _sessionId: string; sessionFocus: string; plan: Record<string, unknown>; remainingSeconds?: number; userPlan?: string; agentMetadata?: Record<string, unknown> }>('/conversation/plan', {
       method: 'POST',
       body: JSON.stringify({ ...(prompt ? { prompt } : {}), ...(mode ? { mode } : {}), ...(inputMode ? { inputMode } : {}) }),
     })
   conversationEnd = (sessionId: string) =>
-    this.request<null>('/conversation/end', {
+    this.request<{ cefrDelta?: { grammarDelta: number; fluencyDelta: number }; errorsCount?: number; correctionsCount?: number } | null>('/conversation/end', {
       method: 'POST',
       body: JSON.stringify({ sessionId }),
     })
+  onboardingPlan = (targetLanguage: string, nativeLanguage: string) =>
+    this.request<{ _sessionId: string; sessionFocus: string; plan: Record<string, unknown>; agentMetadata?: Record<string, unknown>; basePrompt: string }>('/conversation/onboarding-plan', {
+      method: 'POST',
+      body: JSON.stringify({ targetLanguage, nativeLanguage }),
+    })
 
   // Profile
-  profileGet = () => this.request<LearnerProfile>('/profile')
-  profilePatch = (updates: Partial<LearnerProfile>) =>
-    this.request<LearnerProfile>('/profile', {
+  profileGet = () => this.request<ProfileResponse>('/profile')
+  profilePatch = (updates: Partial<ProfileResponse>) =>
+    this.request<ProfileResponse>('/profile', {
       method: 'PATCH',
       body: JSON.stringify(updates),
     })

@@ -10,6 +10,6 @@ export const GET = withAuth(async (_request, { userId }) => {
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,
-    onboardingCompleted: user.onboardingCompleted,
+    onboardingCompleted: user.onboardingComplete,
   })
 })

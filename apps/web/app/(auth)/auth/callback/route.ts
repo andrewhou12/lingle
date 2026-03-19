@@ -31,10 +31,10 @@ export async function GET(request: Request) {
       // Check if user has completed onboarding
       const user = await prisma.user.findUnique({
         where: { id: data.user.id },
-        select: { onboardingCompleted: true },
+        select: { onboardingComplete: true },
       })
 
-      if (!user?.onboardingCompleted) {
+      if (!user?.onboardingComplete) {
         return NextResponse.redirect(`${origin}/conversation/voice/test`)
       }
 

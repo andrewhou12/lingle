@@ -2,37 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeftIcon, GlobeAltIcon, AcademicCapIcon, FlagIcon, LanguageIcon } from '@heroicons/react/24/outline'
-import type { LearnerProfile } from '@lingle/shared/types'
+import { ArrowLeftIcon, GlobeAltIcon, LanguageIcon } from '@heroicons/react/24/outline'
 import { api } from '@/lib/api'
-import { useLanguage } from '@/hooks/use-language'
 
-const DIFFICULTY_LEVELS = [
-  { level: 1, label: 'Absolute Beginner (A1)', shortDescription: 'No prior knowledge' },
-  { level: 2, label: 'Beginner (A1-A2)', shortDescription: 'Basic words and phrases' },
-  { level: 3, label: 'Elementary (A2)', shortDescription: 'Simple conversations' },
-  { level: 4, label: 'Pre-Intermediate (A2-B1)', shortDescription: 'Everyday topics' },
-  { level: 5, label: 'Intermediate (B1)', shortDescription: 'Most situations' },
-  { level: 6, label: 'Upper Intermediate (B1-B2)', shortDescription: 'Complex discussions' },
-  { level: 7, label: 'Advanced (B2)', shortDescription: 'Fluent conversations' },
-  { level: 8, label: 'Upper Advanced (B2-C1)', shortDescription: 'Nuanced expression' },
-  { level: 9, label: 'Near-Native (C1)', shortDescription: 'Professional level' },
-  { level: 10, label: 'Native-Level (C2)', shortDescription: 'Full mastery' },
-]
-
-const DAILY_GOAL_OPTIONS = [
-  { minutes: 10, label: '10 min', description: 'Light' },
-  { minutes: 20, label: '20 min', description: 'Moderate' },
-  { minutes: 30, label: '30 min', description: 'Standard' },
-  { minutes: 60, label: '60 min', description: 'Intensive' },
-]
+type ProfileData = Awaited<ReturnType<typeof api.profileGet>>
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { targetLanguage } = useLanguage()
-  const [profile, setProfile] = useState<LearnerProfile | null>(() => api.peekCache<LearnerProfile>('/profile') ?? null)
-  const [isLoading, setIsLoading] = useState(() => !api.peekCache('/profile'))
-  const [isSaving, setIsSaving] = useState(false)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     setIsLoading(true)
@@ -40,35 +18,7 @@ export default function SettingsPage() {
       setProfile(p)
       setIsLoading(false)
     })
-  }, [targetLanguage])
-
-  const handleDifficultyChange = async (level: number) => {
-    if (!profile || isSaving) return
-    setIsSaving(true)
-    setProfile({ ...profile, difficultyLevel: level })
-    try {
-      const updated = await api.profilePatch({ difficultyLevel: level })
-      setProfile(updated)
-    } catch (err) {
-      console.error('Failed to update difficulty:', err)
-      setProfile(profile)
-    }
-    setIsSaving(false)
-  }
-
-  const handleGoalChange = async (minutes: number) => {
-    if (!profile || isSaving) return
-    setIsSaving(true)
-    setProfile({ ...profile, dailyGoalMinutes: minutes })
-    try {
-      const updated = await api.profilePatch({ dailyGoalMinutes: minutes })
-      setProfile(updated)
-    } catch (err) {
-      console.error('Failed to update daily goal:', err)
-      setProfile(profile)
-    }
-    setIsSaving(false)
-  }
+  }, [])
 
   if (isLoading || !profile) {
     return (
@@ -98,85 +48,40 @@ export default function SettingsPage() {
 
       <div className="rounded-xl border border-border bg-bg mb-6">
         <div className="flex flex-col">
-          <SettingsRow icon={<LanguageIcon className="w-4 h-4" />} label="Target Language" value={profile.targetLanguage} />
+          <SettingsRow icon={<LanguageIcon className="w-4 h-4" />} label="Target Language" value={profile.targetLanguage ?? '—'} />
           <hr className="border-t border-border m-0" />
-          <SettingsRow icon={<GlobeAltIcon className="w-4 h-4" />} label="Native Language" value={profile.nativeLanguage} />
+          <SettingsRow icon={<GlobeAltIcon className="w-4 h-4" />} label="Native Language" value={profile.nativeLanguage ?? '—'} />
         </div>
       </div>
 
       <span className="text-[11px] font-medium text-text-muted block mb-3">
-        Difficulty
+        Session
       </span>
 
       <div className="rounded-xl border border-border bg-bg mb-6">
-        <div className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
-              <AcademicCapIcon className="w-4 h-4" />
-            </div>
-            <span className="text-[13px] font-medium">Level</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            {DIFFICULTY_LEVELS.map((level) => (
-              <button
-                key={level.level}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left cursor-pointer transition-all ${
-                  profile.difficultyLevel === level.level
-                    ? 'border-accent-brand bg-bg-hover'
-                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
-                }`}
-                onClick={() => handleDifficultyChange(level.level)}
-                disabled={isSaving}
-              >
-                <span className={`w-6 h-6 rounded-full text-[12px] font-semibold flex items-center justify-center shrink-0 ${
-                  profile.difficultyLevel === level.level
-                    ? 'bg-accent-brand text-white'
-                    : 'bg-bg-secondary text-text-secondary'
-                }`}>
-                  {level.level}
-                </span>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-[13px] font-medium text-text-primary">{level.label}</span>
-                  <span className="text-[11px] text-text-muted leading-snug">{level.shortDescription}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col">
+          <SettingsRow icon={<span className="text-[12px]">⏱</span>} label="Session Length" value={`${profile.sessionLengthMinutes} min`} />
+          <hr className="border-t border-border m-0" />
+          <SettingsRow icon={<span className="text-[12px]">✏️</span>} label="Correction Style" value={profile.correctionStyle} />
+          <hr className="border-t border-border m-0" />
+          <SettingsRow icon={<span className="text-[12px]">📊</span>} label="Sessions Completed" value={String(profile.sessionsCompleted)} />
         </div>
       </div>
 
-      <span className="text-[11px] font-medium text-text-muted block mb-3">
-        Daily Goal
-      </span>
-
-      <div className="rounded-xl border border-border bg-bg mb-6">
-        <div className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
-              <FlagIcon className="w-4 h-4" />
+      {profile.cefrGrammar != null && (
+        <>
+          <span className="text-[11px] font-medium text-text-muted block mb-3">
+            CEFR Scores
+          </span>
+          <div className="rounded-xl border border-border bg-bg mb-6">
+            <div className="flex flex-col">
+              <SettingsRow icon={<span className="text-[12px]">📝</span>} label="Grammar" value={profile.cefrGrammar.toFixed(1)} />
+              <hr className="border-t border-border m-0" />
+              <SettingsRow icon={<span className="text-[12px]">🗣</span>} label="Fluency" value={(profile.cefrFluency ?? 0).toFixed(1)} />
             </div>
-            <span className="text-[13px] font-medium">Practice time per day</span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            {DAILY_GOAL_OPTIONS.map((option) => (
-              <button
-                key={option.minutes}
-                className={`px-3 py-2.5 rounded-lg border text-center cursor-pointer transition-all ${
-                  profile.dailyGoalMinutes === option.minutes
-                    ? 'border-accent-brand bg-bg-hover'
-                    : 'border-border-subtle bg-bg-pure hover:border-border-strong hover:bg-bg-hover'
-                }`}
-                onClick={() => handleGoalChange(option.minutes)}
-                disabled={isSaving}
-              >
-                <div className="text-[15px] font-semibold text-text-primary">{option.label}</div>
-                <div className="text-[11px] text-text-muted">{option.description}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
+        </>
+      )}
     </div>
   )
 }

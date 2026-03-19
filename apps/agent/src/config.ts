@@ -116,6 +116,30 @@ export function resolveAgentTtsProvider(metadata: AgentMetadata): AgentTtsProvid
   return 'cartesia'
 }
 
+/** Learner model summary passed to the agent for system prompt construction */
+export interface LearnerModelSummary {
+  cefrGrammar: number
+  cefrFluency: number
+  weakAreas?: string[]
+  sessionsCompleted: number
+}
+
+/** Error pattern summary for the agent prompt */
+export interface ErrorPatternSummary {
+  rule: string
+  occurrenceCount: number
+  sessionCount: number
+}
+
+/** Lesson plan passed from the web app to the agent */
+export interface AgentLessonPlan {
+  warmupTopic: string
+  mainActivity: string
+  targetVocab?: string[]
+  grammarFocus?: string[]
+  reviewPatterns?: string[]
+}
+
 /** Agent metadata passed from the web app via LiveKit job metadata */
 export interface AgentMetadata {
   sessionId: string
@@ -130,6 +154,13 @@ export interface AgentMetadata {
   analyzeEndpoint?: string
   ttsProvider?: AgentTtsProvider
   sttProvider?: AgentSttProvider
+  // Extended fields for full session mode
+  learnerModel?: LearnerModelSummary
+  errorPatterns?: ErrorPatternSummary[]
+  lessonPlan?: AgentLessonPlan
+  correctionStyle?: 'recast' | 'explicit' | 'none'
+  personalNotes?: string
+  memories?: string
 }
 
 export function parseAgentMetadata(raw: string | undefined): AgentMetadata {

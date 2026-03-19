@@ -8,15 +8,13 @@ async function main() {
   console.log('Seeding database...\n')
 
   // Clear existing data (order matters for foreign keys)
-  await prisma.itemContextLog.deleteMany()
-  await prisma.reviewEvent.deleteMany()
-  await prisma.lexicalItem.deleteMany()
-  await prisma.grammarItem.deleteMany()
-  await prisma.conversationSession.deleteMany()
-  await prisma.tomInference.deleteMany()
-  await prisma.curriculumItem.deleteMany()
-  await prisma.pragmaticProfile.deleteMany()
-  await prisma.learnerProfile.deleteMany()
+  await prisma.errorLog.deleteMany()
+  await prisma.errorPattern.deleteMany()
+  await prisma.vocabularyItem.deleteMany()
+  await prisma.lesson.deleteMany()
+  await prisma.learnerModel.deleteMany()
+  await prisma.dailyUsage.deleteMany()
+  await prisma.subscription.deleteMany()
   await prisma.user.deleteMany()
 
   // Create test user
@@ -25,20 +23,27 @@ async function main() {
       id: TEST_USER_ID,
       email: 'test@lingle.ai',
       name: 'Test Learner',
-      onboardingCompleted: true,
+      onboardingComplete: true,
+      targetLanguage: 'ja',
+      nativeLanguage: 'en',
+      correctionStyle: 'recast',
+      lessonStylePreference: 'conversational',
+      sessionLengthMinutes: 30,
+      sessionsPerWeek: 2,
     },
   })
   console.log(`  User created (id=${user.id}, ${user.email})`)
 
-  // Create learner profile
-  const profile = await prisma.learnerProfile.create({
+  // Create learner model
+  const learnerModel = await prisma.learnerModel.create({
     data: {
       userId: TEST_USER_ID,
-      targetLanguage: 'Japanese',
-      nativeLanguage: 'English',
+      cefrGrammar: 2.0,
+      cefrFluency: 2.0,
+      sessionsCompleted: 0,
     },
   })
-  console.log(`  LearnerProfile created (id=${profile.id}, ${profile.targetLanguage})`)
+  console.log(`  LearnerModel created (id=${learnerModel.id}, grammar=${learnerModel.cefrGrammar}, fluency=${learnerModel.cefrFluency})`)
 
   console.log(`\nSeed complete!`)
 }

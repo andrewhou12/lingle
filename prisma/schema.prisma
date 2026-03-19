@@ -9,98 +9,245 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── Core User ──────────────────────────────────────────────────────────────
+
 model User {
-  id                   String               @id // Supabase auth user ID
-  email                String?
-  name                 String?
-  avatarUrl            String?
-  onboardingCompleted  Boolean              @default(false)
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  id                    String   @id // Supabase auth user ID
+  email                 String?
+  name                  String?
+  avatarUrl             String?  @map("avatar_url")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
-  learnerProfile       LearnerProfile?
-  conversationSessions ConversationSession[]
-  subscription         Subscription?
-  dailyUsage           DailyUsage[]
+  // Program configuration (set during onboarding)
+  targetLanguage        String?  @map("target_language")
+  nativeLanguage        String?  @map("native_language")
+  programTrack          String   @default("conversation_fluency") @map("program_track")
+  sessionLengthMinutes  Int      @default(30) @map("session_length_minutes")
+  sessionsPerWeek       Int      @default(2) @map("sessions_per_week")
+  onboardingComplete    Boolean  @default(false) @map("onboarding_complete")
+
+  // Pedagogical preferences (set during onboarding)
+  correctionStyle       String   @default("recast") @map("correction_style")
+  lessonStylePreference String   @default("conversational") @map("lesson_style_preference")
+  strugglePatience      Int      @default(6) @map("struggle_patience_seconds")
+  topicFocusPreference  String   @default("focused") @map("topic_focus_preference")
+  nativeLanguageSupport Boolean  @default(true) @map("native_language_support")
+
+  personalNotes         String   @default("") @map("personal_notes")
+  totalLessons          Int      @default(0) @map("total_lessons")
+  totalMinutes          Int      @default(0) @map("total_minutes")
+
+  // Relations
+  learnerModel  LearnerModel?
+  lessons       Lesson[]
+  errorLogs     ErrorLog[]
+  subscription  Subscription?
+  dailyUsage    DailyUsage[]
+
+  @@map("users")
 }
 
-model LearnerProfile {
-  id                      Int      @id @default(autoincrement())
-  userId                  String   @unique
-  user                    User     @relation(fields: [userId], references: [id])
-  targetLanguage          String
-  nativeLanguage          String
-  selfReportedLevel       String   @default("beginner")
-  learningGoals           String[] @default([])
-  dailyNewItemLimit       Int      @default(10)
-  targetRetention         Float    @default(0.90)
-  dailyGoalMinutes        Int      @default(30)
-  difficultyLevel         Int      @default(2)
-  computedLevel           String   @default("A1")
-  comprehensionCeiling    String   @default("A1")
-  productionCeiling       String   @default("A1")
-  readingLevel            Float    @default(0)
-  listeningLevel          Float    @default(0)
-  speakingLevel           Float    @default(0)
-  writingLevel            Float    @default(0)
-  totalSessions           Int      @default(0)
-  totalReviewEvents       Int      @default(0)
-  currentStreak           Int      @default(0)
-  longestStreak           Int      @default(0)
-  lastActiveDate          DateTime?
-  perLanguageSettings     Json     @default("{}")
-  errorPatternSummary     Json     @default("{}")
-  avoidancePatternSummary Json     @default("{}")
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+// ─── Learner Model ──────────────────────────────────────────────────────────
+
+model LearnerModel {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @unique @map("user_id")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // CEFR sub-scores — decimal 1.0–6.0
+  // A1=1.0, A2=2.0, B1=3.0, B2=4.0, C1=5.0, C2=6.0
+  cefrGrammar Float @default(2.0) @map("cefr_grammar")
+  cefrFluency Float @default(2.0) @map("cefr_fluency")
+
+  // Aggregate session signals
+  avgResponseLatencySec Float @default(3.0) @map("avg_response_latency_sec")
+  sessionsCompleted     Int   @default(0) @map("sessions_completed")
+
+  // Longitudinal analysis fields
+  speechProfile          String? @map("speech_profile")
+  priorityFocus          String? @map("priority_focus")
+  errorDensityTrend      String? @map("error_density_trend") // improving | stable | declining | insufficient_data
+  errorDensityPer100Words Float? @map("error_density_per_100_words")
+
+  // Domain rotation tracker
+  domainsVisited String[] @default([]) @map("domains_visited")
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id])
+  errorPatterns ErrorPattern[]
+  vocabItems    VocabularyItem[]
+
+  @@map("learner_models")
 }
 
-model ConversationSession {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  mode            String   @default("conversation")
-  inputMode       String?
-  targetLanguage  String
-  timestamp       DateTime @default(now())
-  durationSeconds Int?
-  transcript      Json
-  targetsPlanned  Json
-  targetsHit      Json
-  errorsLogged    Json
-  avoidanceEvents Json
-  sessionPlan     Json
-  systemPrompt    String?
-  cachedAnalysis  Json?
+// ─── Error Patterns (cross-session) ─────────────────────────────────────────
+
+model ErrorPattern {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  learnerModelId  String   @map("learner_model_id") @db.Uuid
+  userId          String   @map("user_id")
+  rule            String   // e.g. "preterite_vs_imperfect", "particle_wa_vs_ga"
+  language        String   // ISO 639-1: "ja", "es", "fr", etc.
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  lastSeenAt      DateTime @map("last_seen_at")
+  sessionsSeen    String[] @default([]) @map("sessions_seen") // lesson IDs
+
+  learnerModel LearnerModel @relation(fields: [learnerModelId], references: [id])
+
+  @@unique([userId, rule])
+  @@index([userId, language])
+  @@map("error_patterns")
+}
+
+// ─── Vocabulary Items (per-learner) ─────────────────────────────────────────
+
+model VocabularyItem {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  learnerModelId String    @map("learner_model_id") @db.Uuid
+  word           String
+  language       String    // ISO 639-1
+
+  // State machine: new → seen → in_progress → mastered
+  state          String    @default("new")
+  seenCount      Int       @default(0) @map("seen_count")
+  spontaneousUses Int      @default(0) @map("spontaneous_uses")
+  lastSeenAt     DateTime? @map("last_seen_at")
+
+  learnerModel LearnerModel @relation(fields: [learnerModelId], references: [id])
+
+  @@unique([learnerModelId, word, language])
+  @@map("vocabulary_items")
+}
+
+// ─── Lessons ────────────────────────────────────────────────────────────────
+
+model Lesson {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  durationMinutes Int?      @map("duration_minutes")
+  targetLanguage  String    @map("target_language")
+  lessonGoal      String?   @map("lesson_goal")
+  phasesCompleted String[]  @default([]) @map("phases_completed")
+  topicsCovered   String[]  @default([]) @map("topics_covered")
+  vocabIntroduced String[]  @default([]) @map("vocab_introduced")
+  errorsCount     Int       @default(0) @map("errors_count")
+  difficultyFinal Int?      @map("difficulty_final")
+  transcriptPath  String?   @map("transcript_path")
+  summary         String?
+  correctionsDoc  String?   @map("corrections_doc")
+  lessonPlan      Json?     @map("lesson_plan")
+  systemPrompt    String?   @map("system_prompt")
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id])
+  errorLogs ErrorLog[]
 
   @@index([userId])
-  @@index([userId, targetLanguage])
+  @@map("lessons")
 }
+
+// ─── Error Logs (per-error, per-lesson) ─────────────────────────────────────
+
+model ErrorLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id")
+  lessonId   String   @map("lesson_id") @db.Uuid
+  loggedAt   DateTime @default(now()) @map("logged_at")
+  errorType  String   @map("error_type") // grammar | vocab | pronunciation | fluency
+  phrase     String
+  correction String
+  rule       String?
+  reviewed   Boolean  @default(false)
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@index([userId])
+  @@index([rule])
+  @@map("error_logs")
+}
+
+// ─── Curriculum Backbone ────────────────────────────────────────────────────
+
+model CurriculumVocab {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  language      String  // ISO 639-1
+  word          String
+  cefrLevel     String  @map("cefr_level") // "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
+  frequencyRank Int     @map("frequency_rank") // 1 = most common in corpus
+  domain        String? // "food" | "travel" | "work" | "health" | "relationships" | etc.
+
+  @@unique([language, word])
+  @@index([language, cefrLevel])
+  @@index([language, domain])
+  @@map("curriculum_vocab")
+}
+
+model CurriculumGrammar {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  language         String   // ISO 639-1
+  pattern          String   // e.g. "te_form", "subjunctive_present"
+  displayName      String   @map("display_name")
+  cefrLevel        String   @map("cefr_level")
+  sequencePosition Int      @map("sequence_position")
+  prerequisites    String[] // patterns that should be mastered before introducing this
+
+  @@unique([language, pattern])
+  @@index([language, cefrLevel])
+  @@map("curriculum_grammar")
+}
+
+// ─── Episodic Memory ───────────────────────────────────────────────────────
+// Stores extracted facts from conversations for cross-session continuity.
+// Interface mirrors Mem0 so migration to pgvector/Mem0 is trivial.
+
+model Memory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id")
+  content     String   // The fact or memory
+  memoryType  String   @map("memory_type") // personal | preference | goal | context | achievement | recurring_struggle
+  source      String   @default("conversation") // conversation | onboarding | manual
+  lessonId    String?  @map("lesson_id") @db.Uuid // which lesson this was extracted from
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([userId, memoryType])
+  @@map("memories")
+}
+
+// ─── Billing (kept from existing schema) ────────────────────────────────────
 
 model Subscription {
   id                   Int       @id @default(autoincrement())
-  userId               String    @unique
+  userId               String    @unique @map("user_id")
   user                 User      @relation(fields: [userId], references: [id])
   plan                 String    @default("free") // "free" | "pro"
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?   @unique
-  stripePriceId        String?
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
+  stripePriceId        String?   @map("stripe_price_id")
   status               String    @default("active") // "active" | "canceled" | "past_due"
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean   @default(false)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  currentPeriodStart   DateTime? @map("current_period_start")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("subscriptions")
 }
 
 model DailyUsage {
   id                  Int      @id @default(autoincrement())
-  userId              String
+  userId              String   @map("user_id")
   user                User     @relation(fields: [userId], references: [id])
   date                DateTime @db.Date
-  conversationSeconds Int      @default(0)
-  updatedAt           DateTime @updatedAt
+  conversationSeconds Int      @default(0) @map("conversation_seconds")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, date])
   @@index([userId, date])
+  @@map("daily_usage")
 }

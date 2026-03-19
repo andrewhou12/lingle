@@ -92,7 +92,7 @@ function UsageBanner() {
     api.usageGet().then(setUsage).catch(() => {})
     api.profileGet().then((p) => {
       if (p) {
-        setGoalMinutes(p.dailyGoalMinutes ?? 30)
+        setGoalMinutes(p.sessionLengthMinutes ?? 30)
       }
     }).catch(() => {})
   }, [targetLanguage])

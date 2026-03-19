@@ -9,6 +9,7 @@ import { toAgentState } from './voice-aura-orb'
 import { LingleControlBar } from './lingle-control-bar'
 import { LingleChatTranscript, type LingleTranscriptEntry } from './lingle-chat-transcript'
 import { VoiceLiveSubtitles } from './voice-live-subtitles'
+import { Whiteboard } from './whiteboard'
 import { cn } from '@/lib/utils'
 
 const TEST_PROMPTS: Record<string, string> = {
@@ -87,6 +88,11 @@ export function VoiceTestView() {
 
   return (
     <div className="fixed inset-0 bg-bg flex flex-col items-center justify-between z-50">
+      <Whiteboard
+        isOpen={voice.whiteboard.isOpen}
+        onClose={() => voice.whiteboard.setIsOpen(false)}
+        content={voice.whiteboard.content}
+      />
       {voice.connectedRoom && (
         <LiveKitBridge
           room={voice.connectedRoom}

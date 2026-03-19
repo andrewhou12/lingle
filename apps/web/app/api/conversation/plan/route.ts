@@ -8,6 +8,13 @@ export const maxDuration = 60
 import { withUsageCheck, getUsageInfo } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
 import { getLanguageById } from '@/lib/languages'
+import {
+  getVocabTargets,
+  getNextGrammarFocus,
+  selectNextDomain,
+  getGrammarStructuresInScope,
+} from '@/lib/curriculum'
+import { searchMemories } from '@/lib/memory'
 import type { Prisma } from '@prisma/client'
 
 // --- Plan schema ---
@@ -33,20 +40,17 @@ function buildConversationPlanSchema(registerOptions: string) {
 
 // --- Helpers ---
 
-function getDifficultyLabel(level: number): string {
-  const labels: Record<number, string> = {
-    1: 'Absolute Beginner (A1)',
-    2: 'Beginner (A1-A2)',
-    3: 'Elementary (A2)',
-    4: 'Pre-Intermediate (A2-B1)',
-    5: 'Intermediate (B1)',
-    6: 'Upper Intermediate (B1-B2)',
-    7: 'Advanced (B2)',
-    8: 'Upper Advanced (B2-C1)',
-    9: 'Near-Native (C1)',
-    10: 'Native-Level (C2)',
-  }
-  return labels[level] || `Level ${level}`
+function getCefrLabel(score: number): string {
+  if (score < 1.5) return 'Absolute Beginner (A1)'
+  if (score < 2.5) return 'Beginner (A1-A2)'
+  if (score < 3.0) return 'Elementary (A2)'
+  if (score < 3.5) return 'Pre-Intermediate (A2-B1)'
+  if (score < 4.0) return 'Intermediate (B1)'
+  if (score < 4.5) return 'Upper Intermediate (B1-B2)'
+  if (score < 5.0) return 'Advanced (B2)'
+  if (score < 5.5) return 'Upper Advanced (B2-C1)'
+  if (score < 6.0) return 'Near-Native (C1)'
+  return 'Native-Level (C2)'
 }
 
 type SessionPlan = Record<string, unknown>
@@ -75,26 +79,62 @@ function getFallbackPlan(sessionFocus: string): SessionPlan {
 export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   let prompt: string | undefined
   let mode: string | undefined
-  let inputMode: string | undefined
   try {
     const body = await request.json()
     if (body.prompt && typeof body.prompt === 'string') prompt = body.prompt
     if (body.mode && typeof body.mode === 'string') mode = body.mode
-    if (body.inputMode && typeof body.inputMode === 'string') inputMode = body.inputMode
   } catch {
     // No body or invalid JSON
   }
 
-  const profile = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } })
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    include: {
+      learnerModel: {
+        include: {
+          errorPatterns: {
+            orderBy: { occurrenceCount: 'desc' },
+            take: 10,
+          },
+        },
+      },
+    },
+  })
+
+  const targetLanguage = user.targetLanguage ?? 'ja'
+  const nativeLanguage = user.nativeLanguage ?? 'en'
+  const cefrGrammar = user.learnerModel?.cefrGrammar ?? 2.0
+  const cefrFluency = user.learnerModel?.cefrFluency ?? 2.0
 
   const sessionFocus = prompt || 'Free conversation'
   const resolvedMode = mode || 'conversation'
-  const levelLabel = getDifficultyLabel(profile.difficultyLevel)
+  const levelLabel = getCefrLabel(cefrGrammar)
 
-  const langConfig = getLanguageById(profile.targetLanguage)
+  // ── Curriculum-driven planning ──
+
+  const [vocabTargets, grammarFocus, grammarInScope, memoriesText] = await Promise.all([
+    getVocabTargets(userId, targetLanguage, cefrGrammar, 5),
+    getNextGrammarFocus(userId, targetLanguage, cefrGrammar),
+    getGrammarStructuresInScope(targetLanguage, cefrGrammar),
+    searchMemories(userId, sessionFocus, 10),
+  ])
+
+  const domain = selectNextDomain(user.learnerModel?.domainsVisited ?? [])
+
+  // Error patterns for review
+  const errorPatterns = (user.learnerModel?.errorPatterns ?? []).map((ep) => ({
+    rule: ep.rule,
+    occurrenceCount: ep.occurrenceCount,
+    sessionCount: ep.sessionsSeen.length,
+  }))
+  const reviewPatterns = errorPatterns.slice(0, 3).map((ep) => ep.rule)
+
+  // ── Generate conversation plan ──
+
+  const langConfig = getLanguageById(targetLanguage)
   const registerOpts = langConfig?.registerOptions || '"casual", "polite", or "mixed"'
-
   const schema = buildConversationPlanSchema(registerOpts)
+
   let plan: SessionPlan
   try {
     const planPrompt = `You are a session planner for a language learning app.
@@ -102,18 +142,23 @@ export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
 User prompt: "${sessionFocus}"
 Mode: ${resolvedMode}
 Difficulty: ${levelLabel}
-Target language: ${profile.targetLanguage}
-Native language: ${profile.nativeLanguage}
+Target language: ${targetLanguage}
+Native language: ${nativeLanguage}
+Domain focus: ${domain}
+
+Target vocabulary to work into conversation: ${vocabTargets.join(', ') || 'none'}
+Grammar focus: ${grammarFocus?.displayName || 'general practice'}
+Error patterns to address: ${reviewPatterns.join(', ') || 'none'}
 
 Generate a scene card for a natural conversation:
-- topic: what the conversation is about (be specific and engaging)
+- topic: what the conversation is about (be specific and engaging, incorporate the domain)
 - persona: { relationship, personality } — who the AI is playing
 - register: ${registerOpts}
 - tone: the emotional quality
 - setting: where the conversation takes place (optional)
 - sections: 3-6 ordered sections forming a conversation skeleton
 
-Make the plan specific to the user's prompt.`
+Make the plan specific to the user's prompt. Naturally incorporate opportunities for the target vocabulary and grammar.`
 
     const { object } = await generateObject({
       model: anthropic('claude-haiku-4-5-20251001'),
@@ -126,30 +171,82 @@ Make the plan specific to the user's prompt.`
     plan = getFallbackPlan(sessionFocus)
   }
 
-  const systemPrompt = `You are a ${profile.targetLanguage} conversation partner at ${levelLabel} level.`
+  // Attach curriculum data to plan for the agent
+  plan.targetVocab = vocabTargets
+  plan.grammarFocus = grammarFocus ? [grammarFocus.displayName] : []
+  plan.reviewPatterns = reviewPatterns
 
-  const [session, , { remainingSeconds, plan: userPlan }] = await Promise.all([
-    prisma.conversationSession.create({
+  const systemPrompt = `You are a ${targetLanguage} conversation partner at ${levelLabel} level.`
+
+  // ── Create Lesson + update user ──
+
+  const [lesson, , { remainingSeconds, plan: userPlan }] = await Promise.all([
+    prisma.lesson.create({
       data: {
         userId,
-        mode: resolvedMode,
-        inputMode: inputMode || null,
-        targetLanguage: profile.targetLanguage,
-        transcript: [],
-        targetsPlanned: {},
-        targetsHit: [],
-        errorsLogged: [],
-        avoidanceEvents: [],
-        sessionPlan: plan as unknown as Prisma.InputJsonValue,
+        targetLanguage,
+        lessonGoal: sessionFocus,
+        lessonPlan: plan as unknown as Prisma.InputJsonValue,
         systemPrompt,
       },
     }),
-    prisma.learnerProfile.update({
-      where: { userId },
-      data: { totalSessions: { increment: 1 } },
+    prisma.user.update({
+      where: { id: userId },
+      data: { totalLessons: { increment: 1 } },
     }),
     getUsageInfo(userId),
   ])
 
-  return NextResponse.json({ _sessionId: session.id, sessionFocus, plan, remainingSeconds, userPlan })
+  // Update domain rotation
+  if (user.learnerModel) {
+    const visited = [...(user.learnerModel.domainsVisited ?? []), domain].slice(-10)
+    prisma.learnerModel.update({
+      where: { id: user.learnerModel.id },
+      data: { domainsVisited: visited },
+    }).catch(() => {}) // fire-and-forget
+  }
+
+  // ── Build expanded metadata for the agent ──
+
+  const agentMetadata = {
+    // Learner model summary
+    learnerModel: user.learnerModel
+      ? {
+          cefrGrammar: user.learnerModel.cefrGrammar,
+          cefrFluency: user.learnerModel.cefrFluency,
+          sessionsCompleted: user.learnerModel.sessionsCompleted,
+          weakAreas: user.learnerModel.priorityFocus
+            ? [user.learnerModel.priorityFocus]
+            : undefined,
+        }
+      : undefined,
+    // Error patterns
+    errorPatterns: errorPatterns.length > 0 ? errorPatterns : undefined,
+    // Lesson plan for system prompt
+    lessonPlan: {
+      warmupTopic: (plan.sections as { description: string }[])?.[0]?.description || 'greeting',
+      mainActivity: (plan.topic as string) || sessionFocus,
+      targetVocab: vocabTargets,
+      grammarFocus: grammarFocus ? [grammarFocus.displayName] : [],
+      reviewPatterns,
+    },
+    // Difficulty constraints
+    difficultyConstraints: {
+      grammarStructuresInScope: grammarInScope.slice(0, 15),
+    },
+    // User preferences
+    correctionStyle: user.correctionStyle || 'recast',
+    personalNotes: user.personalNotes || undefined,
+    // Episodic memories (Slot 4)
+    memories: memoriesText || undefined,
+  }
+
+  return NextResponse.json({
+    _sessionId: lesson.id,
+    sessionFocus,
+    plan,
+    remainingSeconds,
+    userPlan,
+    agentMetadata,
+  })
 }))
