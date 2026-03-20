@@ -1,6 +1,7 @@
 /**
  * Voice/language configuration for the LiveKit agent worker.
  */
+import type { StructuredLessonPlan } from '@lingle/shared'
 
 /** Supported TTS providers for the LiveKit agent pipeline */
 export type AgentTtsProvider = 'cartesia' | 'rime'
@@ -151,6 +152,8 @@ export interface AgentMetadata {
   // Extended fields for full session mode
   learnerModel?: LearnerModelSummary
   errorPatterns?: ErrorPatternSummary[]
+  structuredPlan?: StructuredLessonPlan
+  /** @deprecated Use structuredPlan instead */
   lessonPlan?: AgentLessonPlan
   correctionStyle?: 'recast' | 'explicit' | 'none'
   personalNotes?: string

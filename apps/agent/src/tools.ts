@@ -20,6 +20,9 @@ import {
   adjustDifficulty as adjustDifficultyState,
   setVocabHomework as setVocabHomeworkState,
   updateSessionState,
+  advanceToNextPhase,
+  appendDeferredTopic,
+  flagForNextSession,
 } from './session-state.js'
 
 /**
@@ -233,23 +236,57 @@ export function buildToolContext(sessionId: string | undefined, sessionMode?: st
       },
     }),
 
-    updateLessonPhase: llm.tool({
+    advancePhase: llm.tool({
       description:
-        'Advance the lesson to the next phase. Phases: warmup → main → review → wrapup. Call when transitioning between lesson segments. Do NOT mention this in your spoken response.',
+        'Advance to the next lesson phase. Call when current phase objectives are met or the SESSION STATE shows SIGNIFICANTLY_OVER time pressure. Do NOT mention this in your spoken response.',
       parameters: {
         type: 'object' as const,
         properties: {
-          phase: {
+          reason: {
             type: 'string',
-            enum: ['warmup', 'main', 'review', 'wrapup'],
-            description: 'The new lesson phase',
+            description: 'Why you are transitioning (e.g. "objectives met", "time pressure")',
           },
         },
-        required: ['phase'],
+        required: ['reason'],
       },
       execute: async (args) => {
-        setLessonPhase(sid, args.phase as 'warmup' | 'main' | 'review' | 'wrapup')
-        console.log(`[tools] updateLessonPhase → ${args.phase}`)
+        advanceToNextPhase(sid)
+        console.log(`[tools] advancePhase: ${args.reason}`)
+        return ''
+      },
+    }),
+
+    deferTopic: llm.tool({
+      description:
+        'Defer a topic to the next session when time runs out or a pivot consumes the allocated time. Do NOT mention this in your spoken response.',
+      parameters: {
+        type: 'object' as const,
+        properties: {
+          topic: { type: 'string', description: 'The topic to defer' },
+          reason: { type: 'string', description: 'Why deferring' },
+        },
+        required: ['topic', 'reason'],
+      },
+      execute: async (args) => {
+        appendDeferredTopic(sid, args.topic)
+        console.log(`[tools] deferTopic: "${args.topic}" — ${args.reason}`)
+        return ''
+      },
+    }),
+
+    flagForNextSession: llm.tool({
+      description:
+        'Flag an error rule for priority review in the next session. Call during debrief for errors that need more practice. Do NOT mention this in your spoken response.',
+      parameters: {
+        type: 'object' as const,
+        properties: {
+          rule: { type: 'string', description: 'The error rule to prioritize next session' },
+        },
+        required: ['rule'],
+      },
+      execute: async (args) => {
+        flagForNextSession(sid, args.rule)
+        console.log(`[tools] flagForNextSession: ${args.rule}`)
         return ''
       },
     }),

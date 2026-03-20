@@ -39,6 +39,21 @@ export async function getSessionState(sessionId: string): Promise<SessionState |
 }
 
 /**
+ * Initialize session state in Redis before the agent connects.
+ * Called at the end of the plan route so that per-turn state injection
+ * and all agent tool mutations have a state object to work with.
+ */
+export async function writeSessionState(state: SessionState): Promise<void> {
+  const r = getRedis()
+  if (!r) return
+  try {
+    await r.set(`session:${state.sessionId}`, JSON.stringify(state), 'EX', 4 * 60 * 60)
+  } catch (err) {
+    console.error('[redis] Failed to write session state:', err)
+  }
+}
+
+/**
  * Delete session state after post-session processing is complete.
  */
 export async function deleteSessionState(sessionId: string): Promise<void> {

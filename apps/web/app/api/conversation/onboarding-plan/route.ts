@@ -3,6 +3,23 @@ import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
 import type { Prisma } from '@prisma/client'
 
+/** Map ISO 639-1 language codes to display names expected by the agent */
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  ja: 'Japanese',
+  en: 'English',
+  ko: 'Korean',
+  zh: 'Mandarin Chinese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+}
+
+function languageDisplayName(code: string): string {
+  return LANGUAGE_DISPLAY_NAMES[code] || code
+}
+
 export const maxDuration = 30
 
 /**
@@ -67,13 +84,15 @@ export const POST = withAuth(async (request, { userId }) => {
   })
 
   // Build the onboarding system prompt
-  const basePrompt = buildOnboardingPrompt(targetLanguage, nativeLanguage)
+  const basePrompt = buildOnboardingPrompt(languageDisplayName(targetLanguage), languageDisplayName(nativeLanguage))
 
   return NextResponse.json({
     _sessionId: lesson.id,
     sessionFocus: 'Onboarding',
     plan,
     agentMetadata: {
+      targetLanguage: languageDisplayName(targetLanguage),
+      nativeLanguage: languageDisplayName(nativeLanguage),
       sessionMode: 'onboarding',
       lessonPlan: {
         warmupTopic: 'Introduction and goals',

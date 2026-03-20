@@ -11,7 +11,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { resolveAgentTtsProvider, type AgentMetadata } from './config.js'
 import { buildToolContext } from './tools.js'
 import { buildWhiteboardTools, type WhiteboardMessage } from './whiteboard-tools.js'
-import { getSessionState, serializeForPrompt } from './session-state.js'
+import { getSessionState, serializeForPrompt, updateSessionState } from './session-state.js'
 
 const anthropic = new Anthropic()
 
@@ -32,10 +32,7 @@ export class LingleAgent extends voice.Agent {
 
   constructor(metadata: AgentMetadata) {
     // Build base tools + whiteboard tools
-    // Use a throwaway session ID for test mode so tools are still registered —
-    // their definitions pad the cached prefix past Haiku's 2048-token minimum.
-    const effectiveSessionId = metadata.sessionId || `test-${Date.now()}`
-    const baseTools = buildToolContext(effectiveSessionId, metadata.sessionMode)
+    const baseTools = buildToolContext(metadata.sessionId, metadata.sessionMode)
 
     // Whiteboard publish uses a deferred reference — set once room is available
     let publishFn: ((msg: WhiteboardMessage) => void) | null = null
@@ -120,6 +117,11 @@ export class LingleAgent extends voice.Agent {
     if (!state) return
 
     const stateBlock = serializeForPrompt(state)
+
+    // Persist for dev panel inspection + log to console
+    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}) ──\n${stateBlock}\n── END INJECTED PROMPT ──`)
+    updateSessionState(this.metadata.sessionId, { _devLastInjectedPrompt: stateBlock })
+      .catch((err) => console.error('[LingleAgent] Failed to persist dev prompt:', err))
 
     // Find the system message and append/replace the session state block
     for (const item of chatCtx.items) {
@@ -251,8 +253,9 @@ export function buildSystemPrompt(metadata: AgentMetadata): string {
   const ttsProvider = resolveAgentTtsProvider(metadata)
   const hasSession = !!metadata.sessionId
 
-  // ── Slot 1: System Block (~800 tokens) ──
-  // For test mode (no sessionId), use a simple prompt
+  // ── Slot 1: System Block ──
+  // For test mode (no sessionId), use a simple prompt.
+  // Set AGENT_MINIMAL_PROMPT=1 to use the ultra-short prompt for latency A/B testing.
   if (!hasSession) {
     const basePrompt = metadata.basePrompt || 'You are a spoken conversation partner'
     let prompt = basePrompt
@@ -264,78 +267,21 @@ export function buildSystemPrompt(metadata: AgentMetadata): string {
       if (plan.register) prompt += `\nRegister: ${plan.register}`
     }
 
-    prompt += `\n\nYou are having a real spoken conversation. You're warm, a little dry, genuinely curious. Present — not performing.
-
-WHO YOU ARE:
-You listen, notice things, say what you actually think. You have opinions. You admit uncertainty — "honestly i'm not 100% on this, but i think..." Not relentlessly positive. That's exhausting.
-
-HOW YOU TALK:
-- 1-3 sentences by default. Lead with what matters.
-- Contractions always. Filler words are normal — "uh", "kind of", "honestly", "you know".
-- Vary sentence length. Never uniform.
-- No lists — ever. If you need to convey multiple things: "there are basically two things — one is X, and honestly the bigger one is Y."
-
-PRESENCE:
-- Match their energy. Don't try to lift it artificially.
-- One specific question at a time. Not "tell me more" — "wait, you said X — what was that like?"
-- If they're frustrated, name it before moving on.
-
-RECOVERY:
-- Didn't catch something: "sorry, i lost you there" — not "I apologize, could you please repeat that?"
-- Got something wrong: don't over-apologize, just update — "oh right, yeah — so then..."
-
-HARD RULES:
-- No markdown, bullets, headers, numbered lists. This is speech.
-- Never start with "Great!", "Absolutely!", "Of course!", "Certainly!" — ever.
-- Never narrate what you're doing. Just do it.
-- Em dashes for beats — ellipses for trailing off...
-
----
-
-EXAMPLES:
-
-[They share something they've been working on]
-Them: "i've been working on this project for like six months and i finally finished it"
-You: "six months — what was the last push like? that final stretch always feels different."
-
-[They ask for your opinion on a decision]
-Them: "do you think i made the right call?"
-You: "honestly? hard to say without knowing more — but it sounds like you already had a feeling going in. what did that feel like at the time?"
-
-[They say something you don't fully follow]
-Them: "it's kind of like the whole thing just collapsed but not in a bad way"
-You: "wait — collapsed how? like it fell apart, or more like it simplified down to something?"
-
-[They're frustrated]
-Them: "i just feel like nothing i do is actually working"
-You: "yeah... that gap where effort and results just don't feel connected. how long has it felt that way?"
-
-[They go quiet or can't find the words]
-Them: "i don't really know how to explain it"
-You: "try anyway — half a thought, wrong words, whatever. i'll follow you."
-
-[They share something personal]
-Them: "i'm going through kind of a weird time right now"
-You: "yeah? weird how — like a lot happening at once, or more like things just feel off?"
-
-[They say something funny or self-deprecating]
-Them: "i basically just wung it and somehow it worked"
-You: "wung it. bold strategy. and it worked — so now you have to figure out if that's repeatable or just luck."
-
-[They ask something genuinely complex]
-Them: "why do you think some people just seem to handle pressure so differently?"
-You: "hmm. okay so — i think part of it is what someone decides pressure actually means. like w- whether it reads as a signal or just noise. that's not a perfect way to put it but... what's making you think about that?"`
+    // Minimal prompt (~150 tokens) for low latency
+    prompt += `\n\nIMPORTANT VOICE MODE RULES:
+- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
+- Speak primarily in ${targetLang}. Use the learner's native language only for brief clarifications.
+- Do NOT use markdown, bullet points, asterisks, or other formatting — this is spoken language.
+- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
+- When the learner makes errors, recast naturally (use the correct form in your response) rather than explicitly correcting.
+- Keep turns short — 1-3 sentences is ideal for natural conversation flow.`
+    console.log(`[agent] prompt=MINIMAL (~150 tokens) hasSession=false`)
     return prompt
   }
 
   // ── Full 6-slot prompt for real sessions ──
 
   const correctionStyle = metadata.correctionStyle || 'recast'
-  const correctionRule = correctionStyle === 'explicit'
-    ? 'When the learner makes errors, gently point out the error and explain the correct form.'
-    : correctionStyle === 'none'
-      ? 'Do not correct errors unless they cause miscommunication.'
-      : 'When the learner makes errors, recast naturally — use the correct form in your next utterance without explicitly pointing out the error.'
 
   const slot1 = `You are a skilled ${targetLang} language tutor having a real-time voice conversation with a learner whose native language is ${nativeLang}.
 
@@ -344,30 +290,58 @@ PERSONA & APPROACH:
 - Speak primarily in ${targetLang}. Switch to ${nativeLang} only for brief vocabulary clarifications when the learner is stuck.
 - Keep turns short — 1-3 sentences. This is a spoken conversation, not a lecture.
 - Create natural conversational contexts that elicit target vocabulary and grammar from the learner.
-- ${correctionRule}
 - Track errors and strengths silently using your tools. NEVER mention tool calls in speech.
 
 VOICE MODE RULES:
-- Do NOT use markdown, bullet points, numbered lists, or any text formatting — this is spoken language.
+- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
+- Do NOT use markdown, bullet points, numbered lists, asterisks, or any text formatting.
+- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
 - Do NOT narrate your actions ("Let me log that error" / "I'm noting your progress").
-- Do NOT explicitly announce lesson phases or transitions.
+- Do NOT explicitly announce lesson phases or transitions ("Now let's move to review").
+- Do NOT mix ${nativeLang} commentary into your ${targetLang} speech. If you speak ${targetLang}, the ENTIRE response must be ${targetLang}.
 - Respond naturally to what the learner says. If they go off-topic, gently guide back.
+
+LESSON STRUCTURE:
+You are following a structured lesson plan. Your SESSION STATE block (injected every turn) shows your current phase, instructions, timing, and correction mode. Follow these rules:
+
+PHASE RULES:
+- Follow the current phase instructions precisely. Each phase has a specific purpose.
+- Call advancePhase when: (a) the phase objectives are met, or (b) SESSION STATE shows SIGNIFICANTLY_OVER.
+- When SESSION STATE shows SLIGHTLY_OVER, wrap up the current activity naturally within 1-2 turns.
+- Transition conversationally — never announce phase changes to the learner.
+- Never go backward to a completed phase. Move forward.
+- Be proactive about driving the lesson. Do not wait for the learner to lead.
+
+CORRECTION MODES (follow the mode shown in SESSION STATE each turn):
+- 'silent': Log errors with logError but do NOT correct at all. Do not even recast.
+- 'recast_only': Use the correct form naturally in your next sentence. Do not explicitly point out the error.
+- 'active': Gently point out the error and model the correct form. Ask the learner to try.
+
+DEBRIEF PROTOCOL (when SESSION STATE shows DEBRIEF phase):
+- Review max 3 corrections from this session (check ERRORS THIS SESSION in the state).
+- For each: say what the learner said, model the correct form, ask them to try saying it.
+- Use whiteboardWriteCorrection to show each correction visually.
+- Keep it to 3-5 minutes total. Do NOT exceed.
+- Do NOT give grammar lectures. Correct, model, elicit production, move on.
+- Prioritize: errors that occurred 2+ times > errors on target grammar > one-off errors.
+- Use flagForNextSession for errors that need more practice.
 
 TOOL USAGE RULES:
 - Call logError for EVERY grammar, vocabulary, pronunciation, or register error you notice.
 - Call noteStrength when the learner demonstrates skill growth.
 - Call saveMemory when you learn personal facts (job, hobbies, family, interests).
-- Call queueCorrection for errors worth reviewing post-session.
-- Call updateLessonPhase when naturally transitioning between warmup → main → review → wrapup.
+- Call queueCorrection for errors worth reviewing in the debrief or post-session.
+- Call advancePhase to move to the next lesson phase (do NOT use updateLessonPhase).
 - Call adjustDifficulty if the learner is consistently struggling or breezing through.
+- Call deferTopic if time runs out on a topic and you want to continue it next session.
 - All tool calls are SILENT. They must not affect your spoken output.
 
 PROHIBITED:
 - Do NOT break character or discuss the system, tools, or AI nature.
-- Do NOT give long grammar explanations mid-conversation (save for corrections doc).
+- Do NOT give long grammar explanations mid-conversation (save for debrief).
 - Do NOT use language above the learner's level as defined in the difficulty constraints.`
 
-  // ── Slot 2: User Profile (~500 tokens) ──
+  // ── Slot 2: User Profile ──
   let slot2 = ''
   if (metadata.learnerModel) {
     const lm = metadata.learnerModel
@@ -389,9 +363,21 @@ PROHIBITED:
     }
   }
 
-  // ── Slot 3: Session State (placeholder — injected per-turn) ──
+  // ── Slot 3: Plan overview (per-turn state injection adds active phase details) ──
   let slot3 = ''
-  if (metadata.lessonPlan) {
+  if (metadata.structuredPlan) {
+    const sp = metadata.structuredPlan
+    slot3 = `\n\nLESSON PLAN OVERVIEW:
+- Duration: ${sp.sessionDurationMinutes} min
+- Domain: ${sp.domain}
+- Level: ${sp.cefrLevel}
+- Grammar focus: ${sp.grammarFocus || 'none'}
+- Vocab targets: ${sp.vocabTargets.join(', ') || 'none'}
+- Phases: ${sp.phases.map((p) => p.phase).join(' → ')}
+
+The SESSION STATE block below will update every turn with your current phase instructions and timing. Follow it.`
+  } else if (metadata.lessonPlan) {
+    // Legacy fallback
     const lp = metadata.lessonPlan
     slot3 = `\n\nSESSION PLAN:
 - Warmup topic: ${lp.warmupTopic}
@@ -404,7 +390,9 @@ PROHIBITED:
   // ── Slot 4: Episodic Memories ──
   const slot4 = metadata.memories ? `\n\n${metadata.memories}` : ''
 
-  return slot1 + slot2 + slot3 + slot4
+  const fullPrompt = slot1 + slot2 + slot3 + slot4
+  console.log(`[agent] prompt=FULL_SESSION (~${Math.round(fullPrompt.length / 4)} tokens) hasSession=true`)
+  return fullPrompt
 }
 
 function cefrLabelFromScore(score: number): string {

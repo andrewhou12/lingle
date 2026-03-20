@@ -85,6 +85,20 @@ export interface SessionState {
   // Compaction bookkeeping
   compactionCount: number
   conversationTokenEstimate: number
+
+  // Structured lesson plan + phase tracking (v1)
+  structuredPlan?: StructuredLessonPlan
+  currentPhaseIndex: number
+  phaseStartedAt: number           // Unix ms when current phase started
+  phasesCompleted: LessonPhaseType[]
+  timePressure: 'on_track' | 'slightly_over' | 'significantly_over'
+
+  // Between-session continuity
+  deferredTopics: string[]
+  nextSessionPriority: string[]    // error rules flagged for next Review phase
+
+  // Dev inspection
+  _devLastInjectedPrompt?: string  // last SESSION STATE block injected into system prompt
 }
 
 export interface CorrectionEntry {
@@ -101,8 +115,40 @@ export interface MemoryEntry {
   timestamp?: string
 }
 
-// ─── Lesson Planning ────────────────────────────────────────────────────────
+// ─── Structured Lesson Plan (v1: 5-phase session arc) ──────────────────────
 
+export type LessonPhaseType = 'warmup' | 'review' | 'core' | 'debrief' | 'close'
+export type CorrectionMode = 'active' | 'recast_only' | 'silent'
+
+export interface PhaseContent {
+  topic?: string
+  discussionPrompts?: string[]
+  vocabTargets?: string[]
+  grammarPattern?: string
+  reviewErrors?: Array<{ rule: string; phrase: string; correction: string }>
+}
+
+export interface PhaseDefinition {
+  phase: LessonPhaseType
+  targetMinutes: number
+  instructions: string
+  correctionMode: CorrectionMode
+  content: PhaseContent
+}
+
+export interface StructuredLessonPlan {
+  sessionDurationMinutes: number
+  domain: string
+  cefrLevel: string
+  grammarFocus: string | null
+  vocabTargets: string[]
+  phases: PhaseDefinition[]
+  difficultyConstraints: DifficultyConstraints
+}
+
+// ─── Legacy Lesson Plan (kept for backward compat) ─────────────────────────
+
+/** @deprecated Use StructuredLessonPlan instead */
 export interface LessonPlan {
   warmupTopic: string
   mainActivity: {
@@ -146,6 +192,8 @@ export interface AgentMetadata {
   // Learner context (populated for real sessions, absent for /voice/test)
   learnerModel?: LearnerModelSummary
   errorPatterns?: ErrorPatternSummary[]
+  structuredPlan?: StructuredLessonPlan
+  /** @deprecated Use structuredPlan instead */
   lessonPlan?: LessonPlan
   difficultyConstraints?: DifficultyConstraints
 

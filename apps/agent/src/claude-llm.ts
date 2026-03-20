@@ -124,10 +124,24 @@ class ClaudeLLMStream extends llm.LLMStream {
     const anthropicTools = convertTools(this.toolCtx)
 
     // --- Prompt caching strategy ---
-    // 1. Cache the system prompt (stable across turns)
-    // 2. Cache conversation history up to the second-to-last user message
-    //    (only the newest user message changes between turns)
+    // Haiku requires >= 2048 tokens in the cached prefix for caching to activate.
+    // System prompt alone (~150-400 tokens in test mode) is too small.
+    // With tools (~10 tools × ~100 tokens each ≈ 1000 tokens) + system prompt
+    // (~1500 tokens in full session mode), we cross the threshold.
+    // In test mode (no tools), caching won't activate — this is acceptable
+    // since test mode has a minimal prompt and low token count anyway.
+    //
+    // For conversation history: cache up to the second-to-last user message
+    // so only the newest user message is uncached per turn.
     const cachedMessages = this.applyCacheBreakpoints(messages)
+
+    // Estimate token count for cache eligibility logging
+    const systemTokenEstimate = system ? Math.ceil(system.length / 4) : 0
+    const toolTokenEstimate = anthropicTools ? anthropicTools.length * 100 : 0
+    const cacheEligible = (systemTokenEstimate + toolTokenEstimate) >= 2048
+    if (!cacheEligible) {
+      console.log(`[cache] prefix too small for caching: ~${systemTokenEstimate + toolTokenEstimate} tokens (system=${systemTokenEstimate}, tools=${toolTokenEstimate}), need >=2048`)
+    }
 
     const params: Anthropic.MessageCreateParamsStreaming = {
       model: this._model,
@@ -141,7 +155,8 @@ class ClaudeLLMStream extends llm.LLMStream {
         {
           type: 'text' as const,
           text: system,
-          cache_control: { type: 'ephemeral' as const },
+          // Only set cache_control when prefix is large enough for caching
+          ...(cacheEligible ? { cache_control: { type: 'ephemeral' as const } } : {}),
         },
       ]
     }
@@ -149,13 +164,14 @@ class ClaudeLLMStream extends llm.LLMStream {
     if (anthropicTools?.length) {
       // Add cache_control to the last tool so system prompt + all tools
       // form the cached prefix. Tools are stable across turns.
-      // Haiku requires >= 2048 tokens in the prefix for caching to activate.
       const toolsWithCache = [...anthropicTools]
-      const lastIdx = toolsWithCache.length - 1
-      toolsWithCache[lastIdx] = {
-        ...toolsWithCache[lastIdx],
-        cache_control: { type: 'ephemeral' as const },
-      } as Anthropic.Tool & { cache_control: { type: 'ephemeral' } }
+      if (cacheEligible) {
+        const lastIdx = toolsWithCache.length - 1
+        toolsWithCache[lastIdx] = {
+          ...toolsWithCache[lastIdx],
+          cache_control: { type: 'ephemeral' as const },
+        } as Anthropic.Tool & { cache_control: { type: 'ephemeral' } }
+      }
       params.tools = toolsWithCache
     }
 

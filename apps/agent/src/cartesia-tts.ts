@@ -8,6 +8,16 @@
  * This plugin keeps a single WebSocket alive for the entire agent session
  * and multiplexes synthesis requests via unique context_id values, saving
  * the connection overhead on every turn after the first.
+ *
+ * TODO: Per-token streaming to Cartesia (like rime-tts.ts does) would
+ * eliminate ~200-600ms of client-side buffering latency. Attempted in
+ * v3-latency-optimization but reverted — sending individual LLM tokens
+ * with max_buffer_delay_ms: 0 caused choppy audio (clips between words).
+ * Cartesia needs enough text context for natural prosody, unlike Rime
+ * which handles this server-side with segment=bySentence.
+ * To fix: either use max_buffer_delay_ms ~100ms with per-token streaming,
+ * or use a lightweight time-based client buffer (~50-100ms) instead of
+ * the current word/char-count thresholds.
  */
 import { tts, AudioByteStream } from '@livekit/agents'
 import type { APIConnectOptions } from '@livekit/agents'
@@ -178,6 +188,7 @@ class SynthesizeStream extends tts.SynthesizeStream {
       },
       language: this.#opts.language,
       add_timestamps: this.#opts.wordTimestamps,
+      max_buffer_delay_ms: 0,
     }
 
     if (this.#opts.speed !== undefined) {
@@ -284,7 +295,8 @@ class SynthesizeStream extends tts.SynthesizeStream {
     // Process text input and send to Cartesia
     const inputTask = async () => {
       let buffer = ''
-      const MIN_WORDS = 2  // Send after 2+ words to reduce chattiness
+      let sentAnything = false
+      const MIN_WORDS = 1  // Send at first punctuation after any word
 
       const sendChunk = (text: string, isContinue: boolean) => {
         if (ws.readyState !== WebSocket.OPEN) return
@@ -295,6 +307,7 @@ class SynthesizeStream extends tts.SynthesizeStream {
           continue: isContinue,
         }
         ws.send(JSON.stringify(msg))
+        sentAnything = true
       }
 
       for await (const data of this.input) {
@@ -311,16 +324,47 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
         buffer += data
 
-        // Send when we have enough words (sentence-like chunks)
+        // Send when we have enough text for Cartesia to start synthesizing.
+        // Japanese/CJK has no spaces, so word-count doesn't work — use char count.
         const words = buffer.trim().split(/\s+/)
-        if (words.length >= MIN_WORDS && /[.!?。！？、,;:\n]/.test(buffer)) {
+        const hasPunctuation = /[.!?。！？、,;:—\n]/.test(buffer)
+        const charCount = buffer.trim().length
+
+        if (words.length >= MIN_WORDS && hasPunctuation) {
           sendChunk(buffer + ' ', true)
           buffer = ''
-        } else if (words.length >= 8) {
-          // Force send long buffers even without punctuation
+        } else if (charCount >= 6 && hasPunctuation) {
+          // CJK: send at punctuation after ~6 chars (~2-3 Japanese words)
+          sendChunk(buffer + ' ', true)
+          buffer = ''
+        } else if (charCount >= 12) {
+          // CJK: force send after ~12 chars even without punctuation
+          sendChunk(buffer + ' ', true)
+          buffer = ''
+        } else if (words.length >= 4) {
+          // Latin: force send after 4 words even without punctuation
           sendChunk(buffer + ' ', true)
           buffer = ''
         }
+      }
+
+      // If aborted (preemptive generation cancelled), close the Cartesia context
+      // immediately so it stops synthesizing. Without this, cancelled preemptive
+      // contexts pile up on the shared WebSocket and delay real synthesis requests.
+      if (this.abortSignal.aborted) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            ...packet,
+            context_id: contextId,
+            transcript: ' ',
+            continue: false,
+          }))
+        }
+        done = true
+        if (!this.queue.closed) {
+          this.queue.put(SynthesizeStream.END_OF_STREAM)
+        }
+        return
       }
 
       // Send remaining buffer
@@ -328,8 +372,28 @@ class SynthesizeStream extends tts.SynthesizeStream {
         sendChunk(buffer + ' ', true)
       }
 
-      // Send end-of-input
-      sendChunk(' ', false)
+      // Send end-of-input — but only if we actually sent text.
+      // Cartesia rejects empty/whitespace-only transcripts.
+      if (sentAnything) {
+        // Flush to force immediate synthesis of any buffered text
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            ...packet,
+            context_id: contextId,
+            transcript: '',
+            continue: true,
+            flush: true,
+          }))
+        }
+        // Close the context
+        sendChunk(' ', false)
+      } else {
+        // Nothing to synthesize (tool-only turn) — signal done immediately
+        done = true
+        if (!this.queue.closed) {
+          this.queue.put(SynthesizeStream.END_OF_STREAM)
+        }
+      }
     }
 
     try {

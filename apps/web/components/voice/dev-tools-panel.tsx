@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { SessionState } from '@lingle/shared'
+import type { SessionState, LessonPhaseType } from '@lingle/shared'
 import { cn } from '@/lib/utils'
 
 interface DevToolsPanelProps {
@@ -14,7 +14,7 @@ interface DevToolsPanelProps {
 
 export function DevToolsPanel({ sessionId, voiceState, duration, isActive, transcript }: DevToolsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [tab, setTab] = useState<'session' | 'state' | 'transcript'>('session')
+  const [tab, setTab] = useState<'session' | 'plan' | 'state' | 'prompt' | 'transcript'>('session')
   const [sessionState, setSessionState] = useState<SessionState | null>(null)
   const [stateLoading, setStateLoading] = useState(false)
   const [postResult, setPostResult] = useState<Record<string, unknown> | null>(null)
@@ -31,9 +31,9 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
     setStateLoading(false)
   }, [sessionId])
 
-  // Auto-poll every 5s when active and state tab is open
+  // Auto-poll every 5s when active and plan, state, or prompt tab is open
   useEffect(() => {
-    if (!isActive || !isOpen || tab !== 'state') return
+    if (!isActive || !isOpen || (tab !== 'state' && tab !== 'plan' && tab !== 'prompt')) return
     fetchState()
     const iv = setInterval(fetchState, 5000)
     return () => clearInterval(iv)
@@ -79,7 +79,7 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
 
       {/* Tabs */}
       <div className="flex border-b border-border">
-        {(['session', 'state', 'transcript'] as const).map((t) => (
+        {(['session', 'plan', 'state', 'prompt', 'transcript'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -88,7 +88,7 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
               tab === t ? 'text-text-primary border-b-2 border-accent-brand' : 'text-text-muted hover:text-text-secondary',
             )}
           >
-            {t === 'session' ? 'Session' : t === 'state' ? 'Redis State' : 'Transcript'}
+            {t === 'session' ? 'Session' : t === 'plan' ? 'Plan' : t === 'state' ? 'Redis' : t === 'prompt' ? 'Prompt' : 'Transcript'}
           </button>
         ))}
       </div>
@@ -130,6 +130,10 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
           </div>
         )}
 
+        {tab === 'plan' && (
+          <PlanTab sessionState={sessionState} sessionId={sessionId} loading={stateLoading} onRetry={fetchState} />
+        )}
+
         {tab === 'state' && (
           <div className="flex flex-col gap-3">
             {!sessionId && (
@@ -142,9 +146,12 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
               <>
                 <Section title="Lesson">
                   <Row label="Phase" value={sessionState.lessonPhase} />
+                  <Row label="Phase Index" value={`${sessionState.currentPhaseIndex ?? '—'}`} />
+                  <Row label="Time Pressure" value={sessionState.timePressure ?? '—'} />
                   <Row label="Difficulty" value={String(sessionState.difficultyLevel)} />
                   <Row label="Elapsed" value={`${sessionState.elapsedMinutes}m`} />
                   <Row label="Goal" value={sessionState.lessonGoal} />
+                  <Row label="Phases Done" value={sessionState.phasesCompleted?.join(', ') || 'none'} />
                 </Section>
                 <Section title={`Errors (${sessionState.errorsLogged.length})`}>
                   {sessionState.errorsLogged.length === 0 ? (
@@ -166,6 +173,16 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
                     </div>
                   ))}
                 </Section>
+                {(sessionState.deferredTopics?.length > 0 || sessionState.nextSessionPriority?.length > 0) && (
+                  <Section title="Between-Session">
+                    {sessionState.deferredTopics?.length > 0 && (
+                      <Row label="Deferred" value={sessionState.deferredTopics.join(', ')} />
+                    )}
+                    {sessionState.nextSessionPriority?.length > 0 && (
+                      <Row label="Next Priority" value={sessionState.nextSessionPriority.join(', ')} />
+                    )}
+                  </Section>
+                )}
                 <Section title="Raw JSON">
                   <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-all text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[300px] overflow-auto">
                     {JSON.stringify(sessionState, null, 2)}
@@ -181,6 +198,37 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'prompt' && (
+          <div className="flex flex-col gap-3">
+            {!sessionId && (
+              <div className="text-text-muted text-center py-4">No active session</div>
+            )}
+            {sessionId && stateLoading && !sessionState && (
+              <div className="text-text-muted text-center py-4">Loading...</div>
+            )}
+            {sessionState?._devLastInjectedPrompt ? (
+              <>
+                <Section title="Last Injected SESSION STATE Block">
+                  <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-words text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[600px] overflow-auto">
+                    {sessionState._devLastInjectedPrompt}
+                  </pre>
+                </Section>
+                <ActionButton
+                  label="Copy to Clipboard"
+                  onClick={() => navigator.clipboard.writeText(sessionState._devLastInjectedPrompt ?? '')}
+                />
+              </>
+            ) : sessionId ? (
+              <div className="text-text-muted text-center py-4">
+                No prompt injected yet (waiting for first turn).
+                <button onClick={fetchState} className="block mx-auto mt-2 text-accent-brand bg-transparent border-none cursor-pointer underline">
+                  Retry
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -215,6 +263,134 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
     </div>
   )
 }
+
+// ─── Plan Tab ────────────────────────────────────────────────────────────────
+
+function PlanTab({ sessionState, sessionId, loading, onRetry }: {
+  sessionState: SessionState | null
+  sessionId: string | null
+  loading: boolean
+  onRetry: () => void
+}) {
+  if (!sessionId) {
+    return <div className="text-text-muted text-center py-4">No active session</div>
+  }
+  if (loading && !sessionState) {
+    return <div className="text-text-muted text-center py-4">Loading...</div>
+  }
+  if (!sessionState) {
+    return (
+      <div className="text-text-muted text-center py-4">
+        No state in Redis.
+        <button onClick={onRetry} className="block mx-auto mt-2 text-accent-brand bg-transparent border-none cursor-pointer underline">
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  const plan = sessionState.structuredPlan
+  if (!plan) {
+    return <div className="text-text-muted text-center py-4">No structured plan (legacy session)</div>
+  }
+
+  const currentIndex = sessionState.currentPhaseIndex ?? 0
+  const completed = new Set<LessonPhaseType>(sessionState.phasesCompleted ?? [])
+  const currentPhase = plan.phases[currentIndex]
+  const phaseElapsedMin = sessionState.phaseStartedAt
+    ? Math.round((Date.now() - sessionState.phaseStartedAt) / 60000 * 10) / 10
+    : 0
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Section title="Lesson Plan">
+        <Row label="Duration" value={`${plan.sessionDurationMinutes} min`} />
+        <Row label="Domain" value={plan.domain} />
+        <Row label="Level" value={plan.cefrLevel} />
+        <Row label="Grammar" value={plan.grammarFocus || '—'} />
+        <Row label="Vocab" value={plan.vocabTargets.join(', ') || '—'} />
+      </Section>
+
+      <Section title="Phase Progression">
+        <div className="flex flex-col gap-1">
+          {plan.phases.map((phase, i) => {
+            const isCurrent = i === currentIndex
+            const isDone = completed.has(phase.phase) || i < currentIndex
+            const icon = isDone ? '✓' : isCurrent ? '▶' : ' '
+            const elapsed = isCurrent ? ` (${phaseElapsedMin}m elapsed)` : ''
+
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'flex items-center gap-2 py-1 px-1.5 rounded text-[11px]',
+                  isCurrent ? 'bg-accent-brand/10 text-text-primary font-semibold' : isDone ? 'text-text-muted' : 'text-text-secondary',
+                )}
+              >
+                <span className="w-4 text-center flex-shrink-0">{icon}</span>
+                <span className="flex-1">
+                  {i + 1}. {phase.phase.toUpperCase()}
+                  <span className="text-text-muted font-normal"> ({phase.targetMinutes}m)</span>
+                  {elapsed && <span className="text-accent-warm font-normal">{elapsed}</span>}
+                </span>
+                <span className={cn(
+                  'text-[9px] px-1.5 py-0.5 rounded-sm',
+                  phase.correctionMode === 'active' ? 'bg-red-50 text-red-600' :
+                  phase.correctionMode === 'recast_only' ? 'bg-amber-50 text-amber-600' :
+                  'bg-gray-50 text-gray-500',
+                )}>
+                  {phase.correctionMode}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        {sessionState.timePressure && sessionState.timePressure !== 'on_track' && (
+          <div className={cn(
+            'mt-2 text-[10px] px-2 py-1 rounded',
+            sessionState.timePressure === 'slightly_over' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700',
+          )}>
+            {sessionState.timePressure === 'slightly_over' ? '⏱ Slightly over time' : '⏱ Significantly over time'}
+          </div>
+        )}
+      </Section>
+
+      {currentPhase && (
+        <Section title="Current Phase">
+          <div className="text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap">
+            {currentPhase.instructions}
+          </div>
+          {currentPhase.content.discussionPrompts && currentPhase.content.discussionPrompts.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border-subtle">
+              <div className="text-[10px] text-text-muted uppercase tracking-wide mb-1">Discussion Prompts</div>
+              {currentPhase.content.discussionPrompts.map((p, i) => (
+                <div key={i} className="text-[11px] text-text-secondary py-0.5">{i + 1}. {p}</div>
+              ))}
+            </div>
+          )}
+          {currentPhase.content.reviewErrors && currentPhase.content.reviewErrors.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border-subtle">
+              <div className="text-[10px] text-text-muted uppercase tracking-wide mb-1">Review Errors</div>
+              {currentPhase.content.reviewErrors.map((e, i) => (
+                <div key={i} className="text-[11px] text-text-secondary py-0.5">
+                  {e.rule}: &ldquo;{e.phrase}&rdquo; &rarr; &ldquo;{e.correction}&rdquo;
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      <Section title="Full Plan JSON">
+        <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-all text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[300px] overflow-auto">
+          {JSON.stringify(plan, null, 2)}
+        </pre>
+      </Section>
+    </div>
+  )
+}
+
+// ─── Shared Components ───────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

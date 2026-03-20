@@ -66,8 +66,6 @@ class SpeechStream extends stt.SpeechStream {
   #opts: SonioxSTTOptions & typeof DEFAULT_OPTS
   #speechStarted = false
   #requestId = 0
-  #firstAudioSentTs = 0    // timestamp of first audio frame sent to Soniox
-  #lastAudioSentTs = 0     // timestamp of last audio frame sent to Soniox
   #lastPreflightTs = 0     // throttle PREFLIGHT_TRANSCRIPT to avoid spamming LLM
 
   constructor(
@@ -79,21 +77,6 @@ class SpeechStream extends stt.SpeechStream {
     super(sttInstance, opts.sampleRate, connOptions)
     this.#client = client
     this.#opts = opts
-  }
-
-  // Debug: trace whether base class pumpInput is delivering frames
-  #pushFrameCount = 0
-  override pushFrame(frame: Parameters<stt.SpeechStream['pushFrame']>[0]): void {
-    this.#pushFrameCount++
-    if (this.#pushFrameCount === 1 || this.#pushFrameCount % 100 === 0) {
-      console.log(`[soniox] pushFrame #${this.#pushFrameCount} (sampleRate=${frame.sampleRate}, samples=${frame.samplesPerChannel})`)
-    }
-    super.pushFrame(frame)
-  }
-
-  override flush(): void {
-    console.log(`[soniox] flush called`)
-    super.flush()
   }
 
   #buildConfig(): SttSessionConfig {
@@ -134,7 +117,9 @@ class SpeechStream extends stt.SpeechStream {
       console.error(`[soniox] SESSION ERROR EVENT:`, err)
     })
     session.on('state_change', (update: { old_state: string; new_state: string }) => {
-      console.log(`[soniox] SESSION STATE: ${update.old_state} → ${update.new_state}`)
+      if (update.new_state === 'error' || update.new_state === 'closed') {
+        console.log(`[soniox] state: ${update.old_state} → ${update.new_state}`)
+      }
     })
 
     try {
@@ -157,21 +142,14 @@ class SpeechStream extends stt.SpeechStream {
       })
 
       let audioFrameCount = 0
-      let loopCount = 0
       while (true) {
-        loopCount++
-        if (loopCount <= 5 || loopCount % 200 === 0) {
-          console.log(`[soniox] run() loop #${loopCount}, waiting on this.input.next()...`)
-        }
         const result = await Promise.race([this.input.next(), abortPromise])
 
-        if (result === undefined) { console.log(`[soniox] run() aborted`); break }
-        if (result.done) { console.log(`[soniox] run() input done`); break }
+        if (result === undefined || result.done) break
 
         const data = result.value
 
         if (data === SpeechStream.FLUSH_SENTINEL) {
-          console.log(`[soniox] run() got FLUSH_SENTINEL`)
           const frames = audioStream.flush()
           for (const frame of frames) {
             if (session.state === 'connected') {
@@ -179,27 +157,15 @@ class SpeechStream extends stt.SpeechStream {
             }
           }
         } else {
-          const inputBytes = data.data.byteLength
           const frames = audioStream.write(data.data.buffer as ArrayBuffer)
-          if (loopCount <= 5 || loopCount % 200 === 0) {
-            console.log(`[soniox] run() loop #${loopCount}: inputBytes=${inputBytes} outputFrames=${frames.length} sessionState=${session.state}`)
-          }
           for (const frame of frames) {
             if (session.state === 'connected') {
               session.sendAudio(Buffer.from(frame.data.buffer))
               audioFrameCount++
-              const now = Date.now()
-              if (audioFrameCount === 1) this.#firstAudioSentTs = now
-              this.#lastAudioSentTs = now
-              if (audioFrameCount === 1 || audioFrameCount % 100 === 0) {
-                console.log(`[soniox] sent ${audioFrameCount} audio frames to soniox`)
-              }
             }
           }
         }
       }
-
-      console.log(`[soniox] input loop ended, total frames sent: ${audioFrameCount}`)
 
       // Flush remaining audio
       if (session.state === 'connected') {
@@ -225,9 +191,6 @@ class SpeechStream extends stt.SpeechStream {
     if (!text.trim()) return
 
     const isFinal = result.tokens.some((t) => t.is_final)
-    const now = Date.now()
-    const sinceLastAudio = this.#lastAudioSentTs ? now - this.#lastAudioSentTs : 0
-    console.log(`[soniox] transcript: "${text.trim().slice(0, 80)}" final=${isFinal} sinceLastAudio=${sinceLastAudio}ms`)
 
     if (!this.#speechStarted) {
       this.#speechStarted = true
@@ -250,7 +213,10 @@ class SpeechStream extends stt.SpeechStream {
 
     this.#requestId++
     // PREFLIGHT_TRANSCRIPT triggers preemptive LLM generation; INTERIM only updates UI.
-    // Throttle PREFLIGHT to at most once per 500ms to avoid spamming cancelled LLM requests.
+    // Throttle PREFLIGHT to avoid spamming cancelled LLM requests — each preemptive
+    // attempt opens an uncached LLM stream (~400ms TTFT) + TTS stream, then cancels it
+    // when the next transcript arrives. Too frequent = massive waste + TTS contention.
+    // 1500ms ensures at most ~1 preemptive attempt during typical speech.
     let eventType: stt.SpeechEventType
     if (isFinal) {
       eventType = stt.SpeechEventType.FINAL_TRANSCRIPT
@@ -258,7 +224,7 @@ class SpeechStream extends stt.SpeechStream {
     } else {
       const now = Date.now()
       const sinceLast = now - this.#lastPreflightTs
-      if (sinceLast >= 500 && text.trim().split(/\s+/).length >= 2) {
+      if (sinceLast >= 1500 && text.trim().split(/\s+/).length >= 2) {
         eventType = stt.SpeechEventType.PREFLIGHT_TRANSCRIPT
         this.#lastPreflightTs = now
       } else {

@@ -74,7 +74,7 @@ import * as cartesia from '@livekit/agents-plugin-cartesia'
 import * as rime from '@livekit/agents-plugin-rime'
 import * as openai from '@livekit/agents-plugin-openai'
 import * as google from '@livekit/agents-plugin-google'
-// import * as livekit from '@livekit/agents-plugin-livekit'
+import * as livekit from '@livekit/agents-plugin-livekit'
 
 import { LingleAgent } from './lingle-agent.js'
 import { ClaudeLLM } from './claude-llm.js'
@@ -93,6 +93,9 @@ import {
   type AgentMetadata,
 } from './config.js'
 import { STT as SonioxSTT } from './soniox-stt.js'
+
+// Deploy version — bump this on each deploy to confirm the right code is running
+const DEPLOY_VERSION = '2025-03-19e'
 
 // ── Diagnostic logger with elapsed time ──
 const t0 = Date.now()
@@ -222,7 +225,7 @@ function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
       languageHints: hints,
       sampleRate: 24000,
       enableEndpointDetection: true,
-      maxEndpointDelayMs: 500,
+      maxEndpointDelayMs: 0,
     })
   }
 
@@ -316,7 +319,7 @@ export default defineAgent({
     const entryStart = Date.now()
     const metadata = parseAgentMetadata(ctx.job.metadata)
     const targetLang = metadata.targetLanguage || 'Japanese'
-    log(`entry START — lang=${targetLang} pid=${process.pid}`)
+    log(`entry START — deploy=${DEPLOY_VERSION} lang=${targetLang} pid=${process.pid}`)
     log(`job.id=${ctx.job.id ?? 'none'} metadata=${ctx.job.metadata?.slice(0, 200) ?? 'none'}`)
 
     // Probe network latency to external services (non-blocking)
@@ -401,11 +404,11 @@ export default defineAgent({
     })
     log(`step 2: VAD loaded in ${Date.now() - vadStart}ms`)
 
-    // Turn detector (MultilingualModel) is available but adds ~200ms-3000ms to EOU
-    // because it waits for the transcript before predicting end-of-turn.
-    // Short Japanese utterances like "はい" cause it to wait up to maxDelay (3s).
-    // Enable it when false interruptions become a bigger problem than latency:
-    //   const turnDetector = new livekit.turnDetector.MultilingualModel()
+    // Turn detector: required for preemptive generation to work correctly.
+    // Without it, the framework starts LLM on partial transcripts → wrong responses.
+    // Adds ~750ms to EOU, but preemptive gen runs the LLM during that window,
+    // so the net latency impact is minimal (~LLM TTFT is hidden behind turn detector).
+    const turnDetector = new livekit.turnDetector.MultilingualModel()
 
     // ── Step 3: Create AgentSession ──
     log(`step 3: creating AgentSession...`)
@@ -444,18 +447,18 @@ export default defineAgent({
       stt,
       llm,
       tts: ttsInstance,
-      preemptiveGeneration: true,
-      turnHandling: {
-        endpointing: {
-          minDelay: 0.15,
-          maxDelay: 3.0,
-        },
-        interruption: {
-          mode: 'adaptive',
-          minDuration: 300,
-          minWords: 1,
-          resumeFalseInterruption: true,
-        },
+      turnDetection: turnDetector,
+      voiceOptions: {
+        // Preemptive generation: starts LLM on the final transcript BEFORE the
+        // turn detector commits. Requires turn detector to work correctly —
+        // without it, the framework fires on partial transcripts → wrong responses.
+        // The turn detector's ~750ms delay is hidden behind the LLM TTFT.
+        preemptiveGeneration: true,
+        // Node.js SDK uses MILLISECONDS (not seconds like Python)
+        minEndpointingDelay: 500,
+        maxEndpointingDelay: 3000,
+        minInterruptionDuration: 500,
+        minInterruptionWords: 0,
       },
     })
     log(`step 3: AgentSession created`)

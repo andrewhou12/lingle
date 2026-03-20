@@ -7,9 +7,18 @@
  * Uses the /ws3 JSON endpoint: wss://users-ws.rime.ai/ws3
  * Docs: https://docs.rime.ai/api-reference/arcana/websockets-json
  *
- * Uses segment=never so Rime buffers all text until we explicitly flush.
- * We flush aggressively (every few words or at punctuation) for low TTFB
- * while keeping continuous audio within each segment (no gaps/freezes).
+ * Uses segment=bySentence so Rime auto-detects sentence boundaries and
+ * synthesizes each sentence as a prosodically-complete unit. We just stream
+ * text tokens in and Rime handles segmentation — no manual flush timing.
+ *
+ * Completion detection: With segment=bySentence, Rime sends a `type=done`
+ * message after all audio for a context is synthesized — same as Cartesia.
+ * This is the primary completion signal. Idle timeout (5s) is a fallback.
+ *
+ * IMPORTANT: We do NOT use the `eos` operation because it closes the shared
+ * WebSocket. With preemptive generation, multiple TTS streams share the same
+ * connection — eos from one stream would kill the connection for all others.
+ * Instead, we use `flush` for the final text and `done` for completion.
  */
 import { tts, AudioByteStream } from '@livekit/agents'
 import type { APIConnectOptions } from '@livekit/agents'
@@ -72,7 +81,7 @@ const messageHandlers = new Map<string, MessageHandler>()
 let currentHandler: MessageHandler | null = null
 
 interface RimeMessage {
-  type: string        // "chunk" | "timestamps" | "error" | "done"
+  type: string        // "chunk" | "timestamps" | "error"
   data?: string       // base64 audio (for "chunk")
   contextId?: string | null
   message?: string    // error message
@@ -97,10 +106,12 @@ function getOrCreateWebSocket(opts: {
     audioFormat: 'pcm',
     lang: opts.lang,
     samplingRate: String(opts.samplingRate),
-    // segment=never: Rime buffers all text, only synthesizes on flush.
-    // We flush aggressively (every few words + at punctuation) for low TTFB,
-    // while keeping continuous audio within each flushed segment (no gaps).
-    segment: 'never',
+    // segment=bySentence: Rime auto-detects sentence boundaries and synthesizes
+    // each sentence as a prosodically-complete unit. This avoids the stuttering
+    // caused by segment=never + manual flush, where flush boundaries could split
+    // words or phrases (e.g., "What" | "'s your name?"), creating independent
+    // audio segments with broken prosody.
+    segment: 'bySentence',
   })
   if (opts.speedAlpha !== undefined) {
     params.set('speedAlpha', String(opts.speedAlpha))
@@ -142,7 +153,10 @@ function getOrCreateWebSocket(opts: {
     ws.on('message', (data: WebSocket.Data) => {
       try {
         const msg: RimeMessage = JSON.parse(data.toString())
-        // Route to handler by contextId, or fall back to current handler
+        // Route to handler by contextId, or fall back to current handler.
+        // Note: Rime doesn't reliably maintain concurrent contextIds —
+        // it may tag chunks with the most recent contextId regardless of
+        // which flush produced them. The currentHandler fallback handles this.
         const handler = (msg.contextId ? messageHandlers.get(msg.contextId) : null) || currentHandler
         if (handler) {
           handler(msg)
@@ -237,39 +251,61 @@ class SynthesizeStream extends tts.SynthesizeStream {
     currentHandler = handler
 
     // ── Receive task ──
-    // Rime doesn't send a "done" message after flush — we detect completion
-    // by waiting for chunks to stop arriving after all input is flushed.
-    const IDLE_TIMEOUT_MS = 300
-    const FIRST_CHUNK_TIMEOUT_MS = 3000
+    // With segment=bySentence, Rime sends a `type=done` message after all
+    // audio for a context is synthesized — same pattern as Cartesia. This is
+    // the primary completion signal. Idle timeout is a fallback only.
+    const IDLE_TIMEOUT_MS = 5000
+    const FIRST_CHUNK_TIMEOUT_MS = 8000
     let lastChunkTs = 0
     let receivedAnyChunk = false
+
+    let chunkCount = 0
+    let totalAudioBytes = 0
+
+    // Helper: create a promise that resolves on message, timeout, OR abort signal.
+    // This ensures aborted streams exit immediately instead of waiting 5s.
+    const waitForMessage = (timeoutMs?: number): Promise<void> => {
+      return new Promise<void>((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | null = null
+        const cleanup = () => {
+          if (timer) clearTimeout(timer)
+          this.abortSignal.removeEventListener('abort', onAbort)
+        }
+        const onAbort = () => { cleanup(); resolve() }
+        const onTimeout = () => { cleanup(); resolve() }
+        const onMessage = () => { cleanup(); resolve() }
+
+        messageResolve = onMessage
+        this.abortSignal.addEventListener('abort', onAbort, { once: true })
+        if (timeoutMs !== undefined) {
+          timer = setTimeout(onTimeout, timeoutMs)
+        }
+        // Resolve immediately if already aborted
+        if (this.abortSignal.aborted) { cleanup(); resolve() }
+      })
+    }
 
     const recvTask = async () => {
       while (!done && !this.closed && !this.abortSignal.aborted) {
         if (messageQueue.length === 0) {
           if (inputDone) {
-            // Draining — wait for chunks with timeout
+            // Draining — wait for chunks with timeout (or abort)
             const timeout = receivedAnyChunk ? IDLE_TIMEOUT_MS : FIRST_CHUNK_TIMEOUT_MS
             const elapsed = Date.now() - lastChunkTs
             const remaining = timeout - elapsed
             if (remaining <= 0) break
 
-            await new Promise<void>((resolve) => {
-              const timer = setTimeout(resolve, remaining)
-              messageResolve = () => { clearTimeout(timer); resolve() }
-              if (this.abortSignal.aborted) { clearTimeout(timer); resolve() }
-            })
+            await waitForMessage(remaining)
 
+            if (this.abortSignal.aborted) break
             if (messageQueue.length === 0) {
               if (Date.now() - lastChunkTs >= timeout) break
               continue
             }
           } else {
-            // Still receiving input — block until a message arrives
-            await new Promise<void>((resolve) => {
-              messageResolve = resolve
-              if (this.abortSignal.aborted) resolve()
-            })
+            // Still receiving input — block until a message arrives (or abort)
+            await waitForMessage()
+            if (this.abortSignal.aborted) break
           }
         }
 
@@ -284,7 +320,9 @@ class SynthesizeStream extends tts.SynthesizeStream {
           if (msg.type === 'chunk' && msg.data) {
             lastChunkTs = Date.now()
             receivedAnyChunk = true
+            chunkCount++
             const audioBuffer = Buffer.from(msg.data, 'base64')
+            totalAudioBytes += audioBuffer.length
             const audioData = audioBuffer.buffer.slice(
               audioBuffer.byteOffset,
               audioBuffer.byteOffset + audioBuffer.byteLength,
@@ -293,12 +331,34 @@ class SynthesizeStream extends tts.SynthesizeStream {
               sendLastFrame(false)
               lastFrame = frame
             }
+          } else if (msg.type === 'done') {
+            // Rime sends `done` after all audio for a context is synthesized
+            // (with segment=bySentence). BUT: Rime tags messages with the most
+            // recent contextId, not the one that produced the audio. So a `done`
+            // from a previous (preemptive) context can arrive tagged as ours.
+            // Only trust `done` when inputDone is true — otherwise it's stale.
+            if (!inputDone) {
+              console.log(`[rime] recv (${contextId}) ignoring stale done (inputDone=false)`)
+              continue
+            }
+            for (const frame of bstream.flush()) {
+              sendLastFrame(false)
+              lastFrame = frame
+            }
+            sendLastFrame(true)
+            if (!this.queue.closed) {
+              this.queue.put(SynthesizeStream.END_OF_STREAM)
+            }
+            console.log(`[rime] recvTask done (${contextId}) chunks=${chunkCount} audioBytes=${totalAudioBytes} inputDone=${inputDone} aborted=${this.abortSignal.aborted} reason=done`)
+            done = true
+            return
+          } else if (msg.type !== 'timestamps') {
+            console.log(`[rime] recv (${contextId}) type=${msg.type} msg=${msg.message || ''}`)
           }
-          // timestamps — ignored for now
         }
       }
 
-      // Flush remaining audio in buffer
+      // Fallback: flush remaining audio (timeout or abort path)
       for (const frame of bstream.flush()) {
         sendLastFrame(false)
         lastFrame = frame
@@ -307,24 +367,27 @@ class SynthesizeStream extends tts.SynthesizeStream {
       if (!this.queue.closed) {
         this.queue.put(SynthesizeStream.END_OF_STREAM)
       }
+      console.log(`[rime] recvTask done (${contextId}) chunks=${chunkCount} audioBytes=${totalAudioBytes} inputDone=${inputDone} aborted=${this.abortSignal.aborted} reason=timeout`)
       done = true
     }
 
     // ── Input task ──
-    // With segment=never, Rime buffers all text until we flush. We flush
-    // aggressively — every few words or at punctuation — so TTFB is low
-    // (~200-400ms) while audio within each segment is continuous (no gaps).
-    const MIN_FLUSH_WORDS = 3
-    const PUNCTUATION = /[.!?;:,—\-。！？、；：]\s*$/
+    // With segment=bySentence, Rime auto-detects sentence boundaries in the
+    // incoming text stream. Each sentence is synthesized as a prosodically-
+    // complete unit — no manual flush timing needed. We just stream tokens in
+    // as fast as the LLM produces them. Rime handles the rest.
+    //
+    // We use `flush` (not `eos`) for the final text because eos is a
+    // connection-level operation that closes the shared WebSocket. With
+    // preemptive generation, multiple streams share the same connection.
 
     const inputTask = async () => {
-      let buffer = ''
-      let wordsSinceFlush = 0
-      let hasFlushed = false
+      let totalTextSent = ''
 
       const sendText = (text: string) => {
         if (ws.readyState !== WebSocket.OPEN) return
         ws.send(JSON.stringify({ text, contextId }))
+        totalTextSent += text
       }
 
       const flush = () => {
@@ -334,73 +397,65 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
       const clear = () => {
         if (ws.readyState !== WebSocket.OPEN) return
+        console.log(`[rime] clear (${contextId}) — aborted, discarding buffer`)
         ws.send(JSON.stringify({ operation: 'clear', contextId }))
       }
 
-      const sendAndMaybeFlush = () => {
-        if (!buffer.trim()) return
-
-        sendText(buffer)
-
-        // Count words in what we just sent
-        wordsSinceFlush += buffer.trim().split(/\s+/).length
-        const atPunctuation = PUNCTUATION.test(buffer)
-        buffer = ''
-
-        // Flush at punctuation after any words, or after MIN_FLUSH_WORDS
-        if ((atPunctuation && wordsSinceFlush >= 1) || wordsSinceFlush >= MIN_FLUSH_WORDS) {
-          flush()
-          wordsSinceFlush = 0
-          hasFlushed = true
-        }
-      }
+      console.log(`[rime] inputTask started (${contextId})`)
 
       for await (const data of this.input) {
         if (this.abortSignal.aborted) break
 
         if (data === SynthesizeStream.FLUSH_SENTINEL) {
-          // Framework flush — send buffered text and trigger synthesis
-          if (buffer.trim()) {
-            sendText(buffer)
-            buffer = ''
-          }
+          // Framework flush — force Rime to synthesize any buffered text now
           flush()
-          wordsSinceFlush = 0
-          hasFlushed = true
           continue
         }
 
-        // Accumulate LLM token
-        buffer += data
-
-        // Send to Rime and flush when we have enough words or hit punctuation
-        sendAndMaybeFlush()
+        // Stream each token directly to Rime. With bySentence segmentation,
+        // Rime accumulates text and auto-synthesizes at sentence boundaries.
+        sendText(data)
       }
 
       // If aborted (e.g. preemptive generation cancelled), clear Rime's buffer
-      // instead of flushing — prevents stale text from being synthesized
+      // and signal recv task to exit immediately — don't drain for 5s.
       if (this.abortSignal.aborted) {
         clear()
+        done = true      // Tell recv task to exit its while loop
         inputDone = true
         if (!lastChunkTs) lastChunkTs = Date.now()
         if (messageResolve) {
           messageResolve()
           messageResolve = null
         }
+        console.log(`[rime] inputTask aborted (${contextId})`)
         return
       }
 
-      // Send any remaining text
-      if (buffer.trim()) {
-        sendText(buffer)
+      // If nothing was ever sent (tool-only turn), skip and signal done
+      if (!totalTextSent) {
+        console.log(`[rime] inputTask done (${contextId}) — empty transcript, skipping`)
+        inputDone = true
+        if (!lastChunkTs) lastChunkTs = Date.now()
+        if (messageResolve) {
+          messageResolve()
+          messageResolve = null
+        }
+        if (!this.queue.closed) {
+          this.queue.put(SynthesizeStream.END_OF_STREAM)
+        }
+        return
       }
 
-      // Final flush to synthesize everything remaining
+      // Final flush — synthesize any remaining buffered text (partial sentence
+      // at the end of the LLM output). Don't use eos — it would close the
+      // shared WebSocket and break other streams (preemptive generation).
       flush()
+      console.log(`[rime] inputTask done (${contextId}) totalText="${totalTextSent.slice(0, 100)}"`)
       inputDone = true
       if (!lastChunkTs) lastChunkTs = Date.now()
 
-      // Wake recv task
+      // Wake recv task to start draining
       if (messageResolve) {
         messageResolve()
         messageResolve = null

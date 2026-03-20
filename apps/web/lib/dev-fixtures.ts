@@ -28,6 +28,13 @@ const BASE: Omit<SessionState, 'sessionId' | 'userId' | 'lessonId'> = {
   },
   compactionCount: 0,
   conversationTokenEstimate: 3200,
+  // v1 structured plan fields
+  currentPhaseIndex: 0,
+  phaseStartedAt: Date.now(),
+  phasesCompleted: [],
+  timePressure: 'on_track' as const,
+  deferredTopics: [],
+  nextSessionPriority: [],
 }
 
 export const FIXTURES: Record<string, (userId: string, sessionId: string, lessonId: string) => SessionState> = {

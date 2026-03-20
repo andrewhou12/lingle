@@ -95,9 +95,11 @@ export const POST = withAuth(async (request, { userId }) => {
         errorsCount: sessionState?.errorsLogged.length ?? 0,
         topicsCovered: sessionState?.topicsCovered ?? [],
         vocabIntroduced: sessionState?.vocabIntroduced ?? [],
-        phasesCompleted: sessionState
-          ? [sessionState.lessonPhase] // final phase reached
-          : [],
+        phasesCompleted: sessionState?.phasesCompleted?.length
+          ? [...sessionState.phasesCompleted, sessionState.lessonPhase]
+          : sessionState
+            ? [sessionState.lessonPhase]
+            : [],
         difficultyFinal: sessionState?.difficultyLevel,
         correctionsDoc,
       },
@@ -120,6 +122,21 @@ export const POST = withAuth(async (request, { userId }) => {
       },
     }),
   ])
+
+  // ── Step 6b: Persist between-session data for next planner ──
+  if (sessionState && (sessionState.deferredTopics?.length || sessionState.nextSessionPriority?.length)) {
+    const existingPlan = dbLesson.lessonPlan as Record<string, unknown> | null
+    prisma.lesson.update({
+      where: { id: sessionId },
+      data: {
+        lessonPlan: {
+          ...(existingPlan ?? {}),
+          deferredTopics: sessionState.deferredTopics ?? [],
+          nextSessionPriority: sessionState.nextSessionPriority ?? [],
+        },
+      },
+    }).catch((err) => console.error('[end] Failed to persist between-session data:', err))
+  }
 
   // ── Step 7: Memory extraction + Longitudinal analysis ──
   if (sessionState) {
