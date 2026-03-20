@@ -147,7 +147,16 @@ class ClaudeLLMStream extends llm.LLMStream {
     }
 
     if (anthropicTools?.length) {
-      params.tools = anthropicTools
+      // Add cache_control to the last tool so system prompt + all tools
+      // form the cached prefix. Tools are stable across turns.
+      // Haiku requires >= 2048 tokens in the prefix for caching to activate.
+      const toolsWithCache = [...anthropicTools]
+      const lastIdx = toolsWithCache.length - 1
+      toolsWithCache[lastIdx] = {
+        ...toolsWithCache[lastIdx],
+        cache_control: { type: 'ephemeral' as const },
+      } as Anthropic.Tool & { cache_control: { type: 'ephemeral' } }
+      params.tools = toolsWithCache
     }
 
     const stream = anthropic.messages.stream(params)

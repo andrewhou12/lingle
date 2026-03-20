@@ -6,37 +6,37 @@ import { cn } from '@/lib/utils'
 
 // ── Message types matching whiteboard-tools.ts ──
 
-interface CorrectionData {
+export interface CorrectionData {
   original: string
   corrected: string
   rule: string
   explanation?: string
 }
 
-interface VocabWord {
+export interface VocabWord {
   word: string
   reading?: string
   meaning: string
 }
 
-interface VocabClusterData {
+export interface VocabClusterData {
   title: string
   words: VocabWord[]
 }
 
-interface TableData {
+export interface TableData {
   title: string
   headers: string[]
   rows: string[][]
 }
 
-interface ContentData {
+export interface ContentData {
   contentType: 'article' | 'dialogue' | 'instructions' | 'notes'
   title: string
   body: string
 }
 
-type WhiteboardContent =
+export type WhiteboardContent =
   | { type: 'correction'; data: CorrectionData }
   | { type: 'vocab_cluster'; data: VocabClusterData }
   | { type: 'table'; data: TableData }
@@ -83,7 +83,7 @@ export function useWhiteboard() {
 
 // ── Renderers ──
 
-function CorrectionCard({ data }: { data: CorrectionData }) {
+export function CorrectionCard({ data }: { data: CorrectionData }) {
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-3">
@@ -107,7 +107,7 @@ function CorrectionCard({ data }: { data: CorrectionData }) {
   )
 }
 
-function VocabClusterCard({ data }: { data: VocabClusterData }) {
+export function VocabClusterCard({ data }: { data: VocabClusterData }) {
   return (
     <div>
       <div className="text-[14px] font-semibold text-text-primary mb-3">{data.title}</div>
@@ -126,7 +126,7 @@ function VocabClusterCard({ data }: { data: VocabClusterData }) {
   )
 }
 
-function TableCard({ data }: { data: TableData }) {
+export function TableCard({ data }: { data: TableData }) {
   return (
     <div>
       <div className="text-[14px] font-semibold text-text-primary mb-3">{data.title}</div>
@@ -158,7 +158,7 @@ function TableCard({ data }: { data: TableData }) {
   )
 }
 
-function ContentCard({ data }: { data: ContentData }) {
+export function ContentCard({ data }: { data: ContentData }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">

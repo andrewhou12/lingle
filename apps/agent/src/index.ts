@@ -1,8 +1,9 @@
 /**
  * LiveKit Agent entry point for Lingle voice conversation.
  *
- * Pipeline: Silero VAD → Soniox/Deepgram STT → GPT-4o mini LLM → Cartesia/Rime TTS
- * Post-turn analysis runs async via Claude Haiku (not latency-critical).
+ * Pipeline: Silero VAD → Turn Detector (MultilingualModel) → Soniox/Deepgram STT → LLM → Cartesia/Rime TTS
+ * Turn detection uses LiveKit's multilingual model for context-aware endpointing.
+ * Adaptive interruption handling distinguishes real interruptions from backchanneling.
  */
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'node:url'
@@ -112,6 +113,7 @@ class TurnLatencyTracker {
   private ttsFirstTs = 0         // TTS first audio byte
   private eouDelayMs = 0         // total EOU delay (VAD silence + turn detector + endpointing)
   private transcriptionDelayMs = 0 // time to get transcript after speech ended
+  private turnDetectorDelayMs = 0 // turn detector inference time (0 if not using turn detector)
   private llmTtftMs = 0          // LLM TTFT from its own metrics
   private ttsTtfbMs = 0          // TTS TTFB from its own metrics
   private llmTotalMs = 0
@@ -128,12 +130,13 @@ class TurnLatencyTracker {
   }
 
   /** Called when EOU is committed (after turn detector decision + endpointing delay) */
-  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number) {
+  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number, turnDetectorDelayMs?: number) {
     this.turnId++
     this.eouTs = Date.now()
     this.lastSpeakingTs = lastSpeakingTimeMs || Date.now() - eouDelayMs  // fallback: approximate from eouDelay
     this.eouDelayMs = eouDelayMs
     this.transcriptionDelayMs = transcriptionDelayMs
+    this.turnDetectorDelayMs = turnDetectorDelayMs || 0
     this.sttFinalTs = 0
     this.llmFirstTs = 0
     this.ttsFirstTs = 0
@@ -144,7 +147,8 @@ class TurnLatencyTracker {
     this.llmTokens = 0
     this.ttsTotalMs = 0
     log(`[latency] ──── TURN ${this.turnId} START ────`)
-    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
+    const tdInfo = this.turnDetectorDelayMs ? `, turnDetector=${this.turnDetectorDelayMs.toFixed(0)}ms` : ''
+    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms${tdInfo}, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
   }
 
   /** Called when STT emits final transcript */
@@ -184,6 +188,11 @@ class TurnLatencyTracker {
 
     log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
     log(`[latency]   EOU delay:          ${this.eouDelayMs.toFixed(0)}ms  (VAD silence + turn detector + endpointing)`)
+    if (this.turnDetectorDelayMs) {
+      const vadOnly = Math.max(0, this.eouDelayMs - this.turnDetectorDelayMs)
+      log(`[latency]     ├─ VAD+endpointing: ${vadOnly.toFixed(0)}ms`)
+      log(`[latency]     └─ Turn detector:   ${this.turnDetectorDelayMs.toFixed(0)}ms  (MultilingualModel inference)`)
+    }
     log(`[latency]   Transcription delay: ${this.transcriptionDelayMs.toFixed(0)}ms`)
     log(`[latency]   EOU → STT final:    ${sttProcessing}ms`)
     log(`[latency]   LLM TTFT:           ${this.llmTtftMs.toFixed(0)}ms`)
@@ -234,7 +243,6 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
       speaker,
       lang: rimeLang,
       samplingRate: 24000,
-      segment: 'immediate',
       speedAlpha: 1.0,
     })
   }
@@ -393,6 +401,12 @@ export default defineAgent({
     })
     log(`step 2: VAD loaded in ${Date.now() - vadStart}ms`)
 
+    // Turn detector (MultilingualModel) is available but adds ~200ms-3000ms to EOU
+    // because it waits for the transcript before predicting end-of-turn.
+    // Short Japanese utterances like "はい" cause it to wait up to maxDelay (3s).
+    // Enable it when false interruptions become a bigger problem than latency:
+    //   const turnDetector = new livekit.turnDetector.MultilingualModel()
+
     // ── Step 3: Create AgentSession ──
     log(`step 3: creating AgentSession...`)
     const stt = buildStt(metadata)
@@ -425,23 +439,23 @@ export default defineAgent({
 
     log(`step 3: providers created (stt=${stt.constructor.name} llm=${llmLabel} tts=${ttsInstance.constructor.name})`)
 
-    // Turn detector (MultilingualModel) is available but adds ~200ms to EOU
-    // because it waits for the transcript before predicting end-of-turn.
-    // Enable it when false interruptions become a bigger problem than latency:
-    //   const turnDetector = new livekit.turnDetector.MultilingualModel()
-    //   turnDetection: turnDetector,
-
     const session = new voice.AgentSession({
       vad,
       stt,
       llm,
       tts: ttsInstance,
-      voiceOptions: {
-        preemptiveGeneration: true,
-        minEndpointingDelay: 0.15,
-        maxEndpointingDelay: 3.0,
-        minInterruptionDuration: 0.3,
-        minInterruptionWords: 1,
+      preemptiveGeneration: true,
+      turnHandling: {
+        endpointing: {
+          minDelay: 0.15,
+          maxDelay: 3.0,
+        },
+        interruption: {
+          mode: 'adaptive',
+          minDuration: 300,
+          minWords: 1,
+          resumeFalseInterruption: true,
+        },
       },
     })
     log(`step 3: AgentSession created`)
@@ -450,7 +464,8 @@ export default defineAgent({
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs)
+        const tdDelay = (m as unknown as { turnDetectorDelayMs?: number }).turnDetectorDelayMs
+        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs, tdDelay)
       } else if (m.type === 'llm_metrics') {
         turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {

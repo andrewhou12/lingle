@@ -32,7 +32,10 @@ export class LingleAgent extends voice.Agent {
 
   constructor(metadata: AgentMetadata) {
     // Build base tools + whiteboard tools
-    const baseTools = buildToolContext(metadata.sessionId, metadata.sessionMode)
+    // Use a throwaway session ID for test mode so tools are still registered —
+    // their definitions pad the cached prefix past Haiku's 2048-token minimum.
+    const effectiveSessionId = metadata.sessionId || `test-${Date.now()}`
+    const baseTools = buildToolContext(effectiveSessionId, metadata.sessionMode)
 
     // Whiteboard publish uses a deferred reference — set once room is available
     let publishFn: ((msg: WhiteboardMessage) => void) | null = null

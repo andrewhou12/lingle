@@ -241,7 +241,7 @@ class SpeechStream extends stt.SpeechStream {
     const detectedLang = result.tokens.find((t) => t.language)?.language || ''
 
     const speechData: stt.SpeechData = {
-      language: detectedLang,
+      language: detectedLang as stt.SpeechData['language'],
       text: text.trim(),
       startTime: startMs / 1000,
       endTime: endMs / 1000,

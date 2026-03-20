@@ -7,9 +7,9 @@
  * Uses the /ws3 JSON endpoint: wss://users-ws.rime.ai/ws3
  * Docs: https://docs.rime.ai/api-reference/arcana/websockets-json
  *
- * Key design: uses segment=never so Rime buffers all text until we explicitly
- * send { operation: "flush" }. We flush at sentence boundaries so each
- * synthesized audio segment has natural prosody.
+ * Uses segment=never so Rime buffers all text until we explicitly flush.
+ * We flush aggressively (every few words or at punctuation) for low TTFB
+ * while keeping continuous audio within each segment (no gaps/freezes).
  */
 import { tts, AudioByteStream } from '@livekit/agents'
 import type { APIConnectOptions } from '@livekit/agents'
@@ -66,7 +66,9 @@ export class TTS extends tts.TTS {
 // Message listener registry keyed by contextId
 type MessageHandler = (msg: RimeMessage) => void
 const messageHandlers = new Map<string, MessageHandler>()
-// Also track a "current" handler for messages without contextId
+// Track the most recently created handler for messages without contextId.
+// With preemptive generation, multiple streams may exist concurrently —
+// only the latest stream should receive untagged messages.
 let currentHandler: MessageHandler | null = null
 
 interface RimeMessage {
@@ -95,7 +97,9 @@ function getOrCreateWebSocket(opts: {
     audioFormat: 'pcm',
     lang: opts.lang,
     samplingRate: String(opts.samplingRate),
-    // segment=never: Rime buffers all text, only synthesizes on flush
+    // segment=never: Rime buffers all text, only synthesizes on flush.
+    // We flush aggressively (every few words + at punctuation) for low TTFB,
+    // while keeping continuous audio within each flushed segment (no gaps).
     segment: 'never',
   })
   if (opts.speedAlpha !== undefined) {
@@ -165,9 +169,6 @@ function getOrCreateWebSocket(opts: {
 
   return sharedWsReady.then(() => sharedWs!)
 }
-
-/** Sentence-ending punctuation pattern */
-const SENTENCE_END = /[.!?。！？]\s*$/
 
 class SynthesizeStream extends tts.SynthesizeStream {
   readonly label = 'rime-persistent'
@@ -310,11 +311,16 @@ class SynthesizeStream extends tts.SynthesizeStream {
     }
 
     // ── Input task ──
-    // Stream LLM tokens to Rime, flush at sentence boundaries.
-    // With segment=never, Rime buffers all text until we flush, so each
-    // flushed segment is a complete sentence with natural prosody.
+    // With segment=never, Rime buffers all text until we flush. We flush
+    // aggressively — every few words or at punctuation — so TTFB is low
+    // (~200-400ms) while audio within each segment is continuous (no gaps).
+    const MIN_FLUSH_WORDS = 3
+    const PUNCTUATION = /[.!?;:,—\-。！？、；：]\s*$/
+
     const inputTask = async () => {
       let buffer = ''
+      let wordsSinceFlush = 0
+      let hasFlushed = false
 
       const sendText = (text: string) => {
         if (ws.readyState !== WebSocket.OPEN) return
@@ -323,7 +329,30 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
       const flush = () => {
         if (ws.readyState !== WebSocket.OPEN) return
-        ws.send(JSON.stringify({ operation: 'flush' }))
+        ws.send(JSON.stringify({ operation: 'flush', contextId }))
+      }
+
+      const clear = () => {
+        if (ws.readyState !== WebSocket.OPEN) return
+        ws.send(JSON.stringify({ operation: 'clear', contextId }))
+      }
+
+      const sendAndMaybeFlush = () => {
+        if (!buffer.trim()) return
+
+        sendText(buffer)
+
+        // Count words in what we just sent
+        wordsSinceFlush += buffer.trim().split(/\s+/).length
+        const atPunctuation = PUNCTUATION.test(buffer)
+        buffer = ''
+
+        // Flush at punctuation after any words, or after MIN_FLUSH_WORDS
+        if ((atPunctuation && wordsSinceFlush >= 1) || wordsSinceFlush >= MIN_FLUSH_WORDS) {
+          flush()
+          wordsSinceFlush = 0
+          hasFlushed = true
+        }
       }
 
       for await (const data of this.input) {
@@ -336,18 +365,29 @@ class SynthesizeStream extends tts.SynthesizeStream {
             buffer = ''
           }
           flush()
+          wordsSinceFlush = 0
+          hasFlushed = true
           continue
         }
 
         // Accumulate LLM token
         buffer += data
 
-        // Send text to Rime's buffer token-by-token (Rime holds it until flush)
-        // But we send in chunks to reduce WebSocket message count
-        if (buffer.length >= 2) {
-          sendText(buffer)
-          buffer = ''
+        // Send to Rime and flush when we have enough words or hit punctuation
+        sendAndMaybeFlush()
+      }
+
+      // If aborted (e.g. preemptive generation cancelled), clear Rime's buffer
+      // instead of flushing — prevents stale text from being synthesized
+      if (this.abortSignal.aborted) {
+        clear()
+        inputDone = true
+        if (!lastChunkTs) lastChunkTs = Date.now()
+        if (messageResolve) {
+          messageResolve()
+          messageResolve = null
         }
+        return
       }
 
       // Send any remaining text
