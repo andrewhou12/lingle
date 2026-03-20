@@ -442,6 +442,13 @@ export default defineAgent({
 
     log(`step 3: providers created (stt=${stt.constructor.name} llm=${llmLabel} tts=${ttsInstance.constructor.name})`)
 
+    // Preemptive generation: only works with Cartesia, which supports concurrent
+    // context_id isolation. Rime's protocol explicitly does NOT maintain multiple
+    // simultaneous context IDs — preemptive streams contaminate the shared
+    // connection and cause audio from wrong responses to leak through.
+    const ttsProvider = resolveAgentTtsProvider(metadata)
+    const usePreemptiveGen = ttsProvider === 'cartesia'
+
     const session = new voice.AgentSession({
       vad,
       stt,
@@ -449,11 +456,7 @@ export default defineAgent({
       tts: ttsInstance,
       turnDetection: turnDetector,
       voiceOptions: {
-        // Preemptive generation: starts LLM on the final transcript BEFORE the
-        // turn detector commits. Requires turn detector to work correctly —
-        // without it, the framework fires on partial transcripts → wrong responses.
-        // The turn detector's ~750ms delay is hidden behind the LLM TTFT.
-        preemptiveGeneration: true,
+        preemptiveGeneration: usePreemptiveGen,
         // Node.js SDK uses MILLISECONDS (not seconds like Python)
         minEndpointingDelay: 500,
         maxEndpointingDelay: 3000,
@@ -461,6 +464,7 @@ export default defineAgent({
         minInterruptionWords: 0,
       },
     })
+    log(`step 3: preemptiveGeneration=${usePreemptiveGen} (tts=${ttsProvider})`)
     log(`step 3: AgentSession created`)
 
     // ── Metrics + error logging ──
