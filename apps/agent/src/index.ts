@@ -247,6 +247,7 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
       lang: rimeLang,
       samplingRate: 24000,
       speedAlpha: 1.0,
+      reduceLatency: true,
     })
   }
 

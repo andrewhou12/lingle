@@ -37,6 +37,8 @@ export interface RimeTTSOptions {
   lang?: string
   samplingRate?: number
   speedAlpha?: number
+  /** Skip text normalization for lower latency (may affect pronunciation of numbers/abbreviations) */
+  reduceLatency?: boolean
 }
 
 const DEFAULTS = {
@@ -101,6 +103,7 @@ function getOrCreateWebSocket(opts: {
   lang: string
   samplingRate: number
   speedAlpha?: number
+  reduceLatency?: boolean
 }): Promise<WebSocket> {
   const params = new URLSearchParams({
     speaker: opts.speaker,
@@ -115,6 +118,9 @@ function getOrCreateWebSocket(opts: {
   })
   if (opts.speedAlpha !== undefined) {
     params.set('speedAlpha', String(opts.speedAlpha))
+  }
+  if (opts.reduceLatency) {
+    params.set('noTextNormalization', 'true')
   }
 
   const url = `wss://users-ws.rime.ai/ws3?${params.toString()}`
@@ -345,10 +351,17 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
     // ── Input task ──
     // segment=never: Rime buffers all text, only synthesizes on flush.
-    // We flush at sentence boundaries (.!?。！？) so each flush produces
-    // one prosodically-complete utterance. No word-count flushing —
-    // that caused mid-word splits ("What" | "'s your name?").
+    //
+    // Flushing strategy for low TTFB + good prosody:
+    // - FIRST flush: after 4+ words ending on a word boundary (space/punct).
+    //   Gets audio playing quickly. Prosody is decent for a short phrase.
+    // - SUBSEQUENT flushes: at sentence boundaries (.!?。！？) only.
+    //   Each sentence is one prosodic utterance — no mid-sentence splits.
+    // - FINAL flush: at end of input for any remaining text.
     const SENTENCE_END = /[.!?。！？]\s*$/
+    const FIRST_FLUSH_MIN_WORDS = 4
+    // Ensure we flush on a word boundary (ends with space or punctuation)
+    const WORD_BOUNDARY = /[\s.!?,;:。！？、；：]\s*$/
 
     const inputTask = async () => {
       let textBuffer = ''
@@ -379,24 +392,35 @@ class SynthesizeStream extends tts.SynthesizeStream {
         if (this.abortSignal.aborted) break
 
         if (data === SynthesizeStream.FLUSH_SENTINEL) {
-          // Framework flush — send accumulated text and trigger synthesis
-          if (textBuffer) {
-            sendText(textBuffer)
-            textBuffer = ''
-          }
+          // Framework flush — trigger synthesis of whatever Rime has buffered
+          textBuffer = ''
           if (totalTextSent) flush()
           continue
         }
 
-        // Accumulate token
+        // Send every token to Rime immediately — with segment=never, Rime
+        // buffers them without synthesizing. This gives Rime a head start on
+        // text processing. We only trigger synthesis via explicit flush.
+        sendText(data)
         textBuffer += data
 
-        // Check if accumulated buffer ends at a sentence boundary.
-        // If so, send everything and flush — Rime synthesizes it as one utterance.
+        // Sentence boundary → flush (good prosody, complete utterance)
         if (SENTENCE_END.test(textBuffer)) {
-          sendText(textBuffer)
           textBuffer = ''
           flush()
+          continue
+        }
+
+        // First flush only: flush early for low TTFB, but only on a word
+        // boundary to avoid splitting words (e.g., "What" | "'s your name?").
+        // After the first flush, Rime is synthesizing so subsequent tokens
+        // accumulate — we only flush those at sentence boundaries above.
+        if (flushCount === 0) {
+          const wordCount = textBuffer.trim().split(/\s+/).length
+          if (wordCount >= FIRST_FLUSH_MIN_WORDS && WORD_BOUNDARY.test(textBuffer)) {
+            textBuffer = ''
+            flush()
+          }
         }
       }
 
@@ -411,11 +435,8 @@ class SynthesizeStream extends tts.SynthesizeStream {
         return
       }
 
-      // Send any remaining text
-      if (textBuffer) {
-        sendText(textBuffer)
-        textBuffer = ''
-      }
+      // Tokens already sent to Rime individually — just reset local tracker
+      textBuffer = ''
 
       // Empty turn (tool-only) — signal done immediately
       if (!totalTextSent) {
