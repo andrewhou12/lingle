@@ -165,12 +165,14 @@ POST /api/conversation/end
 
 ## Agent Tools
 
-All tools write to Redis and return empty strings so the LLM never narrates tool calls.
+Exactly 4 tools. All write to Redis and return empty strings so the LLM never narrates tool calls.
 
-**Silent tracking:** `logError`, `noteStrength`, `saveMemory`, `queueCorrection`
-**Lesson management:** `adjustDifficulty`, `updateLessonPhase`, `setVocabHomework`, `endLesson`
-**Whiteboard:** `whiteboardOpen`, `whiteboardClose`, `whiteboardWriteCorrection`, `whiteboardShowVocabCluster`, `whiteboardShowTable`
-**Onboarding-only:** `setGoal`, `calibrateLevel`, `setPreference`
+| Tool | Execution | Purpose |
+|------|-----------|---------|
+| `flagError` | Fire-and-forget | Log learner errors (minor/major severity only) |
+| `writeWhiteboard` | Soft-blocking (~10ms) | Add/update/delete items on the learner's whiteboard (new_material or corrections section) |
+| `updateLessonPhase` | Blocking | Advance to next lesson phase (requires learner permission first) |
+| `endLesson` | Blocking + 500ms drain | Signal session end, trigger post-session pipeline |
 
 ---
 
@@ -178,15 +180,14 @@ All tools write to Redis and return empty strings so the LLM never narrates tool
 
 | Model | Purpose |
 |---|---|
-| `User` | Auth user (Google OAuth via Supabase) |
-| `LearnerModel` | CEFR grammar + fluency scores, weak areas, session count |
-| `ErrorPattern` | Longitudinal error tracking (rule, count, sessions) |
-| `VocabularyItem` | Spaced repetition vocabulary with FSRS scheduling |
-| `Lesson` | Completed session record (transcript, plan, corrections doc) |
-| `ErrorLog` | Per-error log entries linked to lessons |
-| `CurriculumVocab` | Vocabulary curriculum items with domain tags |
-| `CurriculumGrammar` | Grammar curriculum with CEFR levels |
-| `Memory` | Learner personal facts for cross-session context |
+| `User` | Auth user (Google OAuth via Supabase), profile (interests, occupation, family, goals, recentUpdates) |
+| `LearnerModel` | CEFR grammar + fluency scores (1.0-6.0), skills[21] JSON, session count |
+| `ProducedItem` | Running bank of vocab/grammar the learner has produced in speech (occurrenceCount, unique per user+type+surface). Informs CEFR calculation and lesson planning. |
+| `CurriculumVocab` | Reference word list per language+CEFR level (surface, reading, translation, domain). Used to constrain pipeline extraction and pick planning targets. |
+| `CurriculumGrammar` | Reference grammar patterns per language+CEFR level (pattern key, displayName, description). Same purpose. |
+| `IntroducedItem` | Pedagogically surfaced vocab/grammar/phrases per session (what the tutor taught) |
+| `Lesson` | Session record (lessonPlan JSON, transcript, correctionsDoc, sessionSummary, pipelineStage for resumability) |
+| `ErrorLog` | Per-error log entries (utteranceIndex, severity pedantic/minor/major, likelySttArtifact) |
 | `Subscription` | Stripe subscription state (free/pro) |
 | `DailyUsage` | Conversation seconds per user per day |
 

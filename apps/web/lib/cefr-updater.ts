@@ -1,129 +1,57 @@
 /**
- * CEFR Score Updater — runs after each session.
+ * CEFR Delta Computation — fully algorithmic, NO LLM.
  *
- * Evaluates the session's errors, strengths, and latency data to
- * adjust the learner's decimal CEFR scores (1.0–6.0).
+ * Deterministic formula. Max +/-0.15 per session. Never computed by LLM.
  *
- * Hard rules (from research doc):
- * - Max ±0.3 per session
- * - Min ±0.05 if any data exists
- * - Grammar driven by error rate only
- * - Fluency driven by latency/flow
+ * Factors:
+ *   Grammar: errors (negative) + vocab range produced (positive)
+ *   Fluency: L1 switches, hesitations (negative) + self-corrections,
+ *            grammar diversity produced (positive)
  */
-import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { z } from 'zod'
-import { prisma } from '@lingle/db'
-import type { SessionState } from '@lingle/shared'
+import type { ErrorLog, FluencySignals } from '@lingle/shared'
 
-const cefrUpdateSchema = z.object({
-  grammarDelta: z.number().describe('Change to grammar CEFR score. Positive = improvement, negative = regression. Range: -0.3 to +0.3'),
-  fluencyDelta: z.number().describe('Change to fluency CEFR score. Range: -0.3 to +0.3'),
-  grammarRationale: z.string().describe('Brief explanation for grammar score change'),
-  fluencyRationale: z.string().describe('Brief explanation for fluency score change'),
-})
+export function computeCefrDeltas(
+  currentGrammar: number,
+  currentFluency: number,
+  errors: ErrorLog[],
+  fluencySignals: FluencySignals,
+  sessionDurationMinutes: number,
+  producedVocabCount: number = 0,
+  producedGrammarCount: number = 0,
+): { grammarDelta: number; fluencyDelta: number } {
+  // --- Grammar Delta ---
+  const majorErrors = errors.filter((e) => e.severity === 'major').length
+  const minorErrors = errors.filter((e) => e.severity === 'minor').length
 
-function clampDelta(delta: number): number {
-  // Enforce ±0.3 max, ±0.05 min (if non-zero)
-  const clamped = Math.max(-0.3, Math.min(0.3, delta))
-  if (clamped !== 0 && Math.abs(clamped) < 0.05) {
-    return clamped > 0 ? 0.05 : -0.05
-  }
-  return Math.round(clamped * 100) / 100
-}
+  // Base: slight positive drift for completing a session
+  let grammarDelta = 0.02
 
-function clampCefr(score: number): number {
-  return Math.max(1.0, Math.min(6.0, Math.round(score * 100) / 100))
-}
+  // Penalize for errors (scaled to session length)
+  const minuteScale = Math.min(sessionDurationMinutes / 30, 1.0)
+  grammarDelta -= (majorErrors * 0.04) * minuteScale
+  grammarDelta -= (minorErrors * 0.01) * minuteScale
 
-export async function updateCefrScores(
-  userId: string,
-  sessionState: SessionState,
-): Promise<{ grammarDelta: number; fluencyDelta: number }> {
-  const learnerModel = await prisma.learnerModel.findUnique({
-    where: { userId },
-  })
-  if (!learnerModel) return { grammarDelta: 0, fluencyDelta: 0 }
+  // Reward for vocab range: each unique vocab word produced adds a small positive signal
+  // Diminishing returns: first 5 words matter most, then tapers off
+  const vocabBonus = Math.min(producedVocabCount * 0.005, 0.04)
+  grammarDelta += vocabBonus
 
-  const errorCount = sessionState.errorsLogged.length
-  const strengthCount = sessionState.strengthsNoted.length
-  const avgLatency = sessionState.avgResponseLatencySec
-  const elapsedMin = sessionState.elapsedMinutes
+  // Cap: never move more than +/-0.15 per session
+  grammarDelta = Math.max(-0.15, Math.min(0.15, grammarDelta))
 
-  // Skip if session was too short to evaluate
-  if (elapsedMin < 2 && errorCount === 0 && strengthCount === 0) {
-    return { grammarDelta: 0, fluencyDelta: 0 }
-  }
+  // --- Fluency Delta ---
+  let fluencyDelta = 0.02 // base positive drift
 
-  // Summarize errors by type
-  const errorsByType = new Map<string, number>()
-  for (const e of sessionState.errorsLogged) {
-    errorsByType.set(e.errorType, (errorsByType.get(e.errorType) ?? 0) + 1)
-  }
-  const errorSummary = [...errorsByType.entries()]
-    .map(([type, count]) => `${type}: ${count}`)
-    .join(', ') || 'none'
+  fluencyDelta -= (fluencySignals.l1SwitchCount * 0.03) * minuteScale
+  fluencyDelta -= (fluencySignals.hesitationCount * 0.005) * minuteScale
+  fluencyDelta += (fluencySignals.selfCorrectionCount * 0.01) * minuteScale // positive signal
 
-  const strengthSummary = sessionState.strengthsNoted.slice(0, 5).join('; ') || 'none noted'
+  // Reward for grammar diversity: using varied patterns signals fluency
+  const grammarBonus = Math.min(producedGrammarCount * 0.008, 0.04)
+  fluencyDelta += grammarBonus
 
-  try {
-    const { object } = await generateObject({
-      model: anthropic('claude-haiku-4-5-20251001'),
-      schema: cefrUpdateSchema,
-      prompt: `Evaluate this language learning session and determine CEFR score adjustments.
+  // Cap: never move more than +/-0.15 per session
+  fluencyDelta = Math.max(-0.15, Math.min(0.15, fluencyDelta))
 
-Current scores: Grammar ${learnerModel.cefrGrammar.toFixed(1)}, Fluency ${learnerModel.cefrFluency.toFixed(1)}
-Session duration: ${elapsedMin} minutes
-Total errors: ${errorCount} (${errorSummary})
-Strengths noted: ${strengthSummary}
-Average response latency: ${avgLatency.toFixed(1)}s
-Difficulty level: ${sessionState.difficultyLevel}/5
-Lesson phase reached: ${sessionState.lessonPhase}
-
-Rules:
-- Grammar delta: based on error rate and type. Many grammar errors = negative. Few errors at current level = slight positive.
-- Fluency delta: based on response latency and session flow. Fast responses (< 2s) = positive. Slow (> 5s) = negative.
-- Range: -0.3 to +0.3. Use small adjustments (±0.05 to ±0.1) for typical sessions.
-- Only use larger adjustments (±0.2 to ±0.3) for clearly exceptional or poor performance.
-- If insufficient data, return 0 for that dimension.`,
-    })
-
-    const grammarDelta = clampDelta(object.grammarDelta)
-    const fluencyDelta = clampDelta(object.fluencyDelta)
-
-    const newGrammar = clampCefr(learnerModel.cefrGrammar + grammarDelta)
-    const newFluency = clampCefr(learnerModel.cefrFluency + fluencyDelta)
-
-    await prisma.learnerModel.update({
-      where: { id: learnerModel.id },
-      data: {
-        cefrGrammar: newGrammar,
-        cefrFluency: newFluency,
-        sessionsCompleted: { increment: 1 },
-        avgResponseLatencySec: avgLatency || learnerModel.avgResponseLatencySec,
-      },
-    })
-
-    console.log(`[cefr-updater] ${userId}: grammar ${learnerModel.cefrGrammar.toFixed(1)} → ${newGrammar.toFixed(1)} (${grammarDelta > 0 ? '+' : ''}${grammarDelta}), fluency ${learnerModel.cefrFluency.toFixed(1)} → ${newFluency.toFixed(1)} (${fluencyDelta > 0 ? '+' : ''}${fluencyDelta})`)
-
-    return { grammarDelta, fluencyDelta }
-  } catch (err) {
-    console.error('[cefr-updater] Failed:', err)
-    // Fallback: simple heuristic
-    const grammarDelta = clampDelta(errorCount > 5 ? -0.1 : errorCount === 0 ? 0.05 : 0)
-    const fluencyDelta = clampDelta(avgLatency < 3 ? 0.05 : avgLatency > 6 ? -0.1 : 0)
-
-    if (grammarDelta !== 0 || fluencyDelta !== 0) {
-      await prisma.learnerModel.update({
-        where: { id: learnerModel.id },
-        data: {
-          cefrGrammar: clampCefr(learnerModel.cefrGrammar + grammarDelta),
-          cefrFluency: clampCefr(learnerModel.cefrFluency + fluencyDelta),
-          sessionsCompleted: { increment: 1 },
-        },
-      })
-    }
-
-    return { grammarDelta, fluencyDelta }
-  }
+  return { grammarDelta, fluencyDelta }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { SessionState, LessonPhaseType } from '@lingle/shared'
+import type { RedisSessionState, LessonPhase } from '@lingle/shared'
 import { cn } from '@/lib/utils'
 
 interface DevToolsPanelProps {
@@ -15,7 +15,7 @@ interface DevToolsPanelProps {
 export function DevToolsPanel({ sessionId, voiceState, duration, isActive, transcript }: DevToolsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [tab, setTab] = useState<'session' | 'plan' | 'state' | 'prompt' | 'transcript'>('session')
-  const [sessionState, setSessionState] = useState<SessionState | null>(null)
+  const [sessionState, setSessionState] = useState<RedisSessionState | null>(null)
   const [stateLoading, setStateLoading] = useState(false)
   const [postResult, setPostResult] = useState<Record<string, unknown> | null>(null)
 
@@ -145,13 +145,9 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
             {sessionState && (
               <>
                 <Section title="Lesson">
-                  <Row label="Phase" value={sessionState.lessonPhase} />
-                  <Row label="Phase Index" value={`${sessionState.currentPhaseIndex ?? '—'}`} />
-                  <Row label="Time Pressure" value={sessionState.timePressure ?? '—'} />
-                  <Row label="Difficulty" value={String(sessionState.difficultyLevel)} />
-                  <Row label="Elapsed" value={`${sessionState.elapsedMinutes}m`} />
-                  <Row label="Goal" value={sessionState.lessonGoal} />
-                  <Row label="Phases Done" value={sessionState.phasesCompleted?.join(', ') || 'none'} />
+                  <Row label="Phase" value={sessionState.currentPhase} />
+                  <Row label="Extension" value={sessionState.phaseExtensionGranted ? 'granted' : 'no'} />
+                  <Row label="Topic" value={sessionState.lessonPlan?.core?.topic ?? '—'} />
                 </Section>
                 <Section title={`Errors (${sessionState.errorsLogged.length})`}>
                   {sessionState.errorsLogged.length === 0 ? (
@@ -159,30 +155,24 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
                   ) : (
                     sessionState.errorsLogged.map((e, i) => (
                       <div key={i} className="py-1 border-b border-border-subtle last:border-0">
-                        <div className="text-text-primary">{e.phrase} &rarr; {e.correction}</div>
-                        <div className="text-text-muted">{e.rule} ({e.errorType})</div>
+                        <div className="text-text-primary">{e.userUtterance} &rarr; {e.correction}</div>
+                        <div className="text-text-muted">{e.errorDetail} ({e.errorType}, {e.severity})</div>
                       </div>
                     ))
                   )}
                 </Section>
-                <Section title={`Corrections (${sessionState.corrections.length})`}>
-                  {sessionState.corrections.map((c, i) => (
+                <Section title={`Corrections Queued (${sessionState.correctionsQueued.length})`}>
+                  {sessionState.correctionsQueued.map((c, i) => (
                     <div key={i} className="py-1 border-b border-border-subtle last:border-0">
-                      <div className="text-text-primary">&ldquo;{c.phrase}&rdquo; &rarr; &ldquo;{c.correction}&rdquo;</div>
-                      {c.explanation && <div className="text-text-muted mt-0.5">{c.explanation}</div>}
+                      <div className="text-text-primary">&ldquo;{c.userUtterance}&rdquo; &rarr; &ldquo;{c.correction}&rdquo;</div>
+                      <div className="text-text-muted mt-0.5">{c.errorDetail}</div>
                     </div>
                   ))}
                 </Section>
-                {(sessionState.deferredTopics?.length > 0 || sessionState.nextSessionPriority?.length > 0) && (
-                  <Section title="Between-Session">
-                    {sessionState.deferredTopics?.length > 0 && (
-                      <Row label="Deferred" value={sessionState.deferredTopics.join(', ')} />
-                    )}
-                    {sessionState.nextSessionPriority?.length > 0 && (
-                      <Row label="Next Priority" value={sessionState.nextSessionPriority.join(', ')} />
-                    )}
-                  </Section>
-                )}
+                <Section title="Whiteboard">
+                  <Row label="New Material" value={sessionState.whiteboardContent?.newMaterial?.map((i) => i.content).join(', ') || 'none'} />
+                  <Row label="Corrections" value={sessionState.whiteboardContent?.corrections?.map((i) => i.content).join(', ') || 'none'} />
+                </Section>
                 <Section title="Raw JSON">
                   <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-all text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[300px] overflow-auto">
                     {JSON.stringify(sessionState, null, 2)}
@@ -209,21 +199,15 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
             {sessionId && stateLoading && !sessionState && (
               <div className="text-text-muted text-center py-4">Loading...</div>
             )}
-            {sessionState?._devLastInjectedPrompt ? (
-              <>
-                <Section title="Last Injected SESSION STATE Block">
-                  <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-words text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[600px] overflow-auto">
-                    {sessionState._devLastInjectedPrompt}
-                  </pre>
-                </Section>
-                <ActionButton
-                  label="Copy to Clipboard"
-                  onClick={() => navigator.clipboard.writeText(sessionState._devLastInjectedPrompt ?? '')}
-                />
-              </>
+            {sessionState ? (
+              <Section title="Session State (used for prompt injection)">
+                <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-words text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[600px] overflow-auto">
+                  {JSON.stringify(sessionState, null, 2)}
+                </pre>
+              </Section>
             ) : sessionId ? (
               <div className="text-text-muted text-center py-4">
-                No prompt injected yet (waiting for first turn).
+                No state yet (waiting for session start).
                 <button onClick={fetchState} className="block mx-auto mt-2 text-accent-brand bg-transparent border-none cursor-pointer underline">
                   Retry
                 </button>
@@ -267,7 +251,7 @@ export function DevToolsPanel({ sessionId, voiceState, duration, isActive, trans
 // ─── Plan Tab ────────────────────────────────────────────────────────────────
 
 function PlanTab({ sessionState, sessionId, loading, onRetry }: {
-  sessionState: SessionState | null
+  sessionState: RedisSessionState | null
   sessionId: string | null
   loading: boolean
   onRetry: () => void
@@ -289,33 +273,34 @@ function PlanTab({ sessionState, sessionId, loading, onRetry }: {
     )
   }
 
-  const plan = sessionState.structuredPlan
+  const plan = sessionState.lessonPlan
   if (!plan) {
-    return <div className="text-text-muted text-center py-4">No structured plan (legacy session)</div>
+    return <div className="text-text-muted text-center py-4">No lesson plan</div>
   }
 
-  const currentIndex = sessionState.currentPhaseIndex ?? 0
-  const completed = new Set<LessonPhaseType>(sessionState.phasesCompleted ?? [])
-  const currentPhase = plan.phases[currentIndex]
-  const phaseElapsedMin = sessionState.phaseStartedAt
-    ? Math.round((Date.now() - sessionState.phaseStartedAt) / 60000 * 10) / 10
+  const currentPhase = sessionState.currentPhase
+  const phaseElapsedMin = sessionState.phaseStartTimeMs
+    ? Math.round((Date.now() - sessionState.phaseStartTimeMs) / 60000 * 10) / 10
     : 0
+
+  const phases: LessonPhase[] = ['warmup', 'review', 'core', 'debrief', 'closing']
+  const currentIdx = phases.indexOf(currentPhase)
 
   return (
     <div className="flex flex-col gap-3">
       <Section title="Lesson Plan">
-        <Row label="Duration" value={`${plan.sessionDurationMinutes} min`} />
-        <Row label="Domain" value={plan.domain} />
-        <Row label="Level" value={plan.cefrLevel} />
-        <Row label="Grammar" value={plan.grammarFocus || '—'} />
-        <Row label="Vocab" value={plan.vocabTargets.join(', ') || '—'} />
+        <Row label="Topic" value={plan.core.topic} />
+        <Row label="Angle" value={plan.core.angle} />
+        <Row label="Grammar" value={plan.core.targetGrammar || '—'} />
+        <Row label="Review" value={plan.review.skip ? 'Skipped' : `${plan.review.vocabItems.length} vocab, ${plan.review.grammarItems.length} grammar`} />
       </Section>
 
       <Section title="Phase Progression">
         <div className="flex flex-col gap-1">
-          {plan.phases.map((phase, i) => {
-            const isCurrent = i === currentIndex
-            const isDone = completed.has(phase.phase) || i < currentIndex
+          {phases.map((phase, i) => {
+            const isCurrent = phase === currentPhase
+            const isDone = i < currentIdx
+            const budget = plan.phaseBudgetMinutes[phase] ?? 0
             const icon = isDone ? '✓' : isCurrent ? '▶' : ' '
             const elapsed = isCurrent ? ` (${phaseElapsedMin}m elapsed)` : ''
 
@@ -329,57 +314,15 @@ function PlanTab({ sessionState, sessionId, loading, onRetry }: {
               >
                 <span className="w-4 text-center flex-shrink-0">{icon}</span>
                 <span className="flex-1">
-                  {i + 1}. {phase.phase.toUpperCase()}
-                  <span className="text-text-muted font-normal"> ({phase.targetMinutes}m)</span>
+                  {i + 1}. {phase.toUpperCase()}
+                  <span className="text-text-muted font-normal"> ({budget}m)</span>
                   {elapsed && <span className="text-accent-warm font-normal">{elapsed}</span>}
-                </span>
-                <span className={cn(
-                  'text-[9px] px-1.5 py-0.5 rounded-sm',
-                  phase.correctionMode === 'active' ? 'bg-red-50 text-red-600' :
-                  phase.correctionMode === 'recast_only' ? 'bg-amber-50 text-amber-600' :
-                  'bg-gray-50 text-gray-500',
-                )}>
-                  {phase.correctionMode}
                 </span>
               </div>
             )
           })}
         </div>
-        {sessionState.timePressure && sessionState.timePressure !== 'on_track' && (
-          <div className={cn(
-            'mt-2 text-[10px] px-2 py-1 rounded',
-            sessionState.timePressure === 'slightly_over' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700',
-          )}>
-            {sessionState.timePressure === 'slightly_over' ? '⏱ Slightly over time' : '⏱ Significantly over time'}
-          </div>
-        )}
       </Section>
-
-      {currentPhase && (
-        <Section title="Current Phase">
-          <div className="text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap">
-            {currentPhase.instructions}
-          </div>
-          {currentPhase.content.discussionPrompts && currentPhase.content.discussionPrompts.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-border-subtle">
-              <div className="text-[10px] text-text-muted uppercase tracking-wide mb-1">Discussion Prompts</div>
-              {currentPhase.content.discussionPrompts.map((p, i) => (
-                <div key={i} className="text-[11px] text-text-secondary py-0.5">{i + 1}. {p}</div>
-              ))}
-            </div>
-          )}
-          {currentPhase.content.reviewErrors && currentPhase.content.reviewErrors.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-border-subtle">
-              <div className="text-[10px] text-text-muted uppercase tracking-wide mb-1">Review Errors</div>
-              {currentPhase.content.reviewErrors.map((e, i) => (
-                <div key={i} className="text-[11px] text-text-secondary py-0.5">
-                  {e.rule}: &ldquo;{e.phrase}&rdquo; &rarr; &ldquo;{e.correction}&rdquo;
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-      )}
 
       <Section title="Full Plan JSON">
         <pre className="text-[10px] leading-relaxed whitespace-pre-wrap break-all text-text-secondary bg-bg-secondary rounded-md p-2 max-h-[300px] overflow-auto">

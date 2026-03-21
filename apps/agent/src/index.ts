@@ -90,8 +90,8 @@ import {
   getSonioxLanguageHints,
   resolveAgentTtsProvider,
   resolveAgentSttProvider,
-  type AgentMetadata,
 } from './config.js'
+import type { AgentMetadata } from '@lingle/shared'
 import { STT as SonioxSTT } from './soniox-stt.js'
 
 // Deploy version — bump this on each deploy to confirm the right code is running

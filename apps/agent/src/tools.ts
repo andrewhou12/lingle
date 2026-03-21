@@ -1,332 +1,171 @@
 /**
- * Agent tool definitions for Lingle (Pattern A + B).
+ * Agent tool definitions for Lingle — 4 tools.
  *
- * Pattern A — silent tracking (fire-and-forget, return empty string):
- *   logError, noteStrength, saveMemory, queueCorrection
+ * flagError         — fire-and-forget (returns '' immediately, Redis write in background)
+ * writeWhiteboard   — soft-blocking (awaits ~10ms Redis write before returning)
+ * updateLessonPhase — blocking (awaited, triggers slide transition in UI)
+ * endLesson         — blocking (triggers post-session pipeline)
  *
- * Pattern B — lesson management (mutate state, return empty string):
- *   adjustDifficulty, updateLessonPhase, setVocabHomework, endLesson
- *
- * All tools write to Redis session state and return '' so the LLM
- * doesn't narrate the tool call. They never block the speech pipeline.
+ * All tools return empty strings. Tool calls are invisible to the user.
  */
 import { llm } from '@livekit/agents'
+import type { LessonPhase, SlideContent } from '@lingle/shared'
 import {
-  appendError,
-  appendStrength,
-  appendCorrection,
-  queueMemory,
+  appendFlaggedError,
   setLessonPhase,
-  adjustDifficulty as adjustDifficultyState,
-  setVocabHomework as setVocabHomeworkState,
   updateSessionState,
-  advanceToNextPhase,
-  appendDeferredTopic,
-  flagForNextSession,
+  writeWhiteboard as writeWhiteboardState,
 } from './session-state.js'
 
 /**
- * Build onboarding-specific tools.
- * These make HTTP calls back to the web server to persist preferences.
- */
-function buildOnboardingTools(sessionId: string): llm.ToolContext {
-  return {
-    setGoal: llm.tool({
-      description:
-        'Record the learner\'s language learning goal. Call when you understand their motivation and timeline. Do NOT mention this tool in speech.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          goal: { type: 'string', description: 'The learner\'s goal (e.g. "Travel to Japan next year", "Pass JLPT N3")' },
-          deadline: { type: 'string', description: 'Timeline if mentioned (e.g. "6 months", "next summer"). Leave empty if not specified.' },
-        },
-        required: ['goal'],
-      },
-      execute: async (args) => {
-        queueMemory(sessionId, {
-          content: `Goal: ${args.goal}${args.deadline ? ` (timeline: ${args.deadline})` : ''}`,
-          memoryType: 'goal',
-        })
-        console.log(`[tools] setGoal: "${args.goal}" deadline=${args.deadline || 'none'}`)
-        return ''
-      },
-    }),
-
-    calibrateLevel: llm.tool({
-      description:
-        'Set the learner\'s initial CEFR level based on your conversation assessment. Call once you have enough evidence. Do NOT mention this in speech.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          cefrGrammar: { type: 'number', description: 'Grammar CEFR score 1.0-6.0 (A1=1.0, A2=2.0, B1=3.0, B2=4.0, C1=5.0, C2=6.0)' },
-          cefrFluency: { type: 'number', description: 'Fluency CEFR score 1.0-6.0' },
-          rationale: { type: 'string', description: 'Brief explanation of your assessment' },
-        },
-        required: ['cefrGrammar', 'cefrFluency', 'rationale'],
-      },
-      execute: async (args) => {
-        // Store calibration in session state for post-session processing
-        updateSessionState(sessionId, {
-          difficultyLevel: Math.round((args.cefrGrammar + args.cefrFluency) / 2),
-        }).catch((err) => console.error('[tools] calibrateLevel failed:', err))
-        queueMemory(sessionId, {
-          content: `Initial assessment: Grammar ${args.cefrGrammar.toFixed(1)}, Fluency ${args.cefrFluency.toFixed(1)}. ${args.rationale}`,
-          memoryType: 'context',
-        })
-        console.log(`[tools] calibrateLevel: grammar=${args.cefrGrammar}, fluency=${args.cefrFluency}, reason="${args.rationale}"`)
-        return ''
-      },
-    }),
-
-    setPreference: llm.tool({
-      description:
-        'Record a learner preference (correction style, session length, etc). Do NOT mention this in speech.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          key: {
-            type: 'string',
-            enum: ['correctionStyle', 'sessionLengthMinutes', 'lessonStylePreference'],
-            description: 'The preference key',
-          },
-          value: { type: 'string', description: 'The preference value' },
-        },
-        required: ['key', 'value'],
-      },
-      execute: async (args) => {
-        queueMemory(sessionId, {
-          content: `Preference: ${args.key} = ${args.value}`,
-          memoryType: 'preference',
-        })
-        console.log(`[tools] setPreference: ${args.key}=${args.value}`)
-        return ''
-      },
-    }),
-  }
-}
-
-/**
  * Build tool context for a session. Returns undefined if no sessionId
- * (test mode gets no tools — agent behaves exactly as before).
+ * (test mode gets no tools).
  */
-export function buildToolContext(sessionId: string | undefined, sessionMode?: string): llm.ToolContext | undefined {
+export function buildToolContext(
+  sessionId: string | undefined,
+  slides: SlideContent[],
+  getCurrentPhase: () => LessonPhase,
+): llm.ToolContext | undefined {
   if (!sessionId) return undefined
 
   const sid = sessionId
-  const isOnboarding = sessionMode === 'onboarding'
 
-  // Base tools available in all sessions
-  const baseTools: llm.ToolContext = {
-    // ── Pattern A: Silent Tracking ──────────────────────────────────────
-
-    logError: llm.tool({
+  return {
+    // ── flagError: fire-and-forget ──────────────────────────────────────
+    flagError: llm.tool({
       description:
-        'Log a learner error. Call this silently whenever you notice a grammar, vocabulary, or pronunciation error. Do NOT mention this tool call in your spoken response.',
+        'Log a learner error with severity minor or major. Call silently whenever you notice a grammar, vocabulary, pronunciation, register, or L1 interference error. Do NOT call for pedantic errors. Do NOT mention this tool in speech.',
       parameters: {
         type: 'object' as const,
         properties: {
+          utteranceIndex: {
+            type: 'number',
+            description: 'The turn index of the user utterance containing the error',
+          },
+          userUtterance: {
+            type: 'string',
+            description: 'What the learner said (verbatim)',
+          },
           errorType: {
             type: 'string',
-            enum: ['grammar', 'vocabulary', 'pronunciation', 'register', 'l1_interference'],
+            enum: ['grammar', 'vocab', 'pronunciation', 'register', 'l1_interference'],
             description: 'Category of the error',
           },
-          phrase: { type: 'string', description: 'What the learner said (verbatim)' },
-          correction: { type: 'string', description: 'The correct form' },
-          rule: { type: 'string', description: 'Short rule label (e.g. "te_form_conjugation", "particle_wa_ga")' },
+          errorDetail: {
+            type: 'string',
+            description: 'Description of the error (e.g. "Incorrect て-form conjugation — said 食べって, should be 食べて")',
+          },
+          correction: {
+            type: 'string',
+            description: 'The correct form',
+          },
+          severity: {
+            type: 'string',
+            enum: ['minor', 'major'],
+            description: 'Severity: minor (common slip) or major (fundamental misunderstanding)',
+          },
         },
-        required: ['errorType', 'phrase', 'correction', 'rule'],
+        required: ['utteranceIndex', 'userUtterance', 'errorType', 'errorDetail', 'correction', 'severity'],
       },
       execute: async (args) => {
-        appendError(sid, {
+        appendFlaggedError(sid, {
+          sessionId: sid,
+          utteranceIndex: args.utteranceIndex,
+          userUtterance: args.userUtterance,
           errorType: args.errorType,
-          phrase: args.phrase,
+          errorDetail: args.errorDetail,
           correction: args.correction,
-          rule: args.rule,
+          severity: args.severity,
+          likelySttArtifact: false,
         })
         return ''
       },
     }),
 
-    noteStrength: llm.tool({
+    // ── writeWhiteboard: soft-blocking (~10ms) ──────────────────────────
+    writeWhiteboard: llm.tool({
       description:
-        'Note something the learner did well. Call silently — do NOT mention this in your spoken response.',
+        'Write content to the whiteboard that the learner sees on screen. Use to show new vocabulary, grammar patterns, corrections, or phrases. The whiteboard has two sections: "new_material" for vocab/grammar/phrases being taught, and "corrections" for error corrections. Call with action "add" to add an item, "update" to change it, or "delete" to remove it. Do NOT mention this tool in speech — just reference the content naturally ("as you can see on the board...").',
       parameters: {
         type: 'object' as const,
         properties: {
-          skill: { type: 'string', description: 'The skill demonstrated (e.g. "complex sentence structure", "natural keigo usage")' },
-          example: { type: 'string', description: 'The specific phrase or utterance that demonstrated the skill' },
-        },
-        required: ['skill', 'example'],
-      },
-      execute: async (args) => {
-        appendStrength(sid, args.skill, args.example)
-        return ''
-      },
-    }),
-
-    saveMemory: llm.tool({
-      description:
-        'Save a personal fact about the learner for future sessions. Call when you learn something about their life, interests, job, family, etc. Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          content: { type: 'string', description: 'The fact to remember (e.g. "Learner works as a software engineer in Tokyo")' },
-          memoryType: {
+          itemId: {
             type: 'string',
-            enum: ['personal', 'preference', 'goal', 'context'],
-            description: 'Category of memory',
+            description: 'A unique ID for this whiteboard item (use a short descriptive key like "vocab_kaigi" or "correction_teform")',
+          },
+          section: {
+            type: 'string',
+            enum: ['new_material', 'corrections'],
+            description: 'Which whiteboard section to write to',
+          },
+          content: {
+            type: 'string',
+            description: 'The content to display (e.g. "空港 (くうこう) — airport" or "食べって → 食べて (te-form)")',
+          },
+          type: {
+            type: 'string',
+            enum: ['vocab', 'grammar', 'correction', 'phrase'],
+            description: 'The type of content',
+          },
+          action: {
+            type: 'string',
+            enum: ['add', 'update', 'delete'],
+            description: 'Whether to add a new item, update an existing one, or delete it',
           },
         },
-        required: ['content', 'memoryType'],
+        required: ['itemId', 'section', 'content', 'type', 'action'],
       },
       execute: async (args) => {
-        queueMemory(sid, {
+        await writeWhiteboardState(sid, {
+          itemId: args.itemId,
+          section: args.section,
           content: args.content,
-          memoryType: args.memoryType,
+          type: args.type,
+          action: args.action,
+          phase: getCurrentPhase(),
         })
         return ''
       },
     }),
 
-    queueCorrection: llm.tool({
+    // ── updateLessonPhase: blocking ─────────────────────────────────────
+    updateLessonPhase: llm.tool({
       description:
-        'Queue a correction for the post-session corrections document. Use for errors worth reviewing later. Do NOT mention this in your spoken response.',
+        'Advance to the next lesson phase. You MUST ask the learner for permission before calling this. Only call after they acknowledge. Do NOT mention this tool in speech.',
       parameters: {
         type: 'object' as const,
         properties: {
-          phrase: { type: 'string', description: 'What the learner said' },
-          correction: { type: 'string', description: 'The correct form' },
-          rule: { type: 'string', description: 'Grammar/vocabulary rule that applies' },
-          explanation: { type: 'string', description: 'Brief explanation for the learner' },
-        },
-        required: ['phrase', 'correction', 'rule'],
-      },
-      execute: async (args) => {
-        appendCorrection(sid, {
-          phrase: args.phrase,
-          correction: args.correction,
-          rule: args.rule,
-          explanation: args.explanation,
-        })
-        return ''
-      },
-    }),
-
-    // ── Pattern B: Lesson Management ────────────────────────────────────
-
-    adjustDifficulty: llm.tool({
-      description:
-        'Adjust the conversation difficulty up or down. Call when the learner is consistently struggling (down) or breezing through (up). Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          direction: {
+          phase: {
             type: 'string',
-            enum: ['up', 'down'],
-            description: 'Direction to adjust',
-          },
-          reason: { type: 'string', description: 'Why you are adjusting (for logging)' },
-        },
-        required: ['direction', 'reason'],
-      },
-      execute: async (args) => {
-        adjustDifficultyState(sid, args.direction)
-        console.log(`[tools] adjustDifficulty ${args.direction}: ${args.reason}`)
-        return ''
-      },
-    }),
-
-    advancePhase: llm.tool({
-      description:
-        'Advance to the next lesson phase. Call when current phase objectives are met or the SESSION STATE shows SIGNIFICANTLY_OVER time pressure. Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          reason: {
-            type: 'string',
-            description: 'Why you are transitioning (e.g. "objectives met", "time pressure")',
+            enum: ['warmup', 'review', 'core', 'debrief', 'closing'],
+            description: 'The phase to transition to',
           },
         },
-        required: ['reason'],
+        required: ['phase'],
       },
       execute: async (args) => {
-        advanceToNextPhase(sid)
-        console.log(`[tools] advancePhase: ${args.reason}`)
+        const phase = args.phase as LessonPhase
+        const slide = slides.find((s) => s.phase === phase) || {
+          phase,
+          title: phase.toUpperCase(),
+          bullets: [],
+        }
+        await setLessonPhase(sid, phase, slide)
+        console.log(`[tools] updateLessonPhase → ${phase}`)
         return ''
       },
     }),
 
-    deferTopic: llm.tool({
-      description:
-        'Defer a topic to the next session when time runs out or a pivot consumes the allocated time. Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          topic: { type: 'string', description: 'The topic to defer' },
-          reason: { type: 'string', description: 'Why deferring' },
-        },
-        required: ['topic', 'reason'],
-      },
-      execute: async (args) => {
-        appendDeferredTopic(sid, args.topic)
-        console.log(`[tools] deferTopic: "${args.topic}" — ${args.reason}`)
-        return ''
-      },
-    }),
-
-    flagForNextSession: llm.tool({
-      description:
-        'Flag an error rule for priority review in the next session. Call during debrief for errors that need more practice. Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          rule: { type: 'string', description: 'The error rule to prioritize next session' },
-        },
-        required: ['rule'],
-      },
-      execute: async (args) => {
-        flagForNextSession(sid, args.rule)
-        console.log(`[tools] flagForNextSession: ${args.rule}`)
-        return ''
-      },
-    }),
-
-    setVocabHomework: llm.tool({
-      description:
-        'Set vocabulary words for the learner to review after the session. Call near the end of a lesson to compile key vocabulary covered. Do NOT mention this in your spoken response.',
-      parameters: {
-        type: 'object' as const,
-        properties: {
-          words: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'List of vocabulary words/phrases to review',
-          },
-        },
-        required: ['words'],
-      },
-      execute: async (args) => {
-        setVocabHomeworkState(sid, args.words)
-        return ''
-      },
-    }),
-
+    // ── endLesson: blocking ─────────────────────────────────────────────
     endLesson: llm.tool({
       description:
-        'Signal that the lesson should end. Call this after the wrapup phase is complete. The system will handle cleanup. Do NOT mention this in your spoken response.',
+        'Signal that the lesson should end. Call after the closing phase is complete. The system will trigger the post-session pipeline. Do NOT mention this in speech.',
       execute: async () => {
-        updateSessionState(sid, { lessonPhase: 'wrapup' })
-          .catch((err) => console.error('[tools] endLesson failed:', err))
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        await updateSessionState(sid, { currentPhase: 'closing' as LessonPhase })
         console.log(`[tools] endLesson triggered for session ${sid}`)
         return ''
       },
     }),
   }
-
-  // Merge onboarding tools if in onboarding mode
-  if (isOnboarding) {
-    return { ...baseTools, ...buildOnboardingTools(sid) }
-  }
-
-  return baseTools
 }

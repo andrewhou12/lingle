@@ -39,144 +39,240 @@ export interface SubscriptionInfo {
   cancelAtPeriodEnd: boolean
 }
 
-// ─── Session State (Redis hot state, injected into agent every turn) ────────
+// ─── Skill Enum (21 hardcoded skills, no dynamic creation) ──────────────────
 
-export interface ErrorEntry {
-  errorType: 'grammar' | 'vocabulary' | 'pronunciation' | 'register' | 'l1_interference' | 'fluency'
-  phrase: string
-  correction: string
-  rule: string
-  timestamp?: string
-  reviewed?: boolean
+export enum Skill {
+  INTRODUCE_SELF = 'introduce_self',
+  GREET_FAREWELL = 'greet_farewell',
+  TELL_TIME = 'tell_time',
+  DESCRIBE_LOCATION = 'describe_location',
+  TALK_ABOUT_FAMILY = 'talk_about_family',
+  TALK_ABOUT_WORK = 'talk_about_work',
+  MAKE_REQUESTS = 'make_requests',
+  GIVE_OPINIONS = 'give_opinions',
+  EXPRESS_AGREEMENT_DISAGREEMENT = 'express_agreement_disagreement',
+  HANDLE_MISUNDERSTANDINGS = 'handle_misunderstandings',
+  DISCUSS_PAST_EVENTS = 'discuss_past_events',
+  DISCUSS_FUTURE_PLANS = 'discuss_future_plans',
+  MAKE_COMPARISONS = 'make_comparisons',
+  INTERJECT_NATURALLY = 'interject_naturally',
+  HANDLE_PHONE_CALLS = 'handle_phone_calls',
+  ORDER_FOOD = 'order_food',
+  NAVIGATE_TRANSPORT = 'navigate_transport',
+  SMALL_TALK = 'small_talk',
+  DESCRIBE_EMOTIONS = 'describe_emotions',
+  ARGUE_A_POINT = 'argue_a_point',
+  NARRATE_A_STORY = 'narrate_a_story',
 }
 
-export interface DifficultyConstraints {
-  grammarStructuresInScope: string[]
-  maxSentenceComplexity: 'simple' | 'compound' | 'complex'
-  vocabularyTier: 'high_frequency' | 'intermediate' | 'intermediate_advanced' | 'advanced'
-  allowL1Support: boolean
+// Mastery: 0=untested, 1=struggled, 2=with support, 3=independent, 4=automatic
+export interface SkillRecord {
+  skill: Skill
+  mastery: 0 | 1 | 2 | 3 | 4
+  lastEvidencedSessionId: string | null
 }
 
-export interface SessionState {
-  sessionId: string
+// ─── Introduced Item (pedagogically surfaced, NOT incidental) ───────────────
+
+export interface IntroducedItem {
+  id: string
   userId: string
-  lessonId: string
-  lessonPhase: 'warmup' | 'main' | 'review' | 'wrapup'
+  sessionId: string
+  type: 'vocab' | 'grammar' | 'phrase'
+  surface: string
+  translation: string | null
+  notes: string | null
+  introducedAt: Date | string
+}
+
+// ─── Produced Item (vocab/grammar the learner has used in speech) ────────────
+
+export interface ProducedItem {
+  id: string
+  userId: string
+  type: 'vocab' | 'grammar'
+  surface: string
   targetLanguage: string
-  nativeLanguage: string
-  lessonGoal: string
-  difficultyLevel: number // 1–5
-  errorsLogged: ErrorEntry[]
-  topicsCovered: string[]
-  vocabIntroduced: string[]
-  strengthsNoted: string[]
-  corrections: CorrectionEntry[]
-  memoriesQueued: MemoryEntry[]
-  elapsedMinutes: number
-  lessonDurationTarget: number
-
-  // Latency signal
-  avgResponseLatencySec: number
-  responseLatencies: number[] // rolling window of last 10 turns
-
-  // Operational difficulty constraints
-  difficultyConstraints: DifficultyConstraints
-
-  // Compaction bookkeeping
-  compactionCount: number
-  conversationTokenEstimate: number
-
-  // Structured lesson plan + phase tracking (v1)
-  structuredPlan?: StructuredLessonPlan
-  currentPhaseIndex: number
-  phaseStartedAt: number           // Unix ms when current phase started
-  phasesCompleted: LessonPhaseType[]
-  timePressure: 'on_track' | 'slightly_over' | 'significantly_over'
-
-  // Between-session continuity
-  deferredTopics: string[]
-  nextSessionPriority: string[]    // error rules flagged for next Review phase
-
-  // Dev inspection
-  _devLastInjectedPrompt?: string  // last SESSION STATE block injected into system prompt
-}
-
-export interface CorrectionEntry {
-  phrase: string
-  correction: string
-  rule: string
-  explanation?: string
-  timestamp?: string
-}
-
-export interface MemoryEntry {
-  content: string
-  memoryType: 'preference' | 'goal' | 'personal_fact' | 'personal' | 'context' | 'achievement' | 'recurring_struggle'
-  timestamp?: string
-}
-
-// ─── Structured Lesson Plan (v1: 5-phase session arc) ──────────────────────
-
-export type LessonPhaseType = 'warmup' | 'review' | 'core' | 'debrief' | 'close'
-export type CorrectionMode = 'active' | 'recast_only' | 'silent'
-
-export interface PhaseContent {
-  topic?: string
-  discussionPrompts?: string[]
-  vocabTargets?: string[]
-  grammarPattern?: string
-  reviewErrors?: Array<{ rule: string; phrase: string; correction: string }>
-}
-
-export interface PhaseDefinition {
-  phase: LessonPhaseType
-  targetMinutes: number
-  instructions: string
-  correctionMode: CorrectionMode
-  content: PhaseContent
-}
-
-export interface StructuredLessonPlan {
-  sessionDurationMinutes: number
-  domain: string
-  cefrLevel: string
-  grammarFocus: string | null
-  vocabTargets: string[]
-  phases: PhaseDefinition[]
-  difficultyConstraints: DifficultyConstraints
-}
-
-// ─── Legacy Lesson Plan (kept for backward compat) ─────────────────────────
-
-/** @deprecated Use StructuredLessonPlan instead */
-export interface LessonPlan {
-  warmupTopic: string
-  mainActivity: {
-    goal: string
-    method: string
-    expectedDurationMin: number
-  }
-  grammarFocus: string | null
-  vocabTargets: string[]
-  reviewPatterns: string[]
-  difficultyConstraints: DifficultyConstraints
-}
-
-// ─── Learner Model Summary (passed to agent via metadata) ───────────────────
-
-export interface LearnerModelSummary {
-  cefrGrammar: number
-  cefrFluency: number
-  sessionsCompleted: number
-  speechProfile: string | null
-  priorityFocus: string | null
-  errorDensityTrend: string | null
-}
-
-export interface ErrorPatternSummary {
-  rule: string
   occurrenceCount: number
-  sessionsSeen: number
+  firstSeenAt: Date | string
+  lastSeenAt: Date | string
+}
+
+// ─── Curriculum Reference (deterministic lists, no state) ───────────────────
+
+export interface CurriculumVocabItem {
+  surface: string
+  reading: string | null
+  translation: string
+  cefrLevel: string
+  domain: string | null
+}
+
+export interface CurriculumGrammarItem {
+  pattern: string
+  displayName: string
+  cefrLevel: string
+  description: string
+}
+
+// ─── Error Log (session-scoped, no cross-session aggregation) ───────────────
+
+export type ErrorType = 'grammar' | 'vocab' | 'pronunciation' | 'register' | 'l1_interference'
+export type ErrorSeverity = 'pedantic' | 'minor' | 'major'
+
+export interface ErrorLog {
+  sessionId: string
+  utteranceIndex: number
+  userUtterance: string
+  errorType: ErrorType
+  errorDetail: string
+  correction: string
+  severity: ErrorSeverity
+  likelySttArtifact: boolean
+}
+
+// ─── Transcript ─────────────────────────────────────────────────────────────
+
+export interface ToolCallLog {
+  toolName: string
+  args: Record<string, unknown>
+  timestampMs: number
+}
+
+export interface TranscriptTurn {
+  index: number
+  speaker: 'tutor' | 'user'
+  text: string
+  timestampMs: number
+  toolCallsInTurn: ToolCallLog[]
+}
+
+// ─── Lesson Plan (spec: Section 3.3) ────────────────────────────────────────
+
+export type LessonPhase = 'warmup' | 'review' | 'core' | 'debrief' | 'closing'
+
+export interface LessonPlan {
+  sessionId: string
+
+  warmup: {
+    questionOfDay: string
+    personalHook: string | null
+    hookSource: string | null
+  }
+
+  review: {
+    skip: boolean
+    vocabItems: string[]
+    grammarItems: string[]
+    errorsToRevisit: Array<{
+      userUtterance: string
+      correction: string
+      errorDetail: string
+    }>
+  }
+
+  core: {
+    topic: string
+    angle: string
+    targetGrammar: string | null
+    anticipatedErrors: string[]
+  }
+
+  phaseBudgetMinutes: {
+    warmup: number
+    review: number
+    core: number
+    debrief: number
+    closing: number
+  }
+
+  slides: SlideContent[]
+}
+
+export interface SlideContent {
+  phase: LessonPhase
+  title: string
+  bullets: string[]
+}
+
+// ─── Topic Generation (LLM output from planning step) ──────────────────────
+
+export interface TopicGenerationResult {
+  topic: string
+  angle: string
+  rationale: string
+  targetGrammarElicited: string | null
+  estimatedVocabDifficulty: 'A2' | 'B1' | 'B2'
+}
+
+// ─── Session Summary (post-session output) ──────────────────────────────────
+
+export interface SessionSummary {
+  timeline: Array<{
+    phase: LessonPhase
+    durationMinutes: number
+    summary: string
+  }>
+  introducedItems: IntroducedItem[]
+  keyErrors: ErrorLog[]
+  tutorInsights: string[]
+  suggestedFocusNextSession: string
+  cefrUpdate: {
+    grammar: { before: number; after: number }
+    fluency: { before: number; after: number }
+  }
+}
+
+// ─── Pipeline Stage (resumable post-session pipeline) ───────────────────────
+
+export type PipelineStage =
+  | 'error_classification'
+  | 'strength_analysis'
+  | 'personal_facts'
+  | 'cefr_delta'
+  | 'summary_generation'
+  | 'complete'
+
+// ─── Whiteboard (agent writes via writeWhiteboard tool) ─────────────────────
+
+export interface WhiteboardItem {
+  id: string
+  addedAtPhase: LessonPhase
+  content: string
+  type: 'vocab' | 'grammar' | 'correction' | 'phrase'
+}
+
+export interface WhiteboardContent {
+  newMaterial: WhiteboardItem[]
+  corrections: WhiteboardItem[]
+}
+
+// ─── Redis Session State (live state during voice session) ──────────────────
+
+export interface RedisSessionState {
+  sessionId: string
+  lessonPlan: LessonPlan
+  currentPhase: LessonPhase
+  phaseStartTimeMs: number
+  phaseExtensionGranted: boolean
+
+  // Accumulated during session
+  errorsLogged: ErrorLog[]
+  correctionsQueued: ErrorLog[]
+  whiteboardContent: WhiteboardContent
+
+  // Current whiteboard/slide state
+  currentSlide: SlideContent
+}
+
+// ─── Fluency Signals (from post-session Step 2) ────────────────────────────
+
+export interface FluencySignals {
+  hesitationCount: number
+  l1SwitchCount: number
+  selfCorrectionCount: number
+  clarificationRequestCount: number
+  qualitativeSummary: string
 }
 
 // ─── Agent Metadata (passed from web → agent via LiveKit dispatch) ──────────
@@ -188,21 +284,53 @@ export interface AgentMetadata {
   targetLanguage: string
   nativeLanguage: string
   basePrompt?: string
+  sessionMode?: string
 
-  // Learner context (populated for real sessions, absent for /voice/test)
+  // Learner context (populated for real sessions)
   learnerModel?: LearnerModelSummary
-  errorPatterns?: ErrorPatternSummary[]
-  structuredPlan?: StructuredLessonPlan
-  /** @deprecated Use structuredPlan instead */
   lessonPlan?: LessonPlan
-  difficultyConstraints?: DifficultyConstraints
+  userProfile?: UserProfileSummary
 
   // User preferences
   correctionStyle?: 'recast' | 'explicit' | 'none'
-  personalNotes?: string
 
   // Provider overrides
   voiceId?: string
   ttsProvider?: 'cartesia' | 'rime'
   sttProvider?: 'deepgram' | 'soniox'
+
+  // Test mode
+  sessionPlan?: Record<string, unknown>
+}
+
+// ─── Learner Model Summary (passed to agent via metadata) ───────────────────
+
+export interface LearnerModelSummary {
+  cefrGrammar: number
+  cefrFluency: number
+  skills: SkillRecord[]
+  sessionCount: number
+  totalMinutes: number
+}
+
+// ─── User Profile Summary (passed to agent for Slot 2) ─────────────────────
+
+export interface UserProfileSummary {
+  name: string | null
+  interests: string[]
+  occupation: string | null
+  family: string | null
+  goals: string | null
+  recentUpdates: string[]
+}
+
+// ─── CEFR Helpers ───────────────────────────────────────────────────────────
+
+export function cefrLabel(score: number): string {
+  if (score < 2.0) return 'A1'
+  if (score < 3.0) return 'A2'
+  if (score < 4.0) return 'B1'
+  if (score < 5.0) return 'B2'
+  if (score < 6.0) return 'C1'
+  return 'C2'
 }

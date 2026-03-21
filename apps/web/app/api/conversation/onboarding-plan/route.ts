@@ -77,9 +77,7 @@ export const POST = withAuth(async (request, { userId }) => {
     data: {
       userId,
       targetLanguage,
-      lessonGoal: 'Onboarding — getting to know you',
-      lessonPlan: plan as unknown as Prisma.InputJsonValue,
-      systemPrompt: 'onboarding',
+      lessonPlan: { ...plan, _goal: 'Onboarding — getting to know you' } as unknown as Prisma.InputJsonValue,
     },
   })
 

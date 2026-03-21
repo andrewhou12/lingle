@@ -1,26 +1,29 @@
 /**
  * Custom LiveKit Voice Agent for Lingle.
  *
- * Handles:
- * - System prompt construction from learner profile + session plan
- * - Context management: summarizes old turns to keep context window lean
- * - Data channel messages for whiteboard content
+ * Implements the 6-slot system prompt per spec Section 4.5:
+ *   Slot 1 — Identity & role, voice rules, behavioral constraints
+ *   Slot 2 — Learner profile (CEFR, skills, personal context)
+ *   Slot 3 — Lesson plan
+ *   Slot 4 — Phase instructions (exit criteria, permission protocol)
+ *   Slot 5 — Tool instructions
+ *   Slot 6 — Behavioral constraints (edge cases)
+ *
+ * Per-turn: Redis session state injected as system message addendum.
+ * Context compression after 20+ turns (async, never blocks).
  */
 import { voice, llm } from '@livekit/agents'
 import Anthropic from '@anthropic-ai/sdk'
-import { resolveAgentTtsProvider, type AgentMetadata } from './config.js'
+import type { AgentMetadata, LessonPhase } from '@lingle/shared'
+import { cefrLabel } from '@lingle/shared'
 import { buildToolContext } from './tools.js'
-import { buildWhiteboardTools, type WhiteboardMessage } from './whiteboard-tools.js'
-import { getSessionState, serializeForPrompt, updateSessionState } from './session-state.js'
+import { getSessionState, serializeForPrompt } from './session-state.js'
 
 const anthropic = new Anthropic()
 
-/** Max message pairs to keep in full before summarizing older ones */
 const MAX_FULL_TURNS = 20
-/** When summarizing, keep this many recent turns in full */
-const KEEP_RECENT_TURNS = 12
+const KEEP_RECENT_TURNS = 5
 
-/** Returns true if the transcript is empty noise (dots, punctuation, whitespace) */
 function isGarbageTranscript(text: string): boolean {
   return /^[\s.…。、,!?！？·]+$/.test(text) || text.trim().length === 0
 }
@@ -29,60 +32,24 @@ export class LingleAgent extends voice.Agent {
   private metadata: AgentMetadata
   private turnIndex = 0
   private contextSummary: string | null = null
-  /** Last injected session state signature — skip re-injection if unchanged to preserve preemptive gen */
   private lastStateSignature = ''
+  private currentPhase: LessonPhase = 'warmup'
 
   constructor(metadata: AgentMetadata) {
-    // Build base tools + whiteboard tools
-    const baseTools = buildToolContext(metadata.sessionId, metadata.sessionMode)
-
-    // Whiteboard publish uses a deferred reference — set once room is available
-    let publishFn: ((msg: WhiteboardMessage) => void) | null = null
-    const publish = (msg: WhiteboardMessage) => {
-      if (publishFn) publishFn(msg)
-      else console.warn('[LingleAgent] whiteboard publish called before room available')
-    }
-
-    const whiteboardTools = metadata.sessionId ? buildWhiteboardTools(publish) : {}
-    const allTools = baseTools ? { ...baseTools, ...whiteboardTools } : undefined
+    const slides = metadata.lessonPlan?.slides ?? []
+    const self = { currentPhase: 'warmup' as LessonPhase }
+    const tools = buildToolContext(metadata.sessionId, slides, () => self.currentPhase)
 
     super({
       instructions: buildSystemPrompt(metadata),
-      ...(allTools ? { tools: allTools } : {}),
+      ...(tools ? { tools } : {}),
     })
     this.metadata = metadata
-
-    // Wire up the publish function once we have access to the activity/room
-    // This is set lazily on the first tool call attempt
-    this._setPublishFn = (fn) => { publishFn = fn }
+    // Wire up the phase tracker so writeWhiteboard can read it
+    this._phaseRef = self
   }
 
-  private _setPublishFn: ((fn: (msg: WhiteboardMessage) => void) => void) | null = null
-
-  override async onEnter(): Promise<void> {
-    // Wire up whiteboard publish function now that we have room access
-    if (this._setPublishFn) {
-      this._setPublishFn((msg: WhiteboardMessage) => {
-        try {
-          const activity = this.getActivityOrThrow()
-          const room = (activity as unknown as {
-            room?: {
-              localParticipant?: {
-                publishData: (data: Uint8Array, opts: { reliable: boolean }) => void
-              }
-            }
-          }).room
-          if (room?.localParticipant) {
-            const encoder = new TextEncoder()
-            const payload = encoder.encode(JSON.stringify(msg))
-            room.localParticipant.publishData(payload, { reliable: true })
-          }
-        } catch {
-          // No activity or room yet
-        }
-      })
-    }
-  }
+  private _phaseRef: { currentPhase: LessonPhase } = { currentPhase: 'warmup' }
 
   override async onUserTurnCompleted(
     chatCtx: llm.ChatContext,
@@ -97,13 +64,7 @@ export class LingleAgent extends voice.Agent {
 
     this.turnIndex++
 
-    // Inject live session state (Slot 3) into system prompt.
-    // CRITICAL FOR PREEMPTIVE GEN: Only mutate the chat context if the
-    // session state actually changed semantically. If we always mutate,
-    // the framework detects a context change and cancels the preemptive
-    // response — forcing a full LLM re-generation (+300-600ms E2E).
-    // By skipping injection when state hasn't changed, preemptive gen
-    // responses survive and we save the full LLM TTFT.
+    // Inject live session state into system prompt (only if changed)
     if (this.metadata.sessionId) {
       try {
         await this.injectSessionStateIfChanged(chatCtx)
@@ -112,79 +73,52 @@ export class LingleAgent extends voice.Agent {
       }
     }
 
-    // Context management: summarize old turns when context grows too large.
-    // Fire-and-forget to avoid blocking the LLM response — compression uses
-    // a Haiku API call (~500-1000ms) which would destroy latency if awaited.
-    // The chat context is modified in place, but by the time compression
-    // finishes the LLM is already streaming. This is safe because compression
-    // only affects older messages that the LLM has already processed.
+    // Context compression (async, never blocks)
     this.maybeCompressContext(chatCtx).catch((err) => {
       console.error('[LingleAgent] Context compression failed:', err)
     })
-
   }
 
   /**
-   * Read session state from Redis and inject it into the system message
-   * ONLY if semantically important fields changed since last injection.
-   *
-   * This is critical for preemptive generation: if we always mutate the
-   * chat context, the framework cancels the preemptive response every turn,
-   * adding 300-600ms to E2E latency. By only mutating when the state
-   * actually changes (lesson phase, difficulty, error count thresholds),
-   * preemptive responses survive most turns.
-   *
-   * Fields that trigger re-injection:
-   * - lessonPhase / currentPhaseIndex (phase changed)
-   * - difficultyLevel (difficulty adjusted)
-   * - errorsLogged.length crossing a threshold (new errors matter for correction mode)
-   * - timePressure changing category (on_track → slightly_over)
-   *
-   * Fields that do NOT trigger re-injection:
-   * - elapsedMinutes (changes every turn, non-critical)
-   * - phaseStartedAt (timestamp, non-critical)
-   * - vocabIntroduced / topicsCovered (nice-to-have, not response-critical)
+   * Inject Redis session state into the system message ONLY if semantically
+   * important fields changed. Preserves preemptive generation when state is stable.
    */
   private async injectSessionStateIfChanged(chatCtx: llm.ChatContext): Promise<void> {
-    const state = await getSessionState(this.metadata.sessionId)
+    const state = await getSessionState(this.metadata.sessionId!)
     if (!state) return
 
-    // Build a signature from semantically important fields
+    // Keep phase ref in sync so writeWhiteboard knows current phase
+    this._phaseRef.currentPhase = state.currentPhase
+
     const sig = [
-      state.lessonPhase,
-      state.currentPhaseIndex,
-      state.difficultyLevel,
-      Math.floor(state.errorsLogged.length / 3), // re-inject every 3 errors
-      state.timePressure,
-      state.corrections.length > 0 ? 'has-corrections' : 'no-corrections',
+      state.currentPhase,
+      Math.floor(state.errorsLogged.length / 3),
+      state.phaseExtensionGranted ? 'ext' : 'no-ext',
+      state.correctionsQueued.length > 0 ? 'has-corrections' : 'no-corrections',
+      state.whiteboardContent.newMaterial.length,
+      state.whiteboardContent.corrections.length,
     ].join('|')
 
     if (sig === this.lastStateSignature) {
-      console.log(`[LingleAgent] session state unchanged (turn ${this.turnIndex}), skipping injection — preemptive gen preserved`)
+      console.log(`[LingleAgent] session state unchanged (turn ${this.turnIndex}), skipping injection`)
       return
     }
 
     this.lastStateSignature = sig
     const stateBlock = serializeForPrompt(state)
 
-    // Persist for dev panel inspection + log to console
-    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}, sig changed: ${sig}) ──\n${stateBlock}\n── END INJECTED PROMPT ──`)
-    updateSessionState(this.metadata.sessionId, { _devLastInjectedPrompt: stateBlock })
-      .catch((err) => console.error('[LingleAgent] Failed to persist dev prompt:', err))
+    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}) ──\n${stateBlock}\n── END ──`)
 
-    // Find the system message and append/replace the session state block
+    // Find system message and append/replace
     for (const item of chatCtx.items) {
       if (item.type === 'message') {
         const msg = item as llm.ChatMessage
         if (msg.role === 'system' || msg.role === 'developer') {
           const text = msg.textContent || ''
-          // Replace existing session state block or append
           const marker = '=== SESSION STATE (read every turn) ==='
           const markerIdx = text.indexOf(marker)
           if (markerIdx >= 0) {
-            // Replace everything from marker to end
-            const before = text.substring(0, markerIdx)
-            ;(msg as unknown as { content: string }).content = before + stateBlock
+            ;(msg as unknown as { content: string }).content = text.substring(0, markerIdx) + stateBlock
           } else {
             ;(msg as unknown as { content: string }).content = text + '\n\n' + stateBlock
           }
@@ -195,23 +129,20 @@ export class LingleAgent extends voice.Agent {
   }
 
   /**
-   * When conversation exceeds MAX_FULL_TURNS, summarize older turns into a
-   * compact summary and replace them in the chat context. Keeps the most
-   * recent KEEP_RECENT_TURNS in full for LLM quality.
+   * Compress older turns when context grows beyond MAX_FULL_TURNS.
+   * Keeps the last KEEP_RECENT_TURNS (5) always uncompressed.
+   * Async — never blocks the current turn.
    */
   private async maybeCompressContext(chatCtx: llm.ChatContext): Promise<void> {
-    // Count user+assistant message pairs (excluding system)
     const messages = chatCtx.items.filter(
       (item) => item.type === 'message' && (item as llm.ChatMessage).role !== 'system' && (item as llm.ChatMessage).role !== 'developer',
     )
 
     if (messages.length < MAX_FULL_TURNS * 2) return
 
-    // Split into old (to summarize) and recent (to keep)
     const splitPoint = messages.length - KEEP_RECENT_TURNS * 2
     const oldMessages = messages.slice(0, splitPoint)
 
-    // Build text for summarization
     const oldText = oldMessages
       .map((msg) => {
         const m = msg as llm.ChatMessage
@@ -235,13 +166,11 @@ export class LingleAgent extends voice.Agent {
       if (summaryText) {
         this.contextSummary = summaryText
 
-        // Rebuild context: keep system messages + summary + recent messages
         const systemItems = chatCtx.items.filter(
           (item) => item.type === 'message' && ((item as llm.ChatMessage).role === 'system' || (item as llm.ChatMessage).role === 'developer'),
         )
         const recentItems = messages.slice(splitPoint)
 
-        // Use truncate to clear, then re-add
         const freshCtx = new llm.ChatContext()
         for (const item of systemItems) {
           const msg = item as llm.ChatMessage
@@ -260,7 +189,6 @@ export class LingleAgent extends voice.Agent {
           freshCtx.addMessage({ role: msg.role, content: msg.textContent || '' })
         }
 
-        // Replace items in the original context
         chatCtx.items = freshCtx.items
 
         console.log(`[LingleAgent] Compressed ${oldMessages.length} messages into summary (${summaryText.length} chars)`)
@@ -269,7 +197,6 @@ export class LingleAgent extends voice.Agent {
       console.error('[LingleAgent] Context compression failed:', err)
     }
   }
-
 }
 
 function extractText(message: llm.ChatMessage): string {
@@ -287,24 +214,14 @@ function extractText(message: llm.ChatMessage): string {
 }
 
 /**
- * 6-Slot System Prompt Builder
- *
- * Slot 1 — System block: persona, behavioral rules, tool instructions
- * Slot 2 — User profile: CEFR scores, weak areas, correction style
- * Slot 3 — Session state: phase, errors, difficulty (injected per-turn via Redis)
- * Slot 4 — Retrieved memories: placeholder for Mem0 (Phase 6)
- * Slot 5 — Conversation window: managed by context compression above
- * Slot 6 — Current utterance: handled by LiveKit framework
+ * 6-Slot System Prompt Builder (spec Section 4.5)
  */
 export function buildSystemPrompt(metadata: AgentMetadata): string {
   const targetLang = metadata.targetLanguage || 'the target language'
   const nativeLang = metadata.nativeLanguage || 'English'
-  const ttsProvider = resolveAgentTtsProvider(metadata)
   const hasSession = !!metadata.sessionId
 
-  // ── Slot 1: System Block ──
-  // For test mode (no sessionId), use a simple prompt.
-  // Set AGENT_MINIMAL_PROMPT=1 to use the ultra-short prompt for latency A/B testing.
+  // Test mode (no sessionId): minimal prompt
   if (!hasSession) {
     const basePrompt = metadata.basePrompt || 'You are a spoken conversation partner'
     let prompt = basePrompt
@@ -316,139 +233,145 @@ export function buildSystemPrompt(metadata: AgentMetadata): string {
       if (plan.register) prompt += `\nRegister: ${plan.register}`
     }
 
-    // Minimal prompt (~150 tokens) for low latency
     prompt += `\n\nIMPORTANT VOICE MODE RULES:
-- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
-- Speak primarily in ${targetLang}. Use the learner's native language only for brief clarifications.
-- Do NOT use markdown, bullet points, asterisks, or other formatting — this is spoken language.
-- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
-- When the learner makes errors, recast naturally (use the correct form in your response) rather than explicitly correcting.
-- Keep turns short — 1-3 sentences is ideal for natural conversation flow.`
-    console.log(`[agent] prompt=MINIMAL (~150 tokens) hasSession=false`)
+- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud.
+- Speak primarily in ${targetLang}. Use ${nativeLang} only for brief clarifications.
+- Do NOT use markdown, bullet points, asterisks, or other formatting.
+- Do NOT include stage directions or action descriptions (*like this* or [like this]).
+- Keep turns short — 1-3 sentences.`
     return prompt
   }
 
-  // ── Full 6-slot prompt for real sessions ──
-
-  const correctionStyle = metadata.correctionStyle || 'recast'
-
+  // ── SLOT 1: Identity & Role ──
   const slot1 = `You are a skilled ${targetLang} language tutor having a real-time voice conversation with a learner whose native language is ${nativeLang}.
 
 PERSONA & APPROACH:
 - Be warm, patient, and encouraging. Sound like a real conversation partner, not a textbook.
-- Speak primarily in ${targetLang}. Switch to ${nativeLang} only for brief vocabulary clarifications when the learner is stuck.
-- Keep turns short — 1-3 sentences. This is a spoken conversation, not a lecture.
-- Create natural conversational contexts that elicit target vocabulary and grammar from the learner.
-- Track errors and strengths silently using your tools. NEVER mention tool calls in speech.
+- Speak primarily in ${targetLang}. Switch to ${nativeLang} only for brief vocabulary clarifications when stuck.
+- Keep turns short — 1-3 sentences. This is spoken conversation, not a lecture.
+- Create natural conversational contexts that elicit target vocabulary and grammar.
 
 VOICE MODE RULES:
-- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
-- Do NOT use markdown, bullet points, numbered lists, asterisks, or any text formatting.
-- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
+- Your output is sent DIRECTLY to a text-to-speech engine. Every character is spoken aloud.
+- Do NOT use markdown, bullet points, numbered lists, asterisks, or formatting.
+- Do NOT include stage directions, internal thoughts, or action descriptions.
 - Do NOT narrate your actions ("Let me log that error" / "I'm noting your progress").
-- Do NOT explicitly announce lesson phases or transitions ("Now let's move to review").
-- Do NOT mix ${nativeLang} commentary into your ${targetLang} speech. If you speak ${targetLang}, the ENTIRE response must be ${targetLang}.
-- Respond naturally to what the learner says. If they go off-topic, gently guide back.
+- Do NOT mix ${nativeLang} commentary into ${targetLang} speech.`
 
-LESSON STRUCTURE:
-You are following a structured lesson plan. Your SESSION STATE block (injected every turn) shows your current phase, instructions, timing, and correction mode. Follow these rules:
-
-PHASE RULES:
-- Follow the current phase instructions precisely. Each phase has a specific purpose.
-- Call advancePhase when: (a) the phase objectives are met, or (b) SESSION STATE shows SIGNIFICANTLY_OVER.
-- When SESSION STATE shows SLIGHTLY_OVER, wrap up the current activity naturally within 1-2 turns.
-- Transition conversationally — never announce phase changes to the learner.
-- Never go backward to a completed phase. Move forward.
-- Be proactive about driving the lesson. Do not wait for the learner to lead.
-
-CORRECTION MODES (follow the mode shown in SESSION STATE each turn):
-- 'silent': Log errors with logError but do NOT correct at all. Do not even recast.
-- 'recast_only': Use the correct form naturally in your next sentence. Do not explicitly point out the error.
-- 'active': Gently point out the error and model the correct form. Ask the learner to try.
-
-DEBRIEF PROTOCOL (when SESSION STATE shows DEBRIEF phase):
-- Review max 3 corrections from this session (check ERRORS THIS SESSION in the state).
-- For each: say what the learner said, model the correct form, ask them to try saying it.
-- Use whiteboardWriteCorrection to show each correction visually.
-- Keep it to 3-5 minutes total. Do NOT exceed.
-- Do NOT give grammar lectures. Correct, model, elicit production, move on.
-- Prioritize: errors that occurred 2+ times > errors on target grammar > one-off errors.
-- Use flagForNextSession for errors that need more practice.
-
-TOOL USAGE RULES:
-- Call logError for EVERY grammar, vocabulary, pronunciation, or register error you notice.
-- Call noteStrength when the learner demonstrates skill growth.
-- Call saveMemory when you learn personal facts (job, hobbies, family, interests).
-- Call queueCorrection for errors worth reviewing in the debrief or post-session.
-- Call advancePhase to move to the next lesson phase (do NOT use updateLessonPhase).
-- Call adjustDifficulty if the learner is consistently struggling or breezing through.
-- Call deferTopic if time runs out on a topic and you want to continue it next session.
-- All tool calls are SILENT. They must not affect your spoken output.
-
-PROHIBITED:
-- Do NOT break character or discuss the system, tools, or AI nature.
-- Do NOT give long grammar explanations mid-conversation (save for debrief).
-- Do NOT use language above the learner's level as defined in the difficulty constraints.`
-
-  // ── Slot 2: User Profile ──
+  // ── SLOT 2: Learner Profile ──
   let slot2 = ''
   if (metadata.learnerModel) {
     const lm = metadata.learnerModel
-    slot2 = `\n\nLEARNER PROFILE:
-- CEFR Grammar: ${lm.cefrGrammar.toFixed(1)} (${cefrLabelFromScore(lm.cefrGrammar)})
-- CEFR Fluency: ${lm.cefrFluency.toFixed(1)} (${cefrLabelFromScore(lm.cefrFluency)})
-- Weak areas: ${lm.weakAreas?.join(', ') || 'none identified yet'}
-- Sessions completed: ${lm.sessionsCompleted}
-- Correction style preference: ${correctionStyle}`
-    if (metadata.personalNotes) {
-      slot2 += `\n- Personal notes: ${metadata.personalNotes}`
+    slot2 = `
+
+LEARNER PROFILE:
+- CEFR Grammar: ${lm.cefrGrammar.toFixed(1)} (${cefrLabel(lm.cefrGrammar)})
+- CEFR Fluency: ${lm.cefrFluency.toFixed(1)} (${cefrLabel(lm.cefrFluency)})
+- Sessions completed: ${lm.sessionCount}
+- Correction style preference: ${metadata.correctionStyle || 'recast'}`
+  }
+
+  if (metadata.userProfile) {
+    const up = metadata.userProfile
+    if (up.name) slot2 += `\n- Name: ${up.name}`
+    if (up.occupation) slot2 += `\n- Occupation: ${up.occupation}`
+    if (up.family) slot2 += `\n- Family: ${up.family}`
+    if (up.goals) slot2 += `\n- Goals: ${up.goals}`
+    if (up.interests.length > 0) slot2 += `\n- Interests: ${up.interests.join(', ')}`
+    if (up.recentUpdates.length > 0) {
+      slot2 += `\n\nRECENT UPDATES (reference ONLY what is listed here — never infer or embellish):`
+      for (const u of up.recentUpdates) {
+        slot2 += `\n- ${u}`
+      }
     }
   }
 
-  if (metadata.errorPatterns && metadata.errorPatterns.length > 0) {
-    slot2 += `\n\nKNOWN ERROR PATTERNS (address naturally in conversation):`
-    for (const ep of metadata.errorPatterns.slice(0, 8)) {
-      slot2 += `\n- ${ep.rule}: ${ep.occurrenceCount}x across ${ep.sessionCount} sessions`
-    }
-  }
-
-  // ── Slot 3: Plan overview (per-turn state injection adds active phase details) ──
+  // ── SLOT 3: Lesson Plan ──
   let slot3 = ''
-  if (metadata.structuredPlan) {
-    const sp = metadata.structuredPlan
-    slot3 = `\n\nLESSON PLAN OVERVIEW:
-- Duration: ${sp.sessionDurationMinutes} min
-- Domain: ${sp.domain}
-- Level: ${sp.cefrLevel}
-- Grammar focus: ${sp.grammarFocus || 'none'}
-- Vocab targets: ${sp.vocabTargets.join(', ') || 'none'}
-- Phases: ${sp.phases.map((p) => p.phase).join(' → ')}
-
-The SESSION STATE block below will update every turn with your current phase instructions and timing. Follow it.`
-  } else if (metadata.lessonPlan) {
-    // Legacy fallback
+  if (metadata.lessonPlan) {
     const lp = metadata.lessonPlan
-    slot3 = `\n\nSESSION PLAN:
-- Warmup topic: ${lp.warmupTopic}
-- Main activity: ${lp.mainActivity}
-- Target vocab: ${lp.targetVocab?.join(', ') || 'none'}
-- Grammar focus: ${lp.grammarFocus?.join(', ') || 'none'}
-- Review items: ${lp.reviewPatterns?.join(', ') || 'none'}`
+    slot3 = `
+
+LESSON PLAN:
+- Warmup: ${lp.warmup.questionOfDay}${lp.warmup.personalHook ? ` (hook: ${lp.warmup.personalHook})` : ''}
+- Review: ${lp.review.skip ? 'SKIPPED (no items)' : `${lp.review.vocabItems.length} vocab, ${lp.review.grammarItems.length} grammar, ${lp.review.errorsToRevisit.length} errors to revisit`}
+- Core topic: ${lp.core.topic} — ${lp.core.angle}${lp.core.targetGrammar ? ` (target grammar: ${lp.core.targetGrammar})` : ''}
+- Phase budgets: warmup ${lp.phaseBudgetMinutes.warmup}m, review ${lp.phaseBudgetMinutes.review}m, core ${lp.phaseBudgetMinutes.core}m, debrief ${lp.phaseBudgetMinutes.debrief}m, closing ${lp.phaseBudgetMinutes.closing}m`
   }
 
-  // ── Slot 4: Episodic Memories ──
-  const slot4 = metadata.memories ? `\n\n${metadata.memories}` : ''
+  // ── SLOT 4: Phase Instructions ──
+  const slot4 = `
 
-  const fullPrompt = slot1 + slot2 + slot3 + slot4
+PHASE INSTRUCTIONS:
+
+WARMUP:
+Transition to REVIEW when: the user has shared a personal update AND at least 4 minutes have elapsed. OR when 6 minutes have elapsed regardless. Before transitioning, ask: "[Target language: Shall we move on to reviewing what we covered last time?]" and wait for acknowledgment.
+
+REVIEW (if not skipped):
+Transition to CORE when: all review items have been covered (each attempted at least once) OR when 10 minutes have elapsed in this phase. If 8 minutes have elapsed and items remain, begin wrapping up. Before transitioning, ask permission.
+
+CORE:
+Transition to DEBRIEF when: the conversation topic has been substantively explored AND at least 18 minutes have elapsed in this phase. OR when 25 minutes have elapsed. Ask permission before transitioning.
+
+DEBRIEF:
+Review major errors from the session with at least one correction attempt each. Transition to CLOSING when done OR after 5 minutes. Ask permission.
+
+CLOSING:
+Terminal phase. Encourage the user and preview what's next. Then call endLesson.
+
+PERMISSION PROTOCOL:
+Before EVERY phase transition, you MUST ask the learner for permission. Vary how you ask naturally. Wait for acknowledgment before calling updateLessonPhase.
+
+ONE-EXTENSION RULE:
+If the user asks to continue a section after you propose moving on, grant ONE extension of up to 3 additional minutes. If they ask for a second extension, say "Let's make a note of this and come back to it next time" and proceed.`
+
+  // ── SLOT 5: Tool Instructions ──
+  const slot5 = `
+
+TOOL INSTRUCTIONS:
+You have exactly 4 tools. All return empty strings. NEVER narrate or acknowledge tool calls.
+
+- flagError: Call for EVERY grammar/vocab/pronunciation/register/L1 error you notice, but ONLY severity minor or major. Pedantic errors (trivial, one-off) are NOT flagged.
+- writeWhiteboard: Write to the whiteboard the learner sees on screen. Two sections: "new_material" and "corrections". Give each item a stable itemId (e.g. "vocab_kaigi"). You can reference the board naturally but do NOT say "I'm writing to the whiteboard."
+  WHEN TO CALL:
+  - CORE phase: Call with section="new_material" every time you explicitly introduce, explain, or define a new vocabulary word, grammar pattern, or phrase. If you say a word and then explain what it means, that's an introduction — write it.
+  - DEBRIEF phase: Call with section="corrections" for each error you review. Show the incorrect form and the correction.
+  - REVIEW phase: Optionally add reviewed items from the previous session to "new_material" as you cover them.
+  - Do NOT write incidental words that appear in passing conversation. Only write items you are pedagogically surfacing.
+  - Use action="update" if you need to fix a typo. Use action="delete" to remove an item that was wrong.
+- updateLessonPhase: Call to advance to the next phase. ALWAYS ask permission first and wait for acknowledgment.
+- endLesson: Call after the closing phase to end the session.`
+
+  // ── SLOT 6: Behavioral Constraints (Edge Cases) ──
+  const slot6 = `
+
+BEHAVIORAL CONSTRAINTS:
+
+STT FAILURES:
+If the user's utterance seems incoherent, cut off, or doesn't make sense in context, ask for clarification before responding. Never fabricate meaning from unclear input. Say something like "Sorry, I didn't quite catch that — could you say that again?"
+
+OFF-SCRIPT USER:
+Acknowledge, politely redirect, and return to the session. "That's a great idea — let's save that for after our session."
+
+USER DISPUTES CORRECTION:
+Explain your reasoning once. If they remain unconvinced, acknowledge the disagreement and move on. Do not argue. Do not capitulate to incorrect pushback.
+
+USER EMOTIONAL/FRUSTRATED:
+Pause the lesson structure entirely. Acknowledge their feeling directly and genuinely. Offer encouragement specific to their actual progress. Ask if they'd like to continue or stop. Do not rush back to the lesson.
+
+USER REFUSES A PHASE:
+Honor this without argument. Call updateLessonPhase to skip it. Move to the next phase. Do not explain pedagogical value.
+
+USER PRODUCES ABOVE LEVEL:
+Do not raise difficulty. Continue at the current level. Post-session analysis will pick it up.
+
+META QUESTIONS ("What level am I?"):
+Answer briefly from your injected learner profile data. Redirect to current topic.
+
+PERSONAL FACT HALLUCINATION GUARD:
+You may ONLY reference personal facts that are explicitly present in the LEARNER PROFILE and RECENT UPDATES sections above. Never infer, guess, or embellish beyond what is written there. If a fact is not in your profile, it did not happen.`
+
+  const fullPrompt = slot1 + slot2 + slot3 + slot4 + slot5 + slot6
   console.log(`[agent] prompt=FULL_SESSION (~${Math.round(fullPrompt.length / 4)} tokens) hasSession=true`)
   return fullPrompt
-}
-
-function cefrLabelFromScore(score: number): string {
-  if (score < 1.5) return 'A1'
-  if (score < 2.5) return 'A2'
-  if (score < 3.5) return 'B1'
-  if (score < 4.5) return 'B2'
-  if (score < 5.5) return 'C1'
-  return 'C2'
 }

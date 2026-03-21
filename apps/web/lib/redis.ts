@@ -3,7 +3,7 @@
  * Used to read session state written by the agent during a lesson.
  */
 import Redis from 'ioredis'
-import type { SessionState } from '@lingle/shared'
+import type { RedisSessionState } from '@lingle/shared'
 
 let redis: Redis | null = null
 
@@ -22,28 +22,20 @@ function getRedis(): Redis | null {
   return redis
 }
 
-/**
- * Read the session state that the agent has been writing to during the lesson.
- */
-export async function getSessionState(sessionId: string): Promise<SessionState | null> {
+export async function getSessionState(sessionId: string): Promise<RedisSessionState | null> {
   const r = getRedis()
   if (!r) return null
   try {
     const raw = await r.get(`session:${sessionId}`)
     if (!raw) return null
-    return JSON.parse(raw) as SessionState
+    return JSON.parse(raw) as RedisSessionState
   } catch (err) {
     console.error('[redis] Failed to read session state:', err)
     return null
   }
 }
 
-/**
- * Initialize session state in Redis before the agent connects.
- * Called at the end of the plan route so that per-turn state injection
- * and all agent tool mutations have a state object to work with.
- */
-export async function writeSessionState(state: SessionState): Promise<void> {
+export async function writeSessionState(state: RedisSessionState): Promise<void> {
   const r = getRedis()
   if (!r) return
   try {
@@ -53,9 +45,6 @@ export async function writeSessionState(state: SessionState): Promise<void> {
   }
 }
 
-/**
- * Delete session state after post-session processing is complete.
- */
 export async function deleteSessionState(sessionId: string): Promise<void> {
   const r = getRedis()
   if (!r) return

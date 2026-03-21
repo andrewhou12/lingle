@@ -9,14 +9,14 @@ export const GET = withAuth(async (_request, { userId }) => {
     take: 20,
     select: {
       id: true,
-      summary: true,
-      lessonGoal: true,
+      lessonPlan: true,
       startedAt: true,
       endedAt: true,
       durationMinutes: true,
-      errorsCount: true,
       correctionsDoc: true,
       targetLanguage: true,
+      sessionSummary: true,
+      pipelineStage: true,
     },
   })
 
