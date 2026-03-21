@@ -1,8 +1,9 @@
 /**
  * LiveKit Agent entry point for Lingle voice conversation.
  *
- * Pipeline: Silero VAD → Soniox/Deepgram STT → GPT-4o mini LLM → Cartesia/Rime TTS
- * Post-turn analysis runs async via Claude Haiku (not latency-critical).
+ * Pipeline: Silero VAD → Turn Detector (MultilingualModel) → Soniox/Deepgram STT → LLM → Cartesia/Rime TTS
+ * Turn detection uses LiveKit's multilingual model for context-aware endpointing.
+ * Adaptive interruption handling distinguishes real interruptions from backchanneling.
  */
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'node:url'
@@ -72,8 +73,13 @@ import * as deepgram from '@livekit/agents-plugin-deepgram'
 import * as cartesia from '@livekit/agents-plugin-cartesia'
 import * as rime from '@livekit/agents-plugin-rime'
 import * as openai from '@livekit/agents-plugin-openai'
+import * as google from '@livekit/agents-plugin-google'
+import * as livekit from '@livekit/agents-plugin-livekit'
 
 import { LingleAgent } from './lingle-agent.js'
+import { ClaudeLLM } from './claude-llm.js'
+import { TTS as CartesiaPersistentTTS } from './cartesia-tts.js'
+import { TTS as RimePersistentTTS } from './rime-tts.js'
 import {
   parseAgentMetadata,
   getCartesiaVoiceId,
@@ -88,12 +94,147 @@ import {
 } from './config.js'
 import { STT as SonioxSTT } from './soniox-stt.js'
 
+// Deploy version — bump this on each deploy to confirm the right code is running
+const DEPLOY_VERSION = '2025-03-19e'
+
 // ── Diagnostic logger with elapsed time ──
 const t0 = Date.now()
 function log(msg: string) {
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2)
   console.log(`[agent +${elapsed}s] ${msg}`)
 }
+
+// ── Per-turn latency tracker ──
+// Collects timestamps at each pipeline stage and prints a consolidated breakdown.
+class TurnLatencyTracker {
+  private turnId = 0
+  private eouTs = 0              // end-of-utterance committed
+  private lastSpeakingTs = 0     // when user actually stopped speaking (from eou_metrics)
+  private speakingTs = 0         // agent state → speaking (first audio sent to room)
+  private sttFinalTs = 0         // STT final transcript received
+  private llmFirstTs = 0         // LLM first token
+  private ttsFirstTs = 0         // TTS first audio byte
+  private eouDelayMs = 0         // total EOU delay (VAD silence + turn detector + endpointing)
+  private transcriptionDelayMs = 0 // time to get transcript after speech ended
+  private callbackDelayMs = 0    // onUserTurnCompleted callback time (Redis + state injection)
+  private llmTtftMs = 0          // LLM TTFT from its own metrics
+  private ttsTtfbMs = 0          // TTS TTFB from its own metrics
+  private llmTotalMs = 0
+  private llmTokens = 0
+  private ttsTotalMs = 0
+
+  /** Called when agent state transitions to speaking (first audio going out) */
+  markSpeaking() {
+    this.speakingTs = Date.now()
+    if (this.lastSpeakingTs) {
+      const wallClockE2E = this.speakingTs - this.lastSpeakingTs
+      log(`[latency] WALL-CLOCK E2E: ${wallClockE2E}ms  (user silent → agent speaking)`)
+    }
+  }
+
+  /** Called when EOU is committed (after VAD + turn detector + endpointing + callback) */
+  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number, callbackDelayMs?: number) {
+    this.turnId++
+    this.eouTs = Date.now()
+    this.lastSpeakingTs = lastSpeakingTimeMs || Date.now() - eouDelayMs  // fallback: approximate from eouDelay
+    this.eouDelayMs = eouDelayMs
+    this.transcriptionDelayMs = transcriptionDelayMs
+    this.callbackDelayMs = callbackDelayMs || 0
+    this.sttFinalTs = 0
+    this.llmFirstTs = 0
+    this.ttsFirstTs = 0
+    this.speakingTs = 0
+    this.llmTtftMs = 0
+    this.ttsTtfbMs = 0
+    this.llmTotalMs = 0
+    this.llmTokens = 0
+    this.ttsTotalMs = 0
+    log(`[latency] ──── TURN ${this.turnId} START ────`)
+    const cbInfo = this.callbackDelayMs ? `, callback=${this.callbackDelayMs.toFixed(0)}ms` : ''
+    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms${cbInfo}, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
+  }
+
+  /** Called when STT emits final transcript */
+  markSTTFinal(transcript: string) {
+    this.sttFinalTs = Date.now()
+    const sinceEou = this.eouTs ? this.sttFinalTs - this.eouTs : 0
+    log(`[latency] STT final: +${sinceEou}ms after EOU — "${transcript.slice(0, 60)}"`)
+  }
+
+  /** Called when LLM metrics arrive */
+  markLLM(ttftMs: number, totalMs: number, tokens: number) {
+    this.llmFirstTs = this.llmFirstTs || Date.now()
+    this.llmTtftMs = ttftMs
+    this.llmTotalMs = totalMs
+    this.llmTokens = tokens
+    const sinceEou = this.eouTs ? Date.now() - this.eouTs : 0
+    log(`[latency] LLM: ttft=${ttftMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms tokens=${tokens} (+${sinceEou}ms since EOU)`)
+  }
+
+  /** Called when TTS metrics arrive */
+  markTTS(ttfbMs: number, totalMs: number) {
+    this.ttsFirstTs = this.ttsFirstTs || Date.now()
+    this.ttsTtfbMs = ttfbMs
+    this.ttsTotalMs = totalMs
+    const sinceEou = this.eouTs ? Date.now() - this.eouTs : 0
+    log(`[latency] TTS: ttfb=${ttfbMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms (+${sinceEou}ms since EOU)`)
+    this.printSummary()
+  }
+
+  /** Print consolidated turn breakdown */
+  private printSummary() {
+    if (!this.eouTs) return
+
+    const sttProcessing = this.sttFinalTs && this.eouTs ? this.sttFinalTs - this.eouTs : 0
+    const estimatedE2E = this.eouDelayMs + this.llmTtftMs + this.ttsTtfbMs
+    const wallClockE2E = this.lastSpeakingTs && this.speakingTs ? this.speakingTs - this.lastSpeakingTs : 0
+
+    log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
+    log(`[latency]   ┌─ EOU BREAKDOWN ─────────────────────────`)
+    log(`[latency]   │  Total EOU delay:    ${this.eouDelayMs.toFixed(0)}ms  (VAD + turn detector + endpointing)`)
+    if (this.callbackDelayMs) {
+      log(`[latency]   │  onUserTurnCompleted: ${this.callbackDelayMs.toFixed(0)}ms  (Redis + state injection)`)
+      if (this.callbackDelayMs > 100) {
+        log(`[latency]   │     ⚠ Callback >100ms — may be invalidating preemptive gen`)
+      }
+    }
+    log(`[latency]   │  Transcription delay: ${this.transcriptionDelayMs.toFixed(0)}ms  (STT lag behind speech)`)
+    if (this.transcriptionDelayMs > 500) {
+      log(`[latency]   │     ⚠ STT transcription delay >500ms — check STT provider`)
+    }
+    log(`[latency]   │`)
+    log(`[latency]   ├─ PIPELINE STAGES ────────────────────────`)
+    log(`[latency]   │  EOU → STT final:    ${sttProcessing}ms`)
+    log(`[latency]   │  LLM TTFT:           ${this.llmTtftMs.toFixed(0)}ms  ${this.llmTtftMs > 600 ? '⚠ slow (cache miss?)' : ''}`)
+    log(`[latency]   │  LLM total:          ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
+    log(`[latency]   │  TTS TTFB:           ${this.ttsTtfbMs.toFixed(0)}ms  ${this.ttsTtfbMs > 300 ? '⚠ slow' : ''}`)
+    log(`[latency]   │  TTS total:          ${this.ttsTotalMs.toFixed(0)}ms`)
+    log(`[latency]   │`)
+    log(`[latency]   ├─ TOTALS ─────────────────────────────────`)
+    if (wallClockE2E) {
+      log(`[latency]   │  WALL-CLOCK E2E:    ${wallClockE2E}ms  (user silent → agent speaking)`)
+    }
+    log(`[latency]   │  Sum (stages):       ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
+    log(`[latency]   │  + WebRTC overhead:  ~100-200ms`)
+    // Target assessment
+    const target = 800
+    const assessed = wallClockE2E || estimatedE2E
+    if (assessed <= target) {
+      log(`[latency]   │  ✓ Under ${target}ms target`)
+    } else if (assessed <= target * 1.25) {
+      log(`[latency]   │  ~ Close to ${target}ms target (${assessed - target}ms over)`)
+    } else {
+      log(`[latency]   │  ✗ Over ${target}ms target by ${assessed - target}ms`)
+      // Suggest where to optimize
+      if (this.eouDelayMs > 800) log(`[latency]   │    → EOU delay is the bottleneck (reduce minEndpointingDelay?)`)
+      if (this.llmTtftMs > 500) log(`[latency]   │    → LLM TTFT is the bottleneck (prompt cache hit? model choice?)`)
+      if (this.ttsTtfbMs > 250) log(`[latency]   │    → TTS TTFB is the bottleneck (check provider/network)`)
+    }
+    log(`[latency]   └────────────────────────────────────────`)
+  }
+}
+
+const turnTracker = new TurnLatencyTracker()
 
 function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
   const provider = resolveAgentSttProvider(metadata)
@@ -104,15 +245,21 @@ function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
     log(`STT=soniox hints=${hints.join(',')}`)
     return new SonioxSTT({
       languageHints: hints,
-      sampleRate: 48000,
+      sampleRate: 24000,
       enableEndpointDetection: true,
-      maxEndpointDelayMs: 2000,
+      maxEndpointDelayMs: 0,
     })
   }
 
   const deepgramLang = getDeepgramLanguage(targetLang)
   log(`STT=deepgram lang=${deepgramLang}`)
-  return new deepgram.STT({ model: 'nova-3', language: deepgramLang })
+  return new deepgram.STT({
+    model: 'nova-3',
+    language: deepgramLang,
+    // interim_results: true is the default in the LiveKit plugin — needed for preemptive gen
+    // smart_format: false to avoid extra processing latency
+    // endpointing: handled by LiveKit's VAD + turn detector, not Deepgram
+  })
 }
 
 function buildTts(metadata: AgentMetadata): tts.TTS {
@@ -122,29 +269,80 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
   if (provider === 'rime') {
     const rimeLang = getRimeLanguage(targetLang)
     const speaker = metadata.voiceId || getRimeVoiceId(rimeLang)
-    log(`TTS=rime speaker=${speaker} lang=${rimeLang}`)
-    return new rime.TTS({
-      modelId: 'arcana',
+    log(`TTS=rime-persistent speaker=${speaker} lang=${rimeLang}`)
+    return new RimePersistentTTS({
       speaker,
       lang: rimeLang,
-      speedAlpha: 1.0,
       samplingRate: 24000,
-      temperature: 0.3,
-      repetition_penalty: 1.1,
+      speedAlpha: 1.0,
+      reduceLatency: true,
     })
   }
 
   const cartesiaLang = getCartesiaLanguage(targetLang)
   const voiceId = metadata.voiceId || getCartesiaVoiceId(cartesiaLang)
-  log(`TTS=cartesia voice=${voiceId} lang=${cartesiaLang}`)
-  return new cartesia.TTS({
+  log(`TTS=cartesia-persistent voice=${voiceId} lang=${cartesiaLang}`)
+  // CJK mode: 'fast' (lower latency, per-token + 300ms server buffer) or 'natural' (smooth, client-side buffered)
+  // Toggle with AGENT_CJK_MODE=natural in .env to switch back
+  const cjkMode = (process.env.AGENT_CJK_MODE === 'natural' ? 'natural' : 'fast') as 'natural' | 'fast'
+  log(`TTS=cartesia-persistent voice=${voiceId} lang=${cartesiaLang} cjkMode=${cjkMode}`)
+  return new CartesiaPersistentTTS({
     model: 'sonic-3',
     voice: voiceId,
     language: cartesiaLang,
     speed: cartesiaLang === 'ja' ? 0.8 : 1.15,
     sampleRate: 24000,
-    wordTimestamps: cartesiaLang === 'en',
+    wordTimestamps: false,
+    bufferDelayMs: 150,
+    cjkMode,
   })
+}
+
+// ── Network RTT probe ──
+// Measures baseline round-trip time to each external service.
+async function probeNetworkLatency(): Promise<void> {
+  const targets: { name: string; url: string }[] = [
+    { name: 'OpenAI', url: 'https://api.openai.com/v1/models' },
+    { name: 'Cartesia', url: 'https://api.cartesia.ai/' },
+    { name: 'Soniox', url: 'https://api.soniox.com/' },
+    { name: 'Anthropic', url: 'https://api.anthropic.com/' },
+  ]
+
+  const results: string[] = []
+  await Promise.all(
+    targets.map(async ({ name, url }) => {
+      const start = Date.now()
+      try {
+        await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) })
+        results.push(`${name}=${Date.now() - start}ms`)
+      } catch {
+        results.push(`${name}=ERR(${Date.now() - start}ms)`)
+      }
+    }),
+  )
+
+  // Try to detect agent region from metadata endpoint (works on most cloud providers)
+  let region = 'unknown'
+  try {
+    // GCP
+    const res = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/zone', {
+      headers: { 'Metadata-Flavor': 'Google' },
+      signal: AbortSignal.timeout(1000),
+    })
+    if (res.ok) region = (await res.text()).split('/').pop() || 'gcp-unknown'
+  } catch {
+    try {
+      // AWS
+      const res = await fetch('http://169.254.169.254/latest/meta-data/placement/region', {
+        signal: AbortSignal.timeout(1000),
+      })
+      if (res.ok) region = await res.text()
+    } catch {
+      // Not on GCP or AWS — that's fine
+    }
+  }
+
+  log(`[network] RTT: ${results.join('  ')}  agent_region=${region}`)
 }
 
 export default defineAgent({
@@ -156,8 +354,36 @@ export default defineAgent({
     const entryStart = Date.now()
     const metadata = parseAgentMetadata(ctx.job.metadata)
     const targetLang = metadata.targetLanguage || 'Japanese'
-    log(`entry START — lang=${targetLang} pid=${process.pid}`)
+    log(`entry START — deploy=${DEPLOY_VERSION} lang=${targetLang} pid=${process.pid}`)
     log(`job.id=${ctx.job.id ?? 'none'} metadata=${ctx.job.metadata?.slice(0, 200) ?? 'none'}`)
+
+    // Probe network latency to external services (non-blocking)
+    probeNetworkLatency().catch(() => {})
+
+    // Raw Haiku TTFT test — bare API call, no framework overhead
+    ;(async () => {
+      try {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk')
+        const client = new Anthropic()
+        const t = Date.now()
+        const stream = client.messages.stream({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 50,
+          stream: true,
+          messages: [{ role: 'user', content: 'Say hello in one sentence.' }],
+        })
+        let ttft = 0
+        for await (const event of stream) {
+          if (!ttft && event.type === 'content_block_delta') {
+            ttft = Date.now() - t
+          }
+        }
+        const total = Date.now() - t
+        log(`[haiku-probe] raw TTFT=${ttft}ms total=${total}ms (no framework)`)
+      } catch (err) {
+        log(`[haiku-probe] failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    })()
 
     // Log environment state
     log(`env: OPENAI_API_KEY=${process.env.OPENAI_API_KEY ? 'set' : 'MISSING'}`)
@@ -206,55 +432,114 @@ export default defineAgent({
     const vadStart = Date.now()
     const { VAD } = await import('@livekit/agents-plugin-silero')
     const vad = await VAD.load({
-      activationThreshold: 0.65,
-      minSpeechDuration: 150,
+      activationThreshold: 0.5,
+      minSpeechDuration: 100,
+      minSilenceDuration: 200,
+      prefixPaddingDuration: 200,
     })
     log(`step 2: VAD loaded in ${Date.now() - vadStart}ms`)
+
+    // Turn detector: required for preemptive generation to work correctly.
+    // Without it, the framework starts LLM on partial transcripts → wrong responses.
+    // Adds ~750ms to EOU, but preemptive gen runs the LLM during that window,
+    // so the net latency impact is minimal (~LLM TTFT is hidden behind turn detector).
+    const turnDetector = new livekit.turnDetector.MultilingualModel()
 
     // ── Step 3: Create AgentSession ──
     log(`step 3: creating AgentSession...`)
     const stt = buildStt(metadata)
     const ttsInstance = buildTts(metadata)
-    const llm = new openai.LLM({
-      model: 'gpt-4o-mini',
-      maxCompletionTokens: 300,
-    })
-    log(`step 3: providers created (stt=${stt.constructor.name} llm=gpt-4o-mini tts=${ttsInstance.constructor.name})`)
+
+    // LLM provider selection via AGENT_LLM_PROVIDER env var.
+    // Options: claude (default), openai, openai-nano, gemini
+    const llmProvider = process.env.AGENT_LLM_PROVIDER || 'claude'
+    let llm: InstanceType<typeof ClaudeLLM> | openai.LLM | google.LLM
+    let llmLabel: string
+
+    switch (llmProvider) {
+      case 'openai':
+        llm = new openai.LLM({ model: 'gpt-4.1-mini', maxCompletionTokens: 300 })
+        llmLabel = 'openai/gpt-4.1-mini'
+        break
+      case 'openai-nano':
+        llm = new openai.LLM({ model: 'gpt-4.1-nano', maxCompletionTokens: 300 })
+        llmLabel = 'openai/gpt-4.1-nano'
+        break
+      case 'gemini':
+        llm = new google.LLM({ model: 'gemini-2.5-flash', maxOutputTokens: 300 })
+        llmLabel = 'google/gemini-2.5-flash'
+        break
+      default:
+        llm = new ClaudeLLM({ model: 'claude-haiku-4-5-20251001', maxTokens: 200 })
+        llmLabel = 'claude-haiku-4.5'
+        break
+    }
+
+    log(`step 3: providers created (stt=${stt.constructor.name} llm=${llmLabel} tts=${ttsInstance.constructor.name})`)
+
+    // Preemptive generation: only works with Cartesia, which supports concurrent
+    // context_id isolation. Rime's protocol explicitly does NOT maintain multiple
+    // simultaneous context IDs — preemptive streams contaminate the shared
+    // connection and cause audio from wrong responses to leak through.
+    const ttsProvider = resolveAgentTtsProvider(metadata)
+    const usePreemptiveGen = ttsProvider === 'cartesia'
 
     const session = new voice.AgentSession({
       vad,
       stt,
       llm,
       tts: ttsInstance,
+      turnDetection: turnDetector,
       voiceOptions: {
-        preemptiveGeneration: true,
-        minEndpointingDelay: 0.5,
-        maxEndpointingDelay: 3.0,
-        minInterruptionDuration: 0.3,
-        minInterruptionWords: 1,
+        preemptiveGeneration: usePreemptiveGen,
+        // Node.js SDK uses MILLISECONDS (not seconds like Python).
+        // minEndpointingDelay: time to wait after VAD silence before committing turn.
+        //   500ms: safe default, good for natural pauses in speech.
+        //   400ms: slightly faster response, tiny risk of cutting off slow speakers.
+        //   With preemptive generation (Cartesia), LLM starts during this window,
+        //   so reducing it further has diminishing returns.
+        minEndpointingDelay: 400,
+        maxEndpointingDelay: 3000,
+        // minInterruptionDuration: how long user must speak to interrupt agent.
+        //   500ms: prevents backchanneling ("うん", "uh-huh") from interrupting.
+        //   Lower values make the agent more responsive to real interruptions
+        //   but risk false interruptions from acknowledgment sounds.
+        minInterruptionDuration: 500,
+        minInterruptionWords: 0,
       },
     })
+    log(`step 3: preemptiveGeneration=${usePreemptiveGen} (tts=${ttsProvider})`)
     log(`step 3: AgentSession created`)
 
     // ── Metrics + error logging ──
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        log(`[metrics] EOU delay=${m.endOfUtteranceDelayMs.toFixed(0)}ms`)
+        const callbackDelay = (m as unknown as { onUserTurnCompletedDelayMs?: number }).onUserTurnCompletedDelayMs ?? 0
+        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs, callbackDelay)
       } else if (m.type === 'llm_metrics') {
-        log(`[metrics] LLM ttft=${m.ttftMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms tokens=${m.completionTokens}`)
+        turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {
-        log(`[metrics] TTS ttfb=${m.ttfbMs.toFixed(0)}ms total=${m.durationMs.toFixed(0)}ms`)
+        turnTracker.markTTS(m.ttfbMs, m.durationMs)
       }
     })
 
     session.on(voice.AgentSessionEventTypes.AgentStateChanged, (ev) => {
-      log(`[event] agent state: ${(ev as unknown as { oldState?: string }).oldState ?? '?'} → ${(ev as unknown as { newState?: string }).newState ?? '?'}`)
+      const oldState = (ev as unknown as { oldState?: string }).oldState ?? '?'
+      const newState = (ev as unknown as { newState?: string }).newState ?? '?'
+      log(`[event] agent state: ${oldState} → ${newState}`)
+      if (newState === 'speaking') {
+        turnTracker.markSpeaking()
+      }
     })
 
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {
       const transcript = (ev as unknown as { transcript?: string }).transcript ?? ''
-      log(`[event] user transcribed: "${transcript.slice(0, 100)}"`)
+      const isFinal = (ev as unknown as { isFinal?: boolean }).isFinal ?? false
+      log(`[event] user transcribed (final=${isFinal}): "${transcript.slice(0, 100)}"`)
+      if (isFinal && transcript.trim()) {
+        turnTracker.markSTTFinal(transcript)
+      }
     })
 
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {

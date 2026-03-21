@@ -31,9 +31,9 @@ export default function SignInPage() {
       const res = await fetch('/api/auth/sync-user', { method: 'POST' })
       if (res.ok) {
         const { onboardingCompleted } = await res.json()
-        router.push(onboardingCompleted ? '/conversation' : '/onboarding')
+        router.push(onboardingCompleted ? '/dashboard' : '/onboarding')
       } else {
-        router.push('/conversation')
+        router.push('/dashboard')
       }
     } catch {
       setError('Something went wrong. Please try again.')

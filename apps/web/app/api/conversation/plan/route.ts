@@ -1,354 +1,463 @@
 import { NextResponse } from 'next/server'
-import { generateObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
-
-export const maxDuration = 60
 import { withUsageCheck, getUsageInfo } from '@/lib/usage-guard'
 import { prisma } from '@lingle/db'
-import { buildSystemPrompt } from '@/lib/experience-prompt'
-import { getDifficultyLevel } from '@/lib/difficulty-levels'
-import { normalizePlan, type SessionPlan } from '@/lib/session-plan'
-import type { ScenarioMode } from '@/lib/experience-scenarios'
+import {
+  getVocabTargets,
+  getNextGrammarFocus,
+  selectNextDomain,
+  getGrammarStructuresInScope,
+} from '@/lib/curriculum'
+import { searchMemories } from '@/lib/memory'
+import { writeSessionState } from '@/lib/redis'
 import type { Prisma } from '@prisma/client'
-import { MODE_TOOLS } from '@/lib/conversation-tools'
-import { getLanguageById } from '@/lib/languages'
-import { getVarietySeed } from '@/lib/conversation-variety'
-import { warmSessionCache } from '@/lib/conversation-session-cache'
+import type {
+  StructuredLessonPlan,
+  PhaseDefinition,
+  DifficultyConstraints,
+  SessionState,
+} from '@lingle/shared'
 
-// --- Per-mode Zod schemas ---
+export const maxDuration = 60
 
-function buildConversationPlanSchema(registerOptions: string) {
-  return z.object({
-    topic: z.string().describe('What the conversation is about — e.g. "Recommending restaurants to a friend visiting Tokyo"'),
-    persona: z.object({
-      name: z.string().optional().describe('Optional character name'),
-      relationship: z.string().describe('Relationship to the learner — e.g. "close friend", "coworker", "shopkeeper"'),
-      personality: z.string().describe('Personality traits — e.g. "cheerful and talkative", "reserved but warm"'),
-    }),
-    register: z.string().describe(registerOptions),
-    tone: z.string().describe('"lighthearted", "serious", "playful debate", etc.'),
-    setting: z.string().optional().describe('Where the conversation takes place — e.g. "izakaya after work", "LINE messages"'),
-    speakers: z.number().optional().describe('Number of speakers — default 2, 3+ means AI plays multiple roles'),
-    culturalContext: z.string().optional().describe('Relevant cultural context — e.g. "end-of-year party season"'),
-    dynamic: z.string().optional().describe('Conversation dynamic — e.g. "AI leads", "learner is asking for advice"'),
-    tension: z.string().optional().describe('Conversational tension or challenge — e.g. "politely decline an invitation"'),
-    sections: z.array(z.object({
-      id: z.string().describe('Short kebab-case ID — e.g. "greeting", "topic-1", "wrap-up"'),
-      label: z.string().describe('Short display label — e.g. "Greeting", "Weekend plans"'),
-      description: z.string().describe('1-sentence description of what happens in this section'),
-    })).describe('3-6 ordered conversation sections forming a skeleton/roadmap. Always start with a greeting/opener and end with a natural wrap-up.'),
-  })
+// --- Helpers ---
+
+/** Map ISO 639-1 language codes to display names expected by the agent */
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  ja: 'Japanese',
+  en: 'English',
+  ko: 'Korean',
+  zh: 'Mandarin Chinese',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
 }
 
-const tutorPlanSchema = z.object({
-  topic: z.string().describe('What the lesson covers — e.g. "te-form: formation and common uses"'),
-  objective: z.string().describe('What the learner should be able to do after — e.g. "Conjugate and use te-form in 3 sentence patterns"'),
-  steps: z.array(z.object({
-    title: z.string().describe('Step title'),
-    type: z.enum(['activate', 'explain', 'check', 'practice', 'produce', 'review']).describe('Pedagogical step type'),
-    status: z.enum(['upcoming', 'active', 'completed', 'skipped']).default('upcoming'),
-  })).describe('3-8 ordered lesson steps using the 6 pedagogical types'),
-  concepts: z.array(z.object({
-    label: z.string().describe('The concept — e.g. "te-form", "食べる"'),
-    type: z.enum(['grammar', 'vocabulary', 'usage']).describe('Concept category'),
-  })).describe('Key concepts being taught'),
-  exerciseTypes: z.array(z.string()).optional().describe('Types of exercises to use'),
-})
-
-const milestoneSchema = z.object({
-  description: z.string(),
-  completed: z.boolean().default(false),
-})
-
-const planBaseFields = {
-  focus: z.string().describe('One-line session description'),
-  goals: z.array(z.string()).describe('2-4 specific learning objectives'),
-  approach: z.string().describe('1-2 sentences on teaching strategy'),
-  milestones: z
-    .array(milestoneSchema)
-    .describe('3-5 ordered checkpoints to hit during the session'),
+function languageDisplayName(code: string): string {
+  return LANGUAGE_DISPLAY_NAMES[code] || code
 }
 
-const immersionPlanSchema = z.object({
-  ...planBaseFields,
-  contentType: z
-    .string()
-    .describe('Content type: dialogue, reading, news, proficiency-exam, or custom'),
-  contentSpec: z
-    .string()
-    .describe('Specific description of the content to generate'),
-  comprehensionQuestions: z
-    .array(z.string())
-    .optional()
-    .describe('2-4 comprehension questions to ask after presenting content'),
-  targetVocabulary: z
-    .array(z.string())
-    .optional()
-    .describe('Key vocabulary the content will feature'),
-})
+function getCefrLabel(score: number): string {
+  if (score < 1.5) return 'Absolute Beginner (A1)'
+  if (score < 2.5) return 'Beginner (A1-A2)'
+  if (score < 3.0) return 'Elementary (A2)'
+  if (score < 3.5) return 'Pre-Intermediate (A2-B1)'
+  if (score < 4.0) return 'Intermediate (B1)'
+  if (score < 4.5) return 'Upper Intermediate (B1-B2)'
+  if (score < 5.0) return 'Advanced (B2)'
+  if (score < 5.5) return 'Upper Advanced (B2-C1)'
+  if (score < 6.0) return 'Near-Native (C1)'
+  return 'Native-Level (C2)'
+}
 
-const referencePlanSchema = z.object({
-  ...planBaseFields,
-  topic: z.string().describe('The main topic being asked about'),
-  relatedTopics: z
-    .array(z.string())
-    .optional()
-    .describe('2-4 related topics the learner might want to explore next'),
-})
+function cefrLabel(score: number): string {
+  if (score < 1.5) return 'A1'
+  if (score < 2.5) return 'A2'
+  if (score < 3.5) return 'B1'
+  if (score < 4.5) return 'B2'
+  if (score < 5.5) return 'C1'
+  return 'C2'
+}
 
-function getPlanSchema(mode: string, registerOptions: string) {
-  switch (mode) {
-    case 'tutor':
-      return tutorPlanSchema
-    case 'immersion':
-      return immersionPlanSchema
-    case 'reference':
-      return referencePlanSchema
-    default:
-      return buildConversationPlanSchema(registerOptions)
+/** Map domains to discussion prompt templates */
+const DOMAIN_PROMPTS: Record<string, string[]> = {
+  food: [
+    'Ask what they like to cook or eat, and why',
+    'Discuss a memorable meal or restaurant experience',
+    'Talk about food differences between their culture and the target language culture',
+  ],
+  travel: [
+    'Ask about a place they have visited or want to visit',
+    'Discuss what they enjoy most about traveling',
+    'Talk about a surprising or funny travel experience',
+  ],
+  work: [
+    'Ask about their job or daily routine',
+    'Discuss what they find challenging or rewarding about their work',
+    'Talk about how work culture differs across countries',
+  ],
+  health: [
+    'Ask about their exercise or wellness habits',
+    'Discuss how they stay healthy or deal with stress',
+    'Talk about seasonal changes and how they affect daily life',
+  ],
+  relationships: [
+    'Ask about their friends or family',
+    'Discuss what they value in friendships',
+    'Talk about how they keep in touch with people they care about',
+  ],
+  hobbies: [
+    'Ask about hobbies or things they do in their free time',
+    'Discuss something new they have been trying recently',
+    'Talk about a hobby they would like to start',
+  ],
+  general: [
+    'Ask about their week and anything interesting that happened',
+    'Discuss something they have been thinking about lately',
+    'Talk about a goal they are working toward',
+  ],
+  culture: [
+    'Ask about cultural differences they have noticed',
+    'Discuss a movie, book, or show they enjoyed recently',
+    'Talk about traditions or celebrations they look forward to',
+  ],
+  technology: [
+    'Ask about apps or tools they use every day',
+    'Discuss how technology has changed something in their life',
+    'Talk about a piece of technology they find interesting or frustrating',
+  ],
+  nature: [
+    'Ask about their favorite season and why',
+    'Discuss outdoor activities they enjoy',
+    'Talk about a natural place that is special to them',
+  ],
+}
+
+// ── Structured Plan Builder (algorithmic, no LLM) ──────────────────────
+
+function deriveDifficultyConstraints(
+  cefrGrammar: number,
+  grammarInScope: string[],
+): DifficultyConstraints {
+  let maxSentenceComplexity: DifficultyConstraints['maxSentenceComplexity'] = 'simple'
+  let vocabularyTier: DifficultyConstraints['vocabularyTier'] = 'high_frequency'
+  let allowL1Support = true
+
+  if (cefrGrammar >= 3.0) {
+    maxSentenceComplexity = 'compound'
+    vocabularyTier = 'intermediate'
+  }
+  if (cefrGrammar >= 4.0) {
+    maxSentenceComplexity = 'complex'
+    vocabularyTier = 'intermediate_advanced'
+    allowL1Support = false
+  }
+  if (cefrGrammar >= 5.0) {
+    vocabularyTier = 'advanced'
+  }
+
+  return {
+    grammarStructuresInScope: grammarInScope.slice(0, 15),
+    maxSentenceComplexity,
+    vocabularyTier,
+    allowL1Support,
   }
 }
 
-function getModeSpecificPlanningInstructions(mode: string, targetLanguage: string, registerOptions?: string): string {
-  switch (mode) {
-    case 'tutor':
-      return `This is a TUTOR session. Generate a structured lesson plan:
-- topic: what the lesson covers
-- objective: what the learner should be able to do after the lesson
-- steps: 3-8 ordered pedagogical steps. Each step has a type:
-  * "activate" — warm up, activate prior knowledge
-  * "explain" — teach a new concept with examples
-  * "check" — quick comprehension check (question, true/false, etc.)
-  * "practice" — guided practice with exercises
-  * "produce" — free production (learner creates their own sentences/output)
-  * "review" — summarize, reinforce, preview next steps
-  Compose steps freely from these building blocks. All start with status "upcoming".
-- concepts: key grammar, vocabulary, and usage concepts being taught (in ${targetLanguage})
-- exerciseTypes: types of exercises you'll use (e.g. "fill-in-the-blank", "translation", "sentence building")`
+function buildStructuredPlan(params: {
+  sessionDurationMinutes: number
+  domain: string
+  cefrLevel: string
+  targetLanguage: string
+  grammarFocus: { pattern: string; displayName: string } | null
+  vocabTargets: string[]
+  reviewErrors: Array<{ rule: string; phrase: string; correction: string }>
+  memories: string | null
+  difficultyConstraints: DifficultyConstraints
+}): StructuredLessonPlan {
+  const dur = params.sessionDurationMinutes
+  const domain = params.domain
+  const prompts = DOMAIN_PROMPTS[domain] || DOMAIN_PROMPTS.general
 
-    case 'immersion':
-      return `This is an IMMERSION session. Generate a content-focused plan:
-- contentType: one of "dialogue", "reading", "news", "proficiency-exam", or "custom"
-- contentSpec: describe the specific content you'll generate (topic, length, style)
-- comprehensionQuestions: 2-4 questions to test understanding after presenting content
-- targetVocabulary: key vocabulary the content will feature (in ${targetLanguage})`
+  // Timing proportions: warmup 15%, review 10%, core 45%, debrief 20%, close 10%
+  const phases: PhaseDefinition[] = [
+    {
+      phase: 'warmup',
+      targetMinutes: Math.round(dur * 0.15),
+      correctionMode: 'silent',
+      instructions: [
+        `Start with friendly small talk in ${params.targetLanguage}.`,
+        `Ask about their week or something personal related to "${domain}".`,
+        `Keep it light — this is about easing into the target language at low stakes.`,
+        params.memories ? `You know from past sessions: ${params.memories}` : '',
+      ].filter(Boolean).join(' '),
+      content: {
+        topic: domain,
+      },
+    },
+    {
+      phase: 'review',
+      targetMinutes: Math.max(2, Math.round(dur * 0.10)),
+      correctionMode: 'recast_only',
+      instructions: params.reviewErrors.length > 0
+        ? [
+            `Briefly check in on material from recent sessions.`,
+            `Naturally bring up contexts where these errors tend to occur — don't quiz directly.`,
+            `If the learner produces the correct form, note it as a strength and move on.`,
+            `If they make the same error, recast naturally and move on.`,
+          ].join(' ')
+        : `No specific errors to review. Briefly warm up with a question about recent ${params.targetLanguage} practice or something they learned recently.`,
+      content: {
+        reviewErrors: params.reviewErrors.length > 0 ? params.reviewErrors : undefined,
+        vocabTargets: params.vocabTargets.slice(0, 2),
+      },
+    },
+    {
+      phase: 'core',
+      targetMinutes: Math.round(dur * 0.45),
+      correctionMode: 'recast_only',
+      instructions: [
+        `Free conversation about "${domain}". Guide the discussion using the prompts below.`,
+        `Create natural contexts that elicit the target vocabulary.`,
+        params.grammarFocus
+          ? `Look for opportunities to model "${params.grammarFocus.displayName}" in your speech and invite the learner to try using it.`
+          : '',
+        `Keep turns short (1-3 sentences). This is a conversation, not a lecture.`,
+      ].filter(Boolean).join(' '),
+      content: {
+        topic: domain,
+        discussionPrompts: prompts,
+        vocabTargets: params.vocabTargets,
+        grammarPattern: params.grammarFocus?.displayName ?? undefined,
+      },
+    },
+    {
+      phase: 'debrief',
+      targetMinutes: Math.round(dur * 0.20),
+      correctionMode: 'active',
+      instructions: [
+        `Review the top 2-3 errors from this session. For each error:`,
+        `1. Say what the learner said and what the natural form would be.`,
+        `2. Model a sentence using the correct form.`,
+        `3. Ask the learner to try saying it.`,
+        `4. Confirm briefly and move to the next one.`,
+        `Use whiteboardWriteCorrection to show each correction visually.`,
+        `Keep it to 3 corrections max. Do NOT lecture or give long grammar explanations.`,
+        `Correct, model, move on.`,
+      ].join(' '),
+      content: {},
+    },
+    {
+      phase: 'close',
+      targetMinutes: Math.max(2, Math.round(dur * 0.10)),
+      correctionMode: 'silent',
+      instructions: [
+        `Wrap up warmly. Mention 1-2 vocabulary words from this session to keep practicing.`,
+        `Give a brief preview of what you'd like to work on next time.`,
+        `End with an encouraging note about something specific they did well today.`,
+        `Then call endLesson.`,
+      ].join(' '),
+      content: {},
+    },
+  ]
 
-    case 'reference':
-      return `This is a REFERENCE session. Generate a Q&A-focused plan:
-- topic: the main topic being asked about
-- relatedTopics: 2-4 related topics the learner might want to explore next
-- milestones should focus on: define the concept, show examples, address common mistakes, offer practice`
-
-    default:
-      return `This is a CONVERSATION session. Generate a scene card — pure context for a natural conversation:
-- topic: what the conversation is about (be specific and engaging)
-- persona: { relationship, personality } — who the AI is playing. Add a name if it fits.
-- register: ${registerOptions || '"casual", "polite", or "mixed"'} — match the situation
-- tone: the emotional quality — "lighthearted", "serious", "playful debate", etc.
-- setting: where the conversation takes place (optional, include if it adds flavor)
-- culturalContext: relevant cultural context (optional)
-- dynamic: who leads, what's the conversational flow (optional)
-- tension: a conversational challenge or tension point (optional — e.g. "politely decline an invitation")
-- sections: Generate 3-6 ordered sections forming a conversation skeleton/roadmap. The first section should always be a greeting/opener. The last section should be a natural wrap-up. Middle sections are topics to explore. Each section has a short id (kebab-case), a label, and a 1-sentence description.
-
-IMPORTANT: This is a scene card, NOT a lesson plan. No learning objectives, no milestones, no grammar targets. The learning is implicit through natural conversation.
-
-If the user provided a specific topic or scenario, make the scene card match it — specific and interesting.
-
-If the user prompt is empty, generic, or just "Free conversation":
-- If a VARIETY SEED is provided, use it as inspiration to create a specific, interesting scene card. Adapt the persona, topic, tone, and setting from the seed. Make it feel like a real, natural conversation — not a language exercise.
-- If no variety seed is provided, set the topic to something simple and natural and let the learner lead.
-- Either way: no elaborate fictional scenarios. Keep it grounded and realistic — like a real conversation someone might actually have.`
+  return {
+    sessionDurationMinutes: dur,
+    domain,
+    cefrLevel: params.cefrLevel,
+    grammarFocus: params.grammarFocus?.displayName ?? null,
+    vocabTargets: params.vocabTargets,
+    phases,
+    difficultyConstraints: params.difficultyConstraints,
   }
 }
 
-// --- Fallback plans per mode ---
-
-function getFallbackPlan(mode: string, sessionFocus: string): SessionPlan {
-  switch (mode) {
-    case 'tutor':
-      return normalizePlan({
-        topic: sessionFocus,
-        objective: 'Understand and practice the target concept',
-        steps: [
-          { title: 'Warm-up', type: 'activate', status: 'upcoming' },
-          { title: 'Explanation', type: 'explain', status: 'upcoming' },
-          { title: 'Comprehension check', type: 'check', status: 'upcoming' },
-          { title: 'Guided practice', type: 'practice', status: 'upcoming' },
-          { title: 'Free production', type: 'produce', status: 'upcoming' },
-          { title: 'Review', type: 'review', status: 'upcoming' },
-        ],
-        concepts: [],
-        exerciseTypes: ['fill-in-the-blank', 'translation'],
-      }, 'tutor')
-
-    case 'immersion':
-      return normalizePlan({
-        focus: sessionFocus,
-        goals: ['Engage with native-level content', 'Build comprehension'],
-        approach: 'Present content then analyze and discuss.',
-        milestones: [
-          { description: 'Present content', completed: false },
-          { description: 'Comprehension check', completed: false },
-          { description: 'Vocabulary review', completed: false },
-        ],
-        contentType: 'custom',
-        contentSpec: sessionFocus,
-      }, 'immersion')
-
-    case 'reference':
-      return normalizePlan({
-        focus: sessionFocus,
-        goals: ['Answer the question clearly', 'Provide examples'],
-        approach: 'Structured explanation with examples and practice.',
-        milestones: [
-          { description: 'Define the concept', completed: false },
-          { description: 'Show examples', completed: false },
-          { description: 'Common mistakes', completed: false },
-        ],
-        topic: sessionFocus,
-      }, 'reference')
-
-    default:
-      return normalizePlan({
-        topic: sessionFocus,
-        persona: {
-          relationship: 'conversation partner',
-          personality: 'friendly and helpful',
-        },
-        register: 'polite',
-        tone: 'lighthearted',
-        sections: [
-          { id: 'greeting', label: 'Greeting', description: 'Warm greeting and set the scene' },
-          { id: 'main-topic', label: 'Main Topic', description: 'Explore the main conversation topic' },
-          { id: 'wrap-up', label: 'Wrap-up', description: 'Wind down and say goodbye naturally' },
-        ],
-      }, 'conversation')
-  }
-}
+// ── Route Handler ──────────────────────────────────────────────────────
 
 export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
   let prompt: string | undefined
   let mode: string | undefined
-  let inputMode: string | undefined
   try {
     const body = await request.json()
-    if (body.prompt && typeof body.prompt === 'string') {
-      prompt = body.prompt
-    }
-    if (body.mode && typeof body.mode === 'string') {
-      mode = body.mode
-    }
-    if (body.inputMode && typeof body.inputMode === 'string') {
-      inputMode = body.inputMode
-    }
+    if (body.prompt && typeof body.prompt === 'string') prompt = body.prompt
+    if (body.mode && typeof body.mode === 'string') mode = body.mode
   } catch {
     // No body or invalid JSON
   }
 
-  const profile = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } })
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    include: {
+      learnerModel: {
+        include: {
+          errorPatterns: {
+            orderBy: { occurrenceCount: 'desc' },
+            take: 10,
+          },
+        },
+      },
+    },
+  })
+
+  const targetLanguage = user.targetLanguage ?? 'ja'
+  const nativeLanguage = user.nativeLanguage ?? 'en'
+  const cefrGrammar = user.learnerModel?.cefrGrammar ?? 2.0
+  const cefrFluency = user.learnerModel?.cefrFluency ?? 2.0
+  const sessionDuration = user.sessionLengthMinutes ?? 25
 
   const sessionFocus = prompt || 'Free conversation'
   const resolvedMode = mode || 'conversation'
-  const level = getDifficultyLevel(profile.difficultyLevel, profile.targetLanguage)
+  const levelLabel = getCefrLabel(cefrGrammar)
 
-  const availableTools = inputMode === 'voice'
-    ? ['updateSessionPlan']
-    : MODE_TOOLS[resolvedMode as ScenarioMode] ?? MODE_TOOLS.conversation
-  const langConfig = getLanguageById(profile.targetLanguage)
-  const registerOpts = langConfig?.registerOptions || '"casual", "polite", or "mixed"'
+  // ── Curriculum-driven planning ──
 
-  const systemPrompt = buildSystemPrompt({
-    userPrompt: sessionFocus,
-    mode: resolvedMode,
-    difficultyLevel: profile.difficultyLevel,
-    nativeLanguage: profile.nativeLanguage,
-    targetLanguage: profile.targetLanguage,
-    availableTools,
-    voiceMode: inputMode === 'voice',
-  })
+  const [vocabTargets, grammarFocus, grammarInScope, memoriesText] = await Promise.all([
+    getVocabTargets(userId, targetLanguage, cefrGrammar, 5),
+    getNextGrammarFocus(userId, targetLanguage, cefrGrammar),
+    getGrammarStructuresInScope(targetLanguage, cefrGrammar),
+    searchMemories(userId, sessionFocus, 10),
+  ])
 
-  // Generate structured session plan via Haiku with mode-specific schema
-  const schema = getPlanSchema(resolvedMode, registerOpts)
-  let plan: SessionPlan
-  try {
-    const isGenericPrompt = !prompt || prompt.trim() === '' || prompt.trim().toLowerCase() === 'free conversation'
-    const varietySeed = (resolvedMode === 'conversation' && isGenericPrompt) ? `\n\n${getVarietySeed()}` : ''
+  const domain = selectNextDomain(user.learnerModel?.domainsVisited ?? [])
 
-    const planPrompt = resolvedMode === 'conversation' || resolvedMode === 'tutor'
-      ? `You are a session planner for a language learning app.
+  // Error patterns for review (with examples from recent ErrorLog records)
+  const errorPatterns = (user.learnerModel?.errorPatterns ?? []).map((ep) => ({
+    rule: ep.rule,
+    occurrenceCount: ep.occurrenceCount,
+    sessionCount: ep.sessionsSeen.length,
+  }))
 
-User prompt: "${sessionFocus}"
-Mode: ${resolvedMode}
-Difficulty: ${level.label}
-Target language: ${profile.targetLanguage}
-Native language: ${profile.nativeLanguage}
+  // Fetch concrete error examples for the review phase
+  const topErrorRules = errorPatterns.slice(0, 3).map((ep) => ep.rule)
+  const recentErrorLogs = topErrorRules.length > 0
+    ? await prisma.errorLog.findMany({
+        where: {
+          userId,
+          rule: { in: topErrorRules },
+        },
+        orderBy: { loggedAt: 'desc' },
+        take: 10,
+        select: { rule: true, phrase: true, correction: true },
+      })
+    : []
 
-${getModeSpecificPlanningInstructions(resolvedMode, profile.targetLanguage, registerOpts)}${varietySeed}
-
-Generate the plan as JSON. Make it specific${isGenericPrompt ? ' — use the variety seed to create an interesting, specific scene card. Do NOT generate a generic "casual chat" plan' : ' to the user\'s prompt and difficulty level'}.`
-      : `You are a session planner for a language learning app.
-
-User prompt: "${sessionFocus}"
-Mode: ${resolvedMode}
-Difficulty: ${level.label}
-Target language: ${profile.targetLanguage}
-Native language: ${profile.nativeLanguage}
-
-Generate a session plan as JSON:
-- focus: one-line session description
-- goals: 2-4 specific learning objectives appropriate for the difficulty level
-- approach: 1-2 sentences on teaching strategy for this session
-- milestones: 3-5 ordered checkpoints to hit during the session (all start as not completed)
-
-${getModeSpecificPlanningInstructions(resolvedMode, profile.targetLanguage, registerOpts)}
-
-Make the plan specific to the user's prompt and difficulty level.`
-
-    const { object } = await generateObject({
-      model: anthropic('claude-haiku-4-5-20251001'),
-      schema,
-      prompt: planPrompt,
-    })
-    plan = normalizePlan(object, resolvedMode)
-  } catch (err) {
-    console.error('[plan] Failed to generate session plan:', err)
-    plan = getFallbackPlan(resolvedMode, sessionFocus)
+  // Deduplicate: one example per rule
+  const reviewErrors: Array<{ rule: string; phrase: string; correction: string }> = []
+  const seenRules = new Set<string>()
+  for (const log of recentErrorLogs) {
+    if (log.rule && !seenRules.has(log.rule)) {
+      seenRules.add(log.rule)
+      reviewErrors.push({ rule: log.rule, phrase: log.phrase, correction: log.correction })
+    }
   }
 
-  // Parallelize session creation, profile update, and usage check
-  const [session, , { remainingSeconds, plan: userPlan }] = await Promise.all([
-    prisma.conversationSession.create({
+  // ── Build structured lesson plan ──
+
+  const difficultyConstraints = deriveDifficultyConstraints(cefrGrammar, grammarInScope)
+
+  const structuredPlan = buildStructuredPlan({
+    sessionDurationMinutes: sessionDuration,
+    domain,
+    cefrLevel: cefrLabel(cefrGrammar),
+    targetLanguage,
+    grammarFocus,
+    vocabTargets,
+    reviewErrors,
+    memories: memoriesText || null,
+    difficultyConstraints,
+  })
+
+  // Legacy plan object (stored in DB for backward compat)
+  const plan: Record<string, unknown> = {
+    _mode: resolvedMode,
+    domain,
+    targetVocab: vocabTargets,
+    grammarFocus: grammarFocus ? grammarFocus.displayName : null,
+    reviewPatterns: topErrorRules,
+    level: levelLabel,
+  }
+
+  const systemPrompt = `You are a ${targetLanguage} language tutor at ${levelLabel} level.`
+
+  // ── Create Lesson + update user ──
+
+  const [lesson, , { remainingSeconds, plan: userPlan }] = await Promise.all([
+    prisma.lesson.create({
       data: {
         userId,
-        mode: resolvedMode,
-        inputMode: inputMode || null,
-        targetLanguage: profile.targetLanguage,
-        transcript: [],
-        targetsPlanned: {},
-        targetsHit: [],
-        errorsLogged: [],
-        avoidanceEvents: [],
-        sessionPlan: plan as unknown as Prisma.InputJsonValue,
+        targetLanguage,
+        lessonGoal: sessionFocus,
+        lessonPlan: plan as unknown as Prisma.InputJsonValue,
         systemPrompt,
       },
     }),
-    prisma.learnerProfile.update({
-      where: { userId },
-      data: { totalSessions: { increment: 1 } },
+    prisma.user.update({
+      where: { id: userId },
+      data: { totalLessons: { increment: 1 } },
     }),
     getUsageInfo(userId),
   ])
 
-  // Pre-warm session cache so the first voice-stream call hits memory instead of DB
-  warmSessionCache(session.id, {
-    systemPrompt,
-    sessionPlan: plan,
-    mode: resolvedMode,
-    targetLanguage: profile.targetLanguage,
-  })
+  // Update domain rotation (fire-and-forget)
+  if (user.learnerModel) {
+    const visited = [...(user.learnerModel.domainsVisited ?? []), domain].slice(-10)
+    prisma.learnerModel.update({
+      where: { id: user.learnerModel.id },
+      data: { domainsVisited: visited },
+    }).catch(() => {})
+  }
 
-  return NextResponse.json({ _sessionId: session.id, sessionFocus, plan, remainingSeconds, userPlan })
+  // ── Initialize session state in Redis ──
+
+  const initialState: SessionState = {
+    sessionId: lesson.id,
+    userId,
+    lessonId: lesson.id,
+    lessonPhase: 'warmup' as const,
+    targetLanguage,
+    nativeLanguage,
+    lessonGoal: sessionFocus,
+    difficultyLevel: Math.max(1, Math.min(5, Math.round(cefrGrammar))),
+    errorsLogged: [],
+    topicsCovered: [],
+    vocabIntroduced: [],
+    strengthsNoted: [],
+    corrections: [],
+    memoriesQueued: [],
+    elapsedMinutes: 0,
+    lessonDurationTarget: sessionDuration,
+    avgResponseLatencySec: 0,
+    responseLatencies: [],
+    difficultyConstraints,
+    compactionCount: 0,
+    conversationTokenEstimate: 0,
+    // v1 structured plan fields
+    structuredPlan,
+    currentPhaseIndex: 0,
+    phaseStartedAt: Date.now(),
+    phasesCompleted: [],
+    timePressure: 'on_track',
+    deferredTopics: [],
+    nextSessionPriority: [],
+  }
+
+  await writeSessionState(initialState)
+
+  // ── Build agent metadata ──
+
+  const agentMetadata = {
+    targetLanguage: languageDisplayName(targetLanguage),
+    nativeLanguage: languageDisplayName(nativeLanguage),
+    learnerModel: user.learnerModel
+      ? {
+          cefrGrammar: user.learnerModel.cefrGrammar,
+          cefrFluency: user.learnerModel.cefrFluency,
+          sessionsCompleted: user.learnerModel.sessionsCompleted,
+          weakAreas: user.learnerModel.priorityFocus
+            ? [user.learnerModel.priorityFocus]
+            : undefined,
+        }
+      : undefined,
+    errorPatterns: errorPatterns.length > 0 ? errorPatterns : undefined,
+    structuredPlan,
+    correctionStyle: user.correctionStyle || 'recast',
+    personalNotes: user.personalNotes || undefined,
+    memories: memoriesText || undefined,
+    // Voice pipeline overrides (null = use defaults)
+    ttsProvider: user.ttsProvider || undefined,
+    sttProvider: user.sttProvider || undefined,
+    voiceId: user.voiceId || undefined,
+  }
+
+  return NextResponse.json({
+    _sessionId: lesson.id,
+    sessionFocus,
+    plan,
+    structuredPlan,
+    remainingSeconds,
+    userPlan,
+    agentMetadata,
+  })
 }))

@@ -4,14 +4,14 @@
  * Handles:
  * - System prompt construction from learner profile + session plan
  * - Context management: summarizes old turns to keep context window lean
- * - Post-turn analysis via Claude Haiku (runs in-process, no HTTP round-trip)
- * - Data channel messages for analysis results
+ * - Data channel messages for whiteboard content
  */
 import { voice, llm } from '@livekit/agents'
 import Anthropic from '@anthropic-ai/sdk'
-import { buildVoiceSystemPrompt } from '@lingle/shared/conversation-prompt'
-import type { ScenarioMode } from '@lingle/shared/scenario-mode'
 import { resolveAgentTtsProvider, type AgentMetadata } from './config.js'
+import { buildToolContext } from './tools.js'
+import { buildWhiteboardTools, type WhiteboardMessage } from './whiteboard-tools.js'
+import { getSessionState, serializeForPrompt, updateSessionState } from './session-state.js'
 
 const anthropic = new Anthropic()
 
@@ -29,16 +29,59 @@ export class LingleAgent extends voice.Agent {
   private metadata: AgentMetadata
   private turnIndex = 0
   private contextSummary: string | null = null
+  /** Last injected session state signature — skip re-injection if unchanged to preserve preemptive gen */
+  private lastStateSignature = ''
 
   constructor(metadata: AgentMetadata) {
+    // Build base tools + whiteboard tools
+    const baseTools = buildToolContext(metadata.sessionId, metadata.sessionMode)
+
+    // Whiteboard publish uses a deferred reference — set once room is available
+    let publishFn: ((msg: WhiteboardMessage) => void) | null = null
+    const publish = (msg: WhiteboardMessage) => {
+      if (publishFn) publishFn(msg)
+      else console.warn('[LingleAgent] whiteboard publish called before room available')
+    }
+
+    const whiteboardTools = metadata.sessionId ? buildWhiteboardTools(publish) : {}
+    const allTools = baseTools ? { ...baseTools, ...whiteboardTools } : undefined
+
     super({
       instructions: buildSystemPrompt(metadata),
+      ...(allTools ? { tools: allTools } : {}),
     })
     this.metadata = metadata
+
+    // Wire up the publish function once we have access to the activity/room
+    // This is set lazily on the first tool call attempt
+    this._setPublishFn = (fn) => { publishFn = fn }
   }
 
+  private _setPublishFn: ((fn: (msg: WhiteboardMessage) => void) => void) | null = null
+
   override async onEnter(): Promise<void> {
-    // Session started — no-op, lifecycle managed by AgentSession
+    // Wire up whiteboard publish function now that we have room access
+    if (this._setPublishFn) {
+      this._setPublishFn((msg: WhiteboardMessage) => {
+        try {
+          const activity = this.getActivityOrThrow()
+          const room = (activity as unknown as {
+            room?: {
+              localParticipant?: {
+                publishData: (data: Uint8Array, opts: { reliable: boolean }) => void
+              }
+            }
+          }).room
+          if (room?.localParticipant) {
+            const encoder = new TextEncoder()
+            const payload = encoder.encode(JSON.stringify(msg))
+            room.localParticipant.publishData(payload, { reliable: true })
+          }
+        } catch {
+          // No activity or room yet
+        }
+      })
+    }
   }
 
   override async onUserTurnCompleted(
@@ -54,14 +97,100 @@ export class LingleAgent extends voice.Agent {
 
     this.turnIndex++
 
-    // Context management: summarize old turns when context grows too large
-    await this.maybeCompressContext(chatCtx)
-
-    // Fire post-turn analysis asynchronously (in-process via Claude Haiku)
+    // Inject live session state (Slot 3) into system prompt.
+    // CRITICAL FOR PREEMPTIVE GEN: Only mutate the chat context if the
+    // session state actually changed semantically. If we always mutate,
+    // the framework detects a context change and cancels the preemptive
+    // response — forcing a full LLM re-generation (+300-600ms E2E).
+    // By skipping injection when state hasn't changed, preemptive gen
+    // responses survive and we save the full LLM TTFT.
     if (this.metadata.sessionId) {
-      this.runAnalysis(chatCtx, userText).catch((err) => {
-        console.error('[LingleAgent] Analysis failed:', err)
-      })
+      try {
+        await this.injectSessionStateIfChanged(chatCtx)
+      } catch (err) {
+        console.error('[LingleAgent] Session state injection failed:', err)
+      }
+    }
+
+    // Context management: summarize old turns when context grows too large.
+    // Fire-and-forget to avoid blocking the LLM response — compression uses
+    // a Haiku API call (~500-1000ms) which would destroy latency if awaited.
+    // The chat context is modified in place, but by the time compression
+    // finishes the LLM is already streaming. This is safe because compression
+    // only affects older messages that the LLM has already processed.
+    this.maybeCompressContext(chatCtx).catch((err) => {
+      console.error('[LingleAgent] Context compression failed:', err)
+    })
+
+  }
+
+  /**
+   * Read session state from Redis and inject it into the system message
+   * ONLY if semantically important fields changed since last injection.
+   *
+   * This is critical for preemptive generation: if we always mutate the
+   * chat context, the framework cancels the preemptive response every turn,
+   * adding 300-600ms to E2E latency. By only mutating when the state
+   * actually changes (lesson phase, difficulty, error count thresholds),
+   * preemptive responses survive most turns.
+   *
+   * Fields that trigger re-injection:
+   * - lessonPhase / currentPhaseIndex (phase changed)
+   * - difficultyLevel (difficulty adjusted)
+   * - errorsLogged.length crossing a threshold (new errors matter for correction mode)
+   * - timePressure changing category (on_track → slightly_over)
+   *
+   * Fields that do NOT trigger re-injection:
+   * - elapsedMinutes (changes every turn, non-critical)
+   * - phaseStartedAt (timestamp, non-critical)
+   * - vocabIntroduced / topicsCovered (nice-to-have, not response-critical)
+   */
+  private async injectSessionStateIfChanged(chatCtx: llm.ChatContext): Promise<void> {
+    const state = await getSessionState(this.metadata.sessionId)
+    if (!state) return
+
+    // Build a signature from semantically important fields
+    const sig = [
+      state.lessonPhase,
+      state.currentPhaseIndex,
+      state.difficultyLevel,
+      Math.floor(state.errorsLogged.length / 3), // re-inject every 3 errors
+      state.timePressure,
+      state.corrections.length > 0 ? 'has-corrections' : 'no-corrections',
+    ].join('|')
+
+    if (sig === this.lastStateSignature) {
+      console.log(`[LingleAgent] session state unchanged (turn ${this.turnIndex}), skipping injection — preemptive gen preserved`)
+      return
+    }
+
+    this.lastStateSignature = sig
+    const stateBlock = serializeForPrompt(state)
+
+    // Persist for dev panel inspection + log to console
+    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}, sig changed: ${sig}) ──\n${stateBlock}\n── END INJECTED PROMPT ──`)
+    updateSessionState(this.metadata.sessionId, { _devLastInjectedPrompt: stateBlock })
+      .catch((err) => console.error('[LingleAgent] Failed to persist dev prompt:', err))
+
+    // Find the system message and append/replace the session state block
+    for (const item of chatCtx.items) {
+      if (item.type === 'message') {
+        const msg = item as llm.ChatMessage
+        if (msg.role === 'system' || msg.role === 'developer') {
+          const text = msg.textContent || ''
+          // Replace existing session state block or append
+          const marker = '=== SESSION STATE (read every turn) ==='
+          const markerIdx = text.indexOf(marker)
+          if (markerIdx >= 0) {
+            // Replace everything from marker to end
+            const before = text.substring(0, markerIdx)
+            ;(msg as unknown as { content: string }).content = before + stateBlock
+          } else {
+            ;(msg as unknown as { content: string }).content = text + '\n\n' + stateBlock
+          }
+          break
+        }
+      }
     }
   }
 
@@ -141,126 +270,6 @@ export class LingleAgent extends voice.Agent {
     }
   }
 
-  /**
-   * Run post-turn analysis directly via Claude Haiku (no HTTP round-trip).
-   * Results are streamed to the browser via LiveKit data channel.
-   */
-  private async runAnalysis(chatCtx: llm.ChatContext, userText: string): Promise<void> {
-    const { sessionId, targetLanguage, nativeLanguage } = this.metadata
-    if (!sessionId) return
-
-    // Build recent history from chat context
-    const recentMessages = chatCtx.items
-      .filter((item) => item.type === 'message')
-      .slice(-10)
-      .map((item) => {
-        const msg = item as llm.ChatMessage
-        return { role: msg.role, content: msg.textContent || '' }
-      })
-
-    // Get the last assistant message
-    const lastAssistant = [...recentMessages].reverse().find((m) => m.role === 'assistant')
-    const assistantText = lastAssistant?.content || ''
-
-    const langName = targetLanguage || 'Japanese'
-    const analysisPrompt = `Analyze this exchange from a ${langName} language learning conversation.
-
-User said: "${userText}"
-Assistant responded: "${assistantText}"
-
-Recent history for context:
-${recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n')}
-
-Return a JSON object with these fields (omit empty arrays):
-{
-  "corrections": [{"original": "...", "corrected": "...", "explanation": "...", "grammarPoint": "..."}],
-  "naturalnessFeedback": [{"original": "...", "suggestion": "...", "explanation": "..."}],
-  "alternativeExpressions": [{"original": "...", "alternative": "...", "explanation": "..."}],
-  "registerMismatches": [{"original": "...", "suggestion": "...", "expected": "...", "explanation": "..."}],
-  "l1Interference": [{"original": "...", "issue": "...", "suggestion": "..."}],
-  "conversationalTips": [{"tip": "...", "explanation": "..."}],
-  "takeaways": ["..."]
-}
-
-Rules:
-- Only flag genuine learner errors, NOT speech-to-text transcription artifacts.
-- For ${langName}, do NOT flag natural spoken features as errors (e.g., dropped particles in casual speech, contracted forms).
-- Be concise. Each explanation should be 1-2 sentences max.
-- If the user's ${langName} was correct, return mostly empty arrays — don't invent issues.`
-
-    try {
-      const stream = anthropic.messages.stream({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: analysisPrompt }],
-        system: `You are a ${langName} language analysis engine. Output only valid JSON. The learner's native language is ${nativeLanguage || 'English'}.`,
-      })
-
-      let fullText = ''
-      let lastEmitTime = 0
-
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          fullText += event.delta.text
-
-          // Try to parse and emit periodically
-          const now = Date.now()
-          if (now - lastEmitTime < 200) continue
-          lastEmitTime = now
-
-          try {
-            // Attempt to parse partial JSON (may fail for incomplete)
-            const parsed = JSON.parse(fullText)
-            this.publishAnalysis(parsed)
-          } catch {
-            // Incomplete JSON — wait for more
-          }
-        }
-      }
-
-      // Final parse and emit
-      try {
-        // Strip markdown code fences if present
-        let cleaned = fullText.trim()
-        if (cleaned.startsWith('```')) {
-          cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-        }
-        const parsed = JSON.parse(cleaned)
-        this.publishAnalysis(parsed)
-        console.log('[LingleAgent] Analysis complete for turn', this.turnIndex)
-      } catch {
-        console.error('[LingleAgent] Failed to parse final analysis JSON')
-      }
-    } catch (err) {
-      console.error('[LingleAgent] Analysis stream failed:', err)
-    }
-  }
-
-  private publishAnalysis(data: Record<string, unknown>): void {
-    try {
-      const activity = this.getActivityOrThrow()
-      const room = (activity as unknown as {
-        room?: {
-          localParticipant?: {
-            publishData: (data: Uint8Array, opts: { reliable: boolean }) => void
-          }
-        }
-      }).room
-      if (room?.localParticipant) {
-        const encoder = new TextEncoder()
-        const payload = encoder.encode(
-          JSON.stringify({
-            type: 'analysis',
-            turnIndex: this.turnIndex,
-            data: JSON.stringify(data),
-          }),
-        )
-        room.localParticipant.publishData(payload, { reliable: true })
-      }
-    } catch {
-      // No activity or room — skip
-    }
-  }
 }
 
 function extractText(message: llm.ChatMessage): string {
@@ -277,15 +286,169 @@ function extractText(message: llm.ChatMessage): string {
   return ''
 }
 
-function buildSystemPrompt(metadata: AgentMetadata): string {
-  const basePrompt = metadata.basePrompt || 'You are a language conversation partner.'
-  const sessionMode = (metadata.sessionMode || 'conversation') as ScenarioMode
+/**
+ * 6-Slot System Prompt Builder
+ *
+ * Slot 1 — System block: persona, behavioral rules, tool instructions
+ * Slot 2 — User profile: CEFR scores, weak areas, correction style
+ * Slot 3 — Session state: phase, errors, difficulty (injected per-turn via Redis)
+ * Slot 4 — Retrieved memories: placeholder for Mem0 (Phase 6)
+ * Slot 5 — Conversation window: managed by context compression above
+ * Slot 6 — Current utterance: handled by LiveKit framework
+ */
+export function buildSystemPrompt(metadata: AgentMetadata): string {
+  const targetLang = metadata.targetLanguage || 'the target language'
+  const nativeLang = metadata.nativeLanguage || 'English'
+  const ttsProvider = resolveAgentTtsProvider(metadata)
+  const hasSession = !!metadata.sessionId
 
-  return buildVoiceSystemPrompt(basePrompt, {
-    sessionPlan: metadata.sessionPlan,
-    sessionMode,
-    voiceMode: true,
-    targetLanguage: metadata.targetLanguage,
-    ttsProvider: resolveAgentTtsProvider(metadata),
-  })
+  // ── Slot 1: System Block ──
+  // For test mode (no sessionId), use a simple prompt.
+  // Set AGENT_MINIMAL_PROMPT=1 to use the ultra-short prompt for latency A/B testing.
+  if (!hasSession) {
+    const basePrompt = metadata.basePrompt || 'You are a spoken conversation partner'
+    let prompt = basePrompt
+
+    if (metadata.sessionPlan && typeof metadata.sessionPlan === 'object') {
+      const plan = metadata.sessionPlan as Record<string, unknown>
+      if (plan.topic) prompt += `\n\nSession topic: ${plan.topic}`
+      if (plan.persona) prompt += `\nPersona: ${JSON.stringify(plan.persona)}`
+      if (plan.register) prompt += `\nRegister: ${plan.register}`
+    }
+
+    // Minimal prompt (~150 tokens) for low latency
+    prompt += `\n\nIMPORTANT VOICE MODE RULES:
+- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
+- Speak primarily in ${targetLang}. Use the learner's native language only for brief clarifications.
+- Do NOT use markdown, bullet points, asterisks, or other formatting — this is spoken language.
+- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
+- When the learner makes errors, recast naturally (use the correct form in your response) rather than explicitly correcting.
+- Keep turns short — 1-3 sentences is ideal for natural conversation flow.`
+    console.log(`[agent] prompt=MINIMAL (~150 tokens) hasSession=false`)
+    return prompt
+  }
+
+  // ── Full 6-slot prompt for real sessions ──
+
+  const correctionStyle = metadata.correctionStyle || 'recast'
+
+  const slot1 = `You are a skilled ${targetLang} language tutor having a real-time voice conversation with a learner whose native language is ${nativeLang}.
+
+PERSONA & APPROACH:
+- Be warm, patient, and encouraging. Sound like a real conversation partner, not a textbook.
+- Speak primarily in ${targetLang}. Switch to ${nativeLang} only for brief vocabulary clarifications when the learner is stuck.
+- Keep turns short — 1-3 sentences. This is a spoken conversation, not a lecture.
+- Create natural conversational contexts that elicit target vocabulary and grammar from the learner.
+- Track errors and strengths silently using your tools. NEVER mention tool calls in speech.
+
+VOICE MODE RULES:
+- Your output is sent DIRECTLY to a text-to-speech engine and spoken aloud. Every character you produce will be heard.
+- Do NOT use markdown, bullet points, numbered lists, asterisks, or any text formatting.
+- Do NOT include stage directions, internal thoughts, or action descriptions (*like this* or [like this]).
+- Do NOT narrate your actions ("Let me log that error" / "I'm noting your progress").
+- Do NOT explicitly announce lesson phases or transitions ("Now let's move to review").
+- Do NOT mix ${nativeLang} commentary into your ${targetLang} speech. If you speak ${targetLang}, the ENTIRE response must be ${targetLang}.
+- Respond naturally to what the learner says. If they go off-topic, gently guide back.
+
+LESSON STRUCTURE:
+You are following a structured lesson plan. Your SESSION STATE block (injected every turn) shows your current phase, instructions, timing, and correction mode. Follow these rules:
+
+PHASE RULES:
+- Follow the current phase instructions precisely. Each phase has a specific purpose.
+- Call advancePhase when: (a) the phase objectives are met, or (b) SESSION STATE shows SIGNIFICANTLY_OVER.
+- When SESSION STATE shows SLIGHTLY_OVER, wrap up the current activity naturally within 1-2 turns.
+- Transition conversationally — never announce phase changes to the learner.
+- Never go backward to a completed phase. Move forward.
+- Be proactive about driving the lesson. Do not wait for the learner to lead.
+
+CORRECTION MODES (follow the mode shown in SESSION STATE each turn):
+- 'silent': Log errors with logError but do NOT correct at all. Do not even recast.
+- 'recast_only': Use the correct form naturally in your next sentence. Do not explicitly point out the error.
+- 'active': Gently point out the error and model the correct form. Ask the learner to try.
+
+DEBRIEF PROTOCOL (when SESSION STATE shows DEBRIEF phase):
+- Review max 3 corrections from this session (check ERRORS THIS SESSION in the state).
+- For each: say what the learner said, model the correct form, ask them to try saying it.
+- Use whiteboardWriteCorrection to show each correction visually.
+- Keep it to 3-5 minutes total. Do NOT exceed.
+- Do NOT give grammar lectures. Correct, model, elicit production, move on.
+- Prioritize: errors that occurred 2+ times > errors on target grammar > one-off errors.
+- Use flagForNextSession for errors that need more practice.
+
+TOOL USAGE RULES:
+- Call logError for EVERY grammar, vocabulary, pronunciation, or register error you notice.
+- Call noteStrength when the learner demonstrates skill growth.
+- Call saveMemory when you learn personal facts (job, hobbies, family, interests).
+- Call queueCorrection for errors worth reviewing in the debrief or post-session.
+- Call advancePhase to move to the next lesson phase (do NOT use updateLessonPhase).
+- Call adjustDifficulty if the learner is consistently struggling or breezing through.
+- Call deferTopic if time runs out on a topic and you want to continue it next session.
+- All tool calls are SILENT. They must not affect your spoken output.
+
+PROHIBITED:
+- Do NOT break character or discuss the system, tools, or AI nature.
+- Do NOT give long grammar explanations mid-conversation (save for debrief).
+- Do NOT use language above the learner's level as defined in the difficulty constraints.`
+
+  // ── Slot 2: User Profile ──
+  let slot2 = ''
+  if (metadata.learnerModel) {
+    const lm = metadata.learnerModel
+    slot2 = `\n\nLEARNER PROFILE:
+- CEFR Grammar: ${lm.cefrGrammar.toFixed(1)} (${cefrLabelFromScore(lm.cefrGrammar)})
+- CEFR Fluency: ${lm.cefrFluency.toFixed(1)} (${cefrLabelFromScore(lm.cefrFluency)})
+- Weak areas: ${lm.weakAreas?.join(', ') || 'none identified yet'}
+- Sessions completed: ${lm.sessionsCompleted}
+- Correction style preference: ${correctionStyle}`
+    if (metadata.personalNotes) {
+      slot2 += `\n- Personal notes: ${metadata.personalNotes}`
+    }
+  }
+
+  if (metadata.errorPatterns && metadata.errorPatterns.length > 0) {
+    slot2 += `\n\nKNOWN ERROR PATTERNS (address naturally in conversation):`
+    for (const ep of metadata.errorPatterns.slice(0, 8)) {
+      slot2 += `\n- ${ep.rule}: ${ep.occurrenceCount}x across ${ep.sessionCount} sessions`
+    }
+  }
+
+  // ── Slot 3: Plan overview (per-turn state injection adds active phase details) ──
+  let slot3 = ''
+  if (metadata.structuredPlan) {
+    const sp = metadata.structuredPlan
+    slot3 = `\n\nLESSON PLAN OVERVIEW:
+- Duration: ${sp.sessionDurationMinutes} min
+- Domain: ${sp.domain}
+- Level: ${sp.cefrLevel}
+- Grammar focus: ${sp.grammarFocus || 'none'}
+- Vocab targets: ${sp.vocabTargets.join(', ') || 'none'}
+- Phases: ${sp.phases.map((p) => p.phase).join(' → ')}
+
+The SESSION STATE block below will update every turn with your current phase instructions and timing. Follow it.`
+  } else if (metadata.lessonPlan) {
+    // Legacy fallback
+    const lp = metadata.lessonPlan
+    slot3 = `\n\nSESSION PLAN:
+- Warmup topic: ${lp.warmupTopic}
+- Main activity: ${lp.mainActivity}
+- Target vocab: ${lp.targetVocab?.join(', ') || 'none'}
+- Grammar focus: ${lp.grammarFocus?.join(', ') || 'none'}
+- Review items: ${lp.reviewPatterns?.join(', ') || 'none'}`
+  }
+
+  // ── Slot 4: Episodic Memories ──
+  const slot4 = metadata.memories ? `\n\n${metadata.memories}` : ''
+
+  const fullPrompt = slot1 + slot2 + slot3 + slot4
+  console.log(`[agent] prompt=FULL_SESSION (~${Math.round(fullPrompt.length / 4)} tokens) hasSession=true`)
+  return fullPrompt
+}
+
+function cefrLabelFromScore(score: number): string {
+  if (score < 1.5) return 'A1'
+  if (score < 2.5) return 'A2'
+  if (score < 3.5) return 'B1'
+  if (score < 4.5) return 'B2'
+  if (score < 5.5) return 'C1'
+  return 'C2'
 }

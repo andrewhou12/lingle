@@ -7,19 +7,19 @@ export const GET = withAuth(async (_request, { userId }) => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [usage, subscription, activeSessions] = await Promise.all([
+  const [usage, subscription, activeLessons] = await Promise.all([
     prisma.dailyUsage.findUnique({
       where: { userId_date: { userId, date: today } },
     }),
     prisma.subscription.findUnique({ where: { userId } }),
-    // Find active sessions (no durationSeconds yet = still in progress)
-    prisma.conversationSession.findMany({
+    // Find active lessons (no endedAt yet = still in progress)
+    prisma.lesson.findMany({
       where: {
         userId,
-        durationSeconds: null,
-        timestamp: { gte: today },
+        endedAt: null,
+        startedAt: { gte: today },
       },
-      select: { timestamp: true },
+      select: { startedAt: true },
     }),
   ])
 
@@ -27,10 +27,10 @@ export const GET = withAuth(async (_request, { userId }) => {
   const limitSeconds = getDailyLimitSeconds(plan)
   const completedSeconds = usage?.conversationSeconds ?? 0
 
-  // Add live elapsed time from any active sessions
+  // Add live elapsed time from any active lessons
   let liveSeconds = 0
-  for (const session of activeSessions) {
-    liveSeconds += Math.floor((Date.now() - session.timestamp.getTime()) / 1000)
+  for (const lesson of activeLessons) {
+    liveSeconds += Math.floor((Date.now() - lesson.startedAt.getTime()) / 1000)
   }
 
   const usedSeconds = completedSeconds + liveSeconds

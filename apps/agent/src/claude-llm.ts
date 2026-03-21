@@ -120,14 +120,20 @@ class ClaudeLLMStream extends llm.LLMStream {
   }
 
   protected async run(): Promise<void> {
+    const runStartTs = Date.now()
     const { system, messages } = convertChatContext(this.chatCtx)
     const anthropicTools = convertTools(this.toolCtx)
 
     // --- Prompt caching strategy ---
-    // 1. Cache the system prompt (stable across turns)
-    // 2. Cache conversation history up to the second-to-last user message
-    //    (only the newest user message changes between turns)
     const cachedMessages = this.applyCacheBreakpoints(messages)
+
+    // Estimate token count for cache eligibility logging
+    const systemTokenEstimate = system ? Math.ceil(system.length / 4) : 0
+    const toolTokenEstimate = anthropicTools ? anthropicTools.length * 100 : 0
+    const cacheEligible = (systemTokenEstimate + toolTokenEstimate) >= 2048
+    if (!cacheEligible) {
+      console.log(`[cache] prefix too small for caching: ~${systemTokenEstimate + toolTokenEstimate} tokens (system=${systemTokenEstimate}, tools=${toolTokenEstimate}), need >=2048`)
+    }
 
     const params: Anthropic.MessageCreateParamsStreaming = {
       model: this._model,
@@ -141,17 +147,34 @@ class ClaudeLLMStream extends llm.LLMStream {
         {
           type: 'text' as const,
           text: system,
-          cache_control: { type: 'ephemeral' as const },
+          // Only set cache_control when prefix is large enough for caching
+          ...(cacheEligible ? { cache_control: { type: 'ephemeral' as const } } : {}),
         },
       ]
     }
 
     if (anthropicTools?.length) {
-      params.tools = anthropicTools
+      // Add cache_control to the last tool so system prompt + all tools
+      // form the cached prefix. Tools are stable across turns.
+      const toolsWithCache = [...anthropicTools]
+      if (cacheEligible) {
+        const lastIdx = toolsWithCache.length - 1
+        toolsWithCache[lastIdx] = {
+          ...toolsWithCache[lastIdx],
+          cache_control: { type: 'ephemeral' as const },
+        } as Anthropic.Tool & { cache_control: { type: 'ephemeral' } }
+      }
+      params.tools = toolsWithCache
     }
 
+    const apiCallTs = Date.now()
     const stream = anthropic.messages.stream(params)
 
+    // ── Latency instrumentation ──
+    let firstTokenTs = 0
+    let tokenCount = 0
+    let textLength = 0
+    let toolCallCount = 0
     let currentToolName = ''
     let currentToolId = ''
     let currentToolInput = ''
@@ -166,7 +189,7 @@ class ClaudeLLMStream extends llm.LLMStream {
           const inputTokens = u.input_tokens ?? 0
           const cachedTokens = (u as unknown as Record<string, number>).cache_read_input_tokens ?? 0
           const cacheCreation = (u as unknown as Record<string, number>).cache_creation_input_tokens ?? 0
-          console.log(`[cache] input=${inputTokens} cached_read=${cachedTokens} cached_creation=${cacheCreation}`)
+          console.log(`[llm-latency] message_start: +${Date.now() - apiCallTs}ms, input=${inputTokens} cached_read=${cachedTokens} cached_creation=${cacheCreation}`)
           this.queue.put({
             id: chunkId,
             usage: {
@@ -182,9 +205,16 @@ class ClaudeLLMStream extends llm.LLMStream {
           currentToolName = event.content_block.name
           currentToolId = event.content_block.id
           currentToolInput = ''
+          toolCallCount++
         }
       } else if (event.type === 'content_block_delta') {
         if (event.delta.type === 'text_delta') {
+          if (!firstTokenTs) {
+            firstTokenTs = Date.now()
+            console.log(`[llm-latency] first text token: +${firstTokenTs - apiCallTs}ms from API call, +${firstTokenTs - runStartTs}ms from run start, text="${event.delta.text.slice(0, 30)}"`)
+          }
+          tokenCount++
+          textLength += event.delta.text.length
           // Stream text directly to TTS — zero buffering
           this.queue.put({
             id: chunkId,
@@ -233,6 +263,23 @@ class ClaudeLLMStream extends llm.LLMStream {
         }
       }
     }
+
+    // ── Print latency summary ──
+    const endTs = Date.now()
+    const ttft = firstTokenTs ? firstTokenTs - apiCallTs : 0
+    const totalDuration = endTs - runStartTs
+    console.log(`[llm-latency] ──── SUMMARY ────`)
+    console.log(`[llm-latency]   model: ${this._model}`)
+    console.log(`[llm-latency]   setup time:    ${apiCallTs - runStartTs}ms  (context conversion + cache breakpoints)`)
+    console.log(`[llm-latency]   TTFT:          ${ttft}ms  (API call → first text token)`)
+    console.log(`[llm-latency]   total:         ${totalDuration}ms`)
+    console.log(`[llm-latency]   tokens: ${tokenCount} (${textLength} chars), tools: ${toolCallCount}`)
+    if (tokenCount > 0 && firstTokenTs) {
+      const streamDuration = endTs - firstTokenTs
+      const tokPerSec = tokenCount / (streamDuration / 1000)
+      console.log(`[llm-latency]   stream rate:   ${tokPerSec.toFixed(0)} tok/s`)
+    }
+    console.log(`[llm-latency] ──── END ────`)
   }
 
   /**

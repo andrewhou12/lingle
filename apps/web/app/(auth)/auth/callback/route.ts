@@ -5,7 +5,7 @@ import { prisma } from '@lingle/db'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/conversation'
+  const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
     const supabase = await createClient()
@@ -31,10 +31,10 @@ export async function GET(request: Request) {
       // Check if user has completed onboarding
       const user = await prisma.user.findUnique({
         where: { id: data.user.id },
-        select: { onboardingCompleted: true },
+        select: { onboardingComplete: true },
       })
 
-      if (!user?.onboardingCompleted) {
+      if (!user?.onboardingComplete) {
         return NextResponse.redirect(`${origin}/onboarding`)
       }
 

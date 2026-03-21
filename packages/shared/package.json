@@ -8,10 +8,6 @@
   "exports": {
     ".": "./src/types.ts",
     "./types": "./src/types.ts",
-    "./languages": "./src/languages.ts",
-    "./filler-words": "./src/filler-words.ts",
-    "./session-plan": "./src/session-plan.ts",
-    "./conversation-prompt": "./src/conversation-prompt.ts",
-    "./scenario-mode": "./src/scenario-mode.ts"
+    "./languages": "./src/languages.ts"
   }
 }

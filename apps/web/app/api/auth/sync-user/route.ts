@@ -34,10 +34,10 @@ export async function POST() {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { onboardingCompleted: true },
+    select: { onboardingComplete: true },
   })
 
   return NextResponse.json({
-    onboardingCompleted: dbUser?.onboardingCompleted ?? false,
+    onboardingCompleted: dbUser?.onboardingComplete ?? false,
   })
 }

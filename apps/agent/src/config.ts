@@ -1,6 +1,7 @@
 /**
  * Voice/language configuration for the LiveKit agent worker.
  */
+import type { StructuredLessonPlan } from '@lingle/shared'
 
 /** Supported TTS providers for the LiveKit agent pipeline */
 export type AgentTtsProvider = 'cartesia' | 'rime'
@@ -24,7 +25,13 @@ export function getSonioxLanguageHints(languageId: string): string[] {
   return map[languageId] || ['ja', 'en']
 }
 
-/** Resolve which STT provider to use: metadata > env > default (deepgram) */
+/** Resolve which STT provider to use: metadata > env > default (deepgram)
+ *
+ * Deepgram Nova-3 is the default because it has significantly faster final
+ * transcript delivery (~200ms lag after speech ends vs Soniox ~600-900ms),
+ * which directly reduces E2E latency. Soniox has faster interim results
+ * but slower finals. Override with AGENT_STT_PROVIDER=soniox to switch back.
+ */
 export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvider {
   if (metadata.sttProvider === 'soniox' || metadata.sttProvider === 'deepgram') {
     return metadata.sttProvider
@@ -33,7 +40,7 @@ export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvid
   if (envProvider === 'soniox' || envProvider === 'deepgram') {
     return envProvider
   }
-  return 'soniox'
+  return 'deepgram'
 }
 
 /** Default Cartesia voice IDs per language (from environment variables) */
@@ -48,20 +55,23 @@ export function getRimeVoiceId(languageCode: string): string {
   return process.env[envKey] || process.env.RIME_VOICE_ID || 'luna'
 }
 
-/** Map language IDs to Deepgram STT language codes */
+/** Map language IDs to Deepgram STT language codes.
+ * Nova-3 supports these natively. Use 'multi' for automatic detection
+ * in multilingual conversations (e.g., learner mixes L1 and L2).
+ */
 export function getDeepgramLanguage(languageId: string): string {
   const map: Record<string, string> = {
     English: 'en',
-    Japanese: 'ja',
-    Korean: 'ko',
-    'Mandarin Chinese': 'zh',
+    Japanese: 'multi',     // Use multi for JP — learners mix Japanese + English
+    Korean: 'multi',       // Same: learners mix Korean + English
+    'Mandarin Chinese': 'multi', // Same: learners mix Chinese + English
     Spanish: 'es',
     French: 'fr',
     German: 'de',
     Italian: 'it',
     Portuguese: 'pt',
   }
-  return map[languageId] || 'ja'
+  return map[languageId] || 'multi'
 }
 
 /** Map language IDs to Cartesia TTS language codes */
@@ -96,21 +106,43 @@ export function getRimeLanguage(languageId: string): string {
   return map[languageId] || 'jpn'
 }
 
-/** Resolve which TTS provider to use: metadata > language-based > env > default */
+/** Resolve which TTS provider to use: metadata > env > language-based > default
+ *
+ * To switch providers, set AGENT_TTS_PROVIDER=cartesia or AGENT_TTS_PROVIDER=rime
+ * in .env. This takes priority over language-based defaults.
+ */
 export function resolveAgentTtsProvider(metadata: AgentMetadata): AgentTtsProvider {
-  // Explicit override from metadata
+  // Explicit override from metadata (per-session)
   if (metadata.ttsProvider === 'rime' || metadata.ttsProvider === 'cartesia') {
     return metadata.ttsProvider
   }
-  // Language-based default: Rime for English + Japanese, Cartesia for everything else
-  if (metadata.targetLanguage === 'English' || metadata.targetLanguage === 'Japanese') return 'rime'
-  if (metadata.targetLanguage) return 'cartesia'
-  // Env fallback when no language is specified
-  const envProvider = process.env.AGENT_TTS_PROVIDER
-  if (envProvider === 'rime' || envProvider === 'cartesia') {
-    return envProvider
-  }
+  // Language-based default: Rime for English, Cartesia for everything else
+  if (metadata.targetLanguage === 'English') return 'rime'
   return 'cartesia'
+}
+
+/** Learner model summary passed to the agent for system prompt construction */
+export interface LearnerModelSummary {
+  cefrGrammar: number
+  cefrFluency: number
+  weakAreas?: string[]
+  sessionsCompleted: number
+}
+
+/** Error pattern summary for the agent prompt */
+export interface ErrorPatternSummary {
+  rule: string
+  occurrenceCount: number
+  sessionCount: number
+}
+
+/** Lesson plan passed from the web app to the agent */
+export interface AgentLessonPlan {
+  warmupTopic: string
+  mainActivity: string
+  targetVocab?: string[]
+  grammarFocus?: string[]
+  reviewPatterns?: string[]
 }
 
 /** Agent metadata passed from the web app via LiveKit job metadata */
@@ -124,9 +156,17 @@ export interface AgentMetadata {
   sessionPlan?: unknown
   sessionMode?: string
   basePrompt?: string
-  analyzeEndpoint?: string
   ttsProvider?: AgentTtsProvider
   sttProvider?: AgentSttProvider
+  // Extended fields for full session mode
+  learnerModel?: LearnerModelSummary
+  errorPatterns?: ErrorPatternSummary[]
+  structuredPlan?: StructuredLessonPlan
+  /** @deprecated Use structuredPlan instead */
+  lessonPlan?: AgentLessonPlan
+  correctionStyle?: 'recast' | 'explicit' | 'none'
+  personalNotes?: string
+  memories?: string
 }
 
 export function parseAgentMetadata(raw: string | undefined): AgentMetadata {

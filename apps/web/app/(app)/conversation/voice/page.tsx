@@ -1,10 +1,12 @@
-import { Suspense } from 'react'
-import { VoiceConversationView } from '@/components/voice/voice-conversation-view'
+'use client'
 
-export default function VoiceConversationPage() {
-  return (
-    <Suspense fallback={<div className="h-screen bg-bg" />}>
-      <VoiceConversationView />
-    </Suspense>
-  )
+import dynamic from 'next/dynamic'
+
+const SessionView = dynamic(
+  () => import('@/components/session/session-view').then((m) => m.SessionView),
+  { ssr: false, loading: () => <div className="h-screen bg-bg" /> },
+)
+
+export default function VoiceSessionPage() {
+  return <SessionView />
 }

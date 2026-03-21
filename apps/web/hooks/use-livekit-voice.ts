@@ -6,10 +6,11 @@ import {
   RoomEvent,
   type RemoteParticipant,
 } from 'livekit-client'
-import { api } from '@/lib/api'
-import type { SessionPlan } from '@/lib/session-plan'
-import type { VoiceState, TranscriptLine, VoiceAnalysisResult } from '@/lib/voice/voice-session-fsm'
-import type { UseVoiceConversationReturn, SectionTracking } from './use-voice-conversation'
+import { api, type PostSessionResult } from '@/lib/api'
+import { useWhiteboard } from '@/components/voice/whiteboard'
+import type { UseVoiceConversationReturn, VoiceState, TranscriptLine } from './use-voice-conversation'
+
+type SessionPlan = Record<string, unknown> | null
 
 /** Strip Cartesia SSML/prosody tags and filler tags from text for display */
 function stripSSML(text: string): string {
@@ -37,6 +38,8 @@ export function useLiveKitVoice(opts: {
   connectedRoom: Room | null
   handleAgentStateChange: (state: string) => void
   handleAgentIdentity: (identity: string) => void
+  whiteboard: ReturnType<typeof useWhiteboard>
+  postSessionResult: PostSessionResult | null
 } {
   const [voiceState, setVoiceState] = useState<VoiceState>('IDLE')
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
@@ -47,13 +50,13 @@ export function useLiveKitVoice(opts: {
   const [sessionPlan, setSessionPlan] = useState<SessionPlan | null>(opts.sessionPlan ?? null)
   const [isTalking, setIsTalking] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [analysisResults, setAnalysisResults] = useState<Record<number, VoiceAnalysisResult>>({})
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [sectionTracking, setSectionTracking] = useState<SectionTracking | null>(null)
   const [spokenSentences, setSpokenSentences] = useState<string[]>([])
   const [currentSentence, setCurrentSentence] = useState<string | null>(null)
   const [partialText, setPartialText] = useState('')
   const [connectedRoom, setConnectedRoom] = useState<Room | null>(null)
+  const [postSessionResult, setPostSessionResult] = useState<PostSessionResult | null>(null)
+
+  const whiteboard = useWhiteboard()
 
   const roomRef = useRef<Room | null>(null)
   const connectingRef = useRef(false)
@@ -110,34 +113,9 @@ export function useLiveKitVoice(opts: {
         const decoded = new TextDecoder().decode(data)
         const message = JSON.parse(decoded)
 
-        if (message.type === 'analysis') {
-          setIsAnalyzing(true)
-          try {
-            const analysisData = JSON.parse(message.data)
-            setAnalysisResults((prev) => ({
-              ...prev,
-              [message.turnIndex]: {
-                corrections: analysisData.corrections || [],
-                vocabularyCards: analysisData.vocabularyCards || [],
-                grammarNotes: analysisData.grammarNotes || [],
-                naturalnessFeedback: analysisData.naturalnessFeedback || [],
-                registerMismatches: analysisData.registerMismatches || [],
-                l1Interference: analysisData.l1Interference || [],
-                alternativeExpressions: analysisData.alternativeExpressions || [],
-                conversationalTips: analysisData.conversationalTips || [],
-                takeaways: analysisData.takeaways || [],
-                sectionTracking: analysisData.sectionTracking,
-              },
-            }))
-
-            if (analysisData.sectionTracking) {
-              setSectionTracking(analysisData.sectionTracking)
-            }
-          } catch {
-            // Partial JSON — ignore
-          } finally {
-            setIsAnalyzing(false)
-          }
+        // Whiteboard messages from agent tools
+        if (typeof message.type === 'string' && message.type.startsWith('whiteboard_')) {
+          whiteboard.handleMessage(message)
         }
       } catch {
         // Not JSON — ignore
@@ -195,9 +173,9 @@ export function useLiveKitVoice(opts: {
   const setupSession = useCallback(() => {
     setTranscript([])
     setSpokenSentences([])
+    setPostSessionResult(null)
     setIsActive(true)
     setDuration(0)
-    setAnalysisResults({})
 
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current)
@@ -230,7 +208,7 @@ export function useLiveKitVoice(opts: {
           sessionPlan: result.plan,
           sessionMode: mode,
           basePrompt: prompt,
-          analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
+          ...(result.agentMetadata ?? {}),
         })
       } catch (err) {
         console.error('[livekit-voice] Failed to start session:', err)
@@ -269,7 +247,6 @@ export function useLiveKitVoice(opts: {
           sessionPlan: existingPlan,
           sessionMode: 'conversation',
           basePrompt: messageText,
-          analyzeEndpoint: `${window.location.origin}/api/conversation/voice-analyze`,
         })
       } catch (err) {
         console.error('[livekit-voice] Failed to start with existing plan:', err)
@@ -347,7 +324,8 @@ export function useLiveKitVoice(opts: {
 
     if (sessionIdRef.current) {
       try {
-        await api.conversationEnd(sessionIdRef.current)
+        const result = await api.conversationEnd(sessionIdRef.current)
+        if (result) setPostSessionResult(result)
       } catch (err) {
         console.error('[livekit-voice] Failed to end session:', err)
       }
@@ -498,10 +476,9 @@ export function useLiveKitVoice(opts: {
     currentSentence,
     currentProgress: 0,
     ttsPlaying: voiceState === 'SPEAKING',
-    analysisResults,
     retryLast,
-    sectionTracking,
-    isAnalyzing,
     inputMode: 'vad' as const,
+    whiteboard,
+    postSessionResult,
   }
 }

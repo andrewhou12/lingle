@@ -523,6 +523,125 @@
   40% { opacity: 1; transform: scale(1); }
 }
 
+/* ── Session UI orb animations (Sesame-style blob morphing) ── */
+
+/* Idle: very gentle breathing + subtle organic shape drift */
+@keyframes session-orb-idle {
+  0%, 100% {
+    border-radius: 50%;
+    transform: scale(1);
+  }
+  25% {
+    border-radius: 48% 52% 51% 49% / 50% 49% 51% 50%;
+    transform: scale(1.005);
+  }
+  50% {
+    border-radius: 50% 50% 49% 51% / 51% 50% 50% 49%;
+    transform: scale(1.01);
+  }
+  75% {
+    border-radius: 51% 49% 50% 50% / 49% 51% 50% 50%;
+    transform: scale(1.005);
+  }
+}
+
+/* Speaking: rhythmic pulsing + more pronounced blob morphing */
+@keyframes session-orb-talk {
+  0%, 100% {
+    border-radius: 50%;
+    transform: scale(1);
+  }
+  12% {
+    border-radius: 46% 54% 52% 48% / 48% 54% 46% 52%;
+    transform: scale(1.04);
+  }
+  25% {
+    border-radius: 52% 48% 46% 54% / 53% 47% 53% 47%;
+    transform: scale(0.98);
+  }
+  37% {
+    border-radius: 48% 52% 54% 46% / 46% 52% 48% 54%;
+    transform: scale(1.05);
+  }
+  50% {
+    border-radius: 54% 46% 48% 52% / 52% 48% 54% 46%;
+    transform: scale(0.97);
+  }
+  62% {
+    border-radius: 47% 53% 52% 48% / 54% 46% 47% 53%;
+    transform: scale(1.03);
+  }
+  75% {
+    border-radius: 53% 47% 46% 54% / 48% 53% 52% 47%;
+    transform: scale(0.99);
+  }
+  87% {
+    border-radius: 49% 51% 53% 47% / 51% 49% 46% 54%;
+    transform: scale(1.02);
+  }
+}
+
+/* Listening: gentle inward compression, responsive feel */
+@keyframes session-orb-listen {
+  0%, 100% {
+    border-radius: 50%;
+    transform: scale(1);
+  }
+  20% {
+    border-radius: 48% 52% 50% 50% / 52% 48% 50% 50%;
+    transform: scale(0.97);
+  }
+  40% {
+    border-radius: 50% 50% 48% 52% / 50% 50% 52% 48%;
+    transform: scale(1.01);
+  }
+  60% {
+    border-radius: 52% 48% 50% 50% / 48% 52% 50% 50%;
+    transform: scale(0.98);
+  }
+  80% {
+    border-radius: 50% 50% 52% 48% / 50% 50% 48% 52%;
+    transform: scale(1.005);
+  }
+}
+
+/* Thinking: slow pulse with opacity fade */
+@keyframes session-orb-think {
+  0%, 100% {
+    border-radius: 50%;
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    border-radius: 48% 52% 52% 48% / 52% 48% 48% 52%;
+    transform: scale(0.96);
+    opacity: 0.7;
+  }
+}
+
+/* Halo ring pulse for listening state */
+@keyframes session-orb-halo {
+  0%, 100% { transform: scale(1); opacity: 0.25; }
+  50% { transform: scale(1.03); opacity: 0.4; }
+}
+
+/* ── Session UI panel animations ── */
+@keyframes session-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes session-slide-right {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes session-panel-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes session-ticker {
+  50% { opacity: 0; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

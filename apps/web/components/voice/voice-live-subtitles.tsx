@@ -2,7 +2,6 @@
 
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LanguageIcon, LightBulbIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/spinner'
 import { useOnboarding } from '@/hooks/use-onboarding'
@@ -314,94 +313,16 @@ export function VoiceLiveSubtitles({
               )}
             </div>
 
-            {/* Action buttons */}
+            {/* Coach mark for word lookup hint */}
             <CoachMark
               hintId="hint_voice_subtitles"
-              content="Tap any word above to look it up instantly. Select a phrase for multi-word lookup. Use Translate and Suggest for quick help."
+              content="Tap any word above to look it up instantly. Select a phrase for multi-word lookup."
               side="bottom"
               show={isDismissed('hint_voice_feedback') && !isDismissed('hint_voice_subtitles') && !!cleanAiText}
               onDismiss={() => dismiss('hint_voice_subtitles')}
             >
-            <div className="flex flex-col items-center gap-2.5 mt-1 pointer-events-auto">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onTranslate?.(cleanAiText)}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[13px] font-sans cursor-pointer transition-colors',
-                    translation
-                      ? 'bg-bg-active border-border-strong text-text-primary font-medium'
-                      : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
-                  )}
-                >
-                  <LanguageIcon className="w-3.5 h-3.5" />
-                  Translate
-                </button>
-                <button
-                  onClick={onSuggest}
-                  disabled={suggestionLoading}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[13px] font-sans cursor-pointer transition-colors',
-                    suggestion || suggestionLoading
-                      ? 'bg-bg-active border-border-strong text-text-primary font-medium'
-                      : 'bg-bg-pure border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary hover:border-border-strong',
-                  )}
-                >
-                  <LightBulbIcon className="w-3.5 h-3.5" />
-                  Suggest
-                </button>
-              </div>
-
-            </div>
+            <div />
             </CoachMark>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Translation card — separate from AI text so it persists when user starts talking */}
-      <AnimatePresence>
-        {translation && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.2 }}
-            className="w-full max-w-[440px] bg-bg-pure border border-border-subtle rounded-lg px-5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)]"
-          >
-            <div className="text-[12px] font-medium text-text-secondary mb-1.5 flex items-center gap-1.5">
-              <LanguageIcon className="w-3.5 h-3.5" />
-              Translation
-            </div>
-            <div className="text-[14px] text-text-primary leading-[1.6] font-sans">
-              {translation}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Suggestion card — separate from translation */}
-      <AnimatePresence>
-        {(suggestion || suggestionLoading) && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.2 }}
-            className="w-full max-w-[440px] bg-bg-pure border border-border-subtle rounded-lg px-5 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,.04),0_1px_4px_rgba(0,0,0,.03)]"
-          >
-            <div className="text-[12px] font-medium text-text-secondary mb-1.5 flex items-center gap-1.5">
-              <LightBulbIcon className="w-3.5 h-3.5" />
-              Suggestion
-            </div>
-            {suggestionLoading ? (
-              <div className="flex items-center gap-2.5 py-1.5">
-                <Spinner size={16} />
-                <span className="text-[13px] text-text-secondary">Thinking of a response...</span>
-              </div>
-            ) : suggestion && (
-              <div className={cn("text-[14px] text-text-primary leading-[1.6] font-sans whitespace-pre-wrap", fontClean)}>
-                {suggestion}
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>

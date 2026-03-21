@@ -1,96 +1,101 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
-import type { LearnerProfile } from '@lingle/shared/types'
 
-type PerLangSettings = Record<string, { difficultyLevel?: number; dailyGoalMinutes?: number }>
-
-function serialize(profile: {
-  id: number; targetLanguage: string; nativeLanguage: string;
-  dailyGoalMinutes: number; difficultyLevel: number; totalSessions: number;
-  currentStreak: number; lastActiveDate: Date | null;
-}): LearnerProfile {
-  return {
-    id: profile.id,
-    targetLanguage: profile.targetLanguage,
-    nativeLanguage: profile.nativeLanguage,
-    dailyGoalMinutes: profile.dailyGoalMinutes,
-    difficultyLevel: profile.difficultyLevel,
-    totalSessions: profile.totalSessions,
-    currentStreak: profile.currentStreak,
-    lastActiveDate: profile.lastActiveDate?.toISOString() ?? null,
-  }
-}
+/**
+ * GET /api/profile — return user profile + learner model
+ * POST /api/profile — create user profile during onboarding
+ * PATCH /api/profile — update user preferences
+ */
 
 export const GET = withAuth(async (_request, { userId }) => {
-  const profile = await prisma.learnerProfile.findUnique({ where: { userId } })
-  if (!profile) return NextResponse.json(null)
-  return NextResponse.json(serialize(profile))
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { learnerModel: true },
+  })
+  if (!user) return NextResponse.json(null)
+
+  return NextResponse.json({
+    targetLanguage: user.targetLanguage,
+    nativeLanguage: user.nativeLanguage,
+    sessionLengthMinutes: user.sessionLengthMinutes,
+    correctionStyle: user.correctionStyle,
+    lessonStylePreference: user.lessonStylePreference,
+    ttsProvider: user.ttsProvider,
+    sttProvider: user.sttProvider,
+    voiceId: user.voiceId,
+    totalLessons: user.totalLessons,
+    cefrGrammar: user.learnerModel?.cefrGrammar ?? null,
+    cefrFluency: user.learnerModel?.cefrFluency ?? null,
+    sessionsCompleted: user.learnerModel?.sessionsCompleted ?? 0,
+  })
 })
 
 export const POST = withAuth(async (request, { userId }) => {
   const body = await request.json()
 
-  // Check if profile already exists
-  const existing = await prisma.learnerProfile.findUnique({ where: { userId } })
-  if (existing) {
-    return NextResponse.json(serialize(existing))
+  // Check if user already has a target language set (onboarded)
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (user?.onboardingComplete) {
+    return NextResponse.json({ alreadyOnboarded: true })
   }
 
-  const [profile] = await prisma.$transaction([
-    prisma.learnerProfile.create({
-      data: {
-        userId,
-        targetLanguage: body.targetLanguage,
-        nativeLanguage: body.nativeLanguage || 'English',
-        selfReportedLevel: body.selfReportedLevel || 'beginner',
-        difficultyLevel: body.difficultyLevel || 2,
-        learningGoals: Array.isArray(body.goals) ? body.goals : [],
-      },
-    }),
+  // Update user with onboarding data + create learner model
+  const [updatedUser] = await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { onboardingCompleted: true },
+      data: {
+        targetLanguage: body.targetLanguage,
+        nativeLanguage: body.nativeLanguage || 'en',
+        onboardingComplete: true,
+        correctionStyle: body.correctionStyle || 'recast',
+        lessonStylePreference: body.lessonStylePreference || 'conversational',
+        sessionLengthMinutes: body.sessionLengthMinutes || 30,
+        personalNotes: body.personalNotes || '',
+      },
+    }),
+    prisma.learnerModel.create({
+      data: {
+        userId,
+        cefrGrammar: body.cefrGrammar || 2.0,
+        cefrFluency: body.cefrFluency || 2.0,
+      },
     }),
   ])
-  return NextResponse.json(serialize(profile))
+
+  return NextResponse.json({
+    targetLanguage: updatedUser.targetLanguage,
+    nativeLanguage: updatedUser.nativeLanguage,
+    onboardingComplete: updatedUser.onboardingComplete,
+  })
 })
 
 export const PATCH = withAuth(async (request, { userId }) => {
   const updates = await request.json()
-  const current = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } })
-  const perLang = (current.perLanguageSettings ?? {}) as PerLangSettings
 
-  // Language switch: save current settings under old language, restore new language's settings
-  if (updates.targetLanguage && updates.targetLanguage !== current.targetLanguage) {
-    const oldLang = current.targetLanguage
-    const newLang = updates.targetLanguage
+  // Only allow specific fields to be updated
+  const allowedUserFields = [
+    'targetLanguage', 'nativeLanguage', 'correctionStyle',
+    'lessonStylePreference', 'sessionLengthMinutes', 'sessionsPerWeek',
+    'topicFocusPreference', 'strugglePatience', 'nativeLanguageSupport',
+    'personalNotes', 'ttsProvider', 'sttProvider', 'voiceId',
+  ] as const
 
-    // Save current top-level settings under old language
-    perLang[oldLang] = {
-      difficultyLevel: current.difficultyLevel,
-      dailyGoalMinutes: current.dailyGoalMinutes,
+  const userUpdates: Record<string, unknown> = {}
+  for (const key of allowedUserFields) {
+    if (updates[key] !== undefined) {
+      userUpdates[key] = updates[key]
     }
-
-    // Restore new language's settings (or defaults)
-    const newSettings = perLang[newLang]
-    updates.difficultyLevel = newSettings?.difficultyLevel ?? 2
-    updates.dailyGoalMinutes = newSettings?.dailyGoalMinutes ?? 30
-    updates.perLanguageSettings = perLang
   }
 
-  // When updating difficulty or daily goal, also persist to per-language JSON
-  if (updates.difficultyLevel !== undefined || updates.dailyGoalMinutes !== undefined) {
-    const lang = updates.targetLanguage ?? current.targetLanguage
-    if (!perLang[lang]) perLang[lang] = {}
-    if (updates.difficultyLevel !== undefined) perLang[lang].difficultyLevel = updates.difficultyLevel
-    if (updates.dailyGoalMinutes !== undefined) perLang[lang].dailyGoalMinutes = updates.dailyGoalMinutes
-    updates.perLanguageSettings = perLang
-  }
-
-  const profile = await prisma.learnerProfile.update({
-    where: { userId },
-    data: updates,
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: userUpdates,
   })
-  return NextResponse.json(serialize(profile))
+
+  return NextResponse.json({
+    targetLanguage: user.targetLanguage,
+    nativeLanguage: user.nativeLanguage,
+    correctionStyle: user.correctionStyle,
+  })
 })

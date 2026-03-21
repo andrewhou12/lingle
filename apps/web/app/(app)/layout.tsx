@@ -5,15 +5,14 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import {
-  ChatBubbleLeftRightIcon,
-  ClockIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   EllipsisHorizontalIcon,
   ArrowRightStartOnRectangleIcon,
   ChevronRightIcon,
   Bars3Icon,
-  BookOpenIcon,
+  PhoneIcon,
+  HomeIcon,
 } from '@heroicons/react/24/outline'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -29,9 +28,6 @@ import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { SUPPORTED_LANGUAGES } from '@/lib/languages'
 import { LanguageProvider, useLanguage } from '@/hooks/use-language'
-import { useOnboarding } from '@/hooks/use-onboarding'
-import { CoachMark } from '@/components/onboarding/coach-mark'
-import { getDifficultyLevel } from '@/lib/difficulty-levels'
 
 /* ── Nav Sections ── */
 
@@ -54,14 +50,13 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Practice',
     items: [
-      { id: 'practice', href: '/conversation', icon: <ChatBubbleLeftRightIcon className={IC} />, label: 'Practice' },
-      { id: 'lessons', href: '/lessons', icon: <BookOpenIcon className={IC} />, label: 'Lessons' },
+      { id: 'dashboard', href: '/dashboard', icon: <HomeIcon className={IC} />, label: 'Dashboard' },
+      { id: 'new-session', href: '/conversation/voice', icon: <PhoneIcon className={IC} />, label: 'New Session' },
     ],
   },
   {
-    label: 'Track',
+    label: 'Account',
     items: [
-      { id: 'progress', href: '/progress', icon: <ClockIcon className={IC} />, label: 'History' },
       { id: 'plan', href: '/upgrade', icon: <CreditCardIcon className={IC} />, label: 'Plan' },
       { id: 'settings', href: '/settings', icon: <Cog6ToothIcon className={IC} />, label: 'Settings' },
     ],
@@ -71,9 +66,9 @@ const NAV_SECTIONS: NavSection[] = [
 /* ── Breadcrumb label map ── */
 
 const BREADCRUMB_MAP: Record<string, string> = {
-  '/conversation': 'Practice',
-  '/lessons': 'Lessons',
-  '/progress': 'History',
+  '/dashboard': 'Dashboard',
+  '/conversation/voice': 'New Session',
+  '/conversation/voice/test': 'Voice Test',
   '/settings': 'Settings',
   '/upgrade': 'Plan',
 }
@@ -95,28 +90,16 @@ function LogoIcon() {
 function UsageBanner() {
   const { targetLanguage } = useLanguage()
   const [usage, setUsage] = useState<{ usedSeconds: number; limitSeconds: number; isLimitReached: boolean; plan: string } | null>(null)
-  const [level, setLevel] = useState<string | null>(null)
-  const [streak, setStreak] = useState<number | null>(null)
-  const [minutesToday, setMinutesToday] = useState<number | null>(null)
   const [goalMinutes, setGoalMinutes] = useState(30)
 
   useEffect(() => {
     api.usageGet().then(setUsage).catch(() => {})
     api.profileGet().then((p) => {
       if (p) {
-        const dl = getDifficultyLevel(p.difficultyLevel)
-        setLevel(dl.label.match(/\(([^)]+)\)/)?.[1] ?? dl.label)
-        setStreak(p.currentStreak)
-        setGoalMinutes(p.dailyGoalMinutes ?? 30)
+        setGoalMinutes(p.sessionLengthMinutes ?? 30)
       }
     }).catch(() => {})
-    api.statsToday().then((s) => {
-      setMinutesToday(s.minutesToday)
-    }).catch(() => {})
   }, [targetLanguage])
-
-  const mins = minutesToday ?? 0
-  const pct = Math.min(100, Math.round((mins / goalMinutes) * 100))
 
   const isPro = usage?.plan === 'pro'
   const usedMinutes = usage ? Math.floor(usage.usedSeconds / 60) : 0
@@ -134,7 +117,7 @@ function UsageBanner() {
           </span>
           <span className="text-[12px] text-text-muted">
             {isPro
-              ? `${mins} / ${goalMinutes} min`
+              ? `${usedMinutes} / ${goalMinutes} min`
               : `${usedMinutes} / ${limitMinutes ?? '?'} min`}
           </span>
         </div>
@@ -144,18 +127,8 @@ function UsageBanner() {
               'h-full rounded-full transition-[width] duration-300',
               !isPro && isAtLimit ? 'bg-accent-warm' : !isPro && isNearLimit ? 'bg-[#d4a017]' : 'bg-accent-brand'
             )}
-            style={{ width: `${isPro ? pct : percentage}%` }}
+            style={{ width: `${percentage}%` }}
           />
-        </div>
-        <div className="flex justify-between mt-2.5">
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">{streak ?? 0}</div>
-            <div className="text-[12px] text-text-muted">day streak</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[13px] font-semibold text-text-primary">{level ?? '--'}</div>
-            <div className="text-[12px] text-text-muted">current level</div>
-          </div>
         </div>
         {usage && !isPro && (
           <Link
@@ -212,7 +185,6 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
               <>
                 <div className="flex flex-col min-w-0 flex-1 text-left">
                   <span className="text-[14px] font-medium text-text-primary truncate leading-tight">{displayName}</span>
-                  <span className="text-[12px] text-text-muted">Intermediate</span>
                 </div>
                 <EllipsisHorizontalIcon className="w-3.5 h-3.5 text-text-muted shrink-0" />
               </>
@@ -268,17 +240,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 function AppLayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { targetLanguage, setTargetLanguage } = useLanguage()
-  const onboarding = useOnboarding()
-  const [hasCompletedSession, setHasCompletedSession] = useState(false)
-
-  // Check if user has completed at least one session (for sidebar hint)
-  useEffect(() => {
-    api.conversationList().then((sessions) => {
-      if (sessions.some((s: { durationSeconds: number | null }) => s.durationSeconds !== null && s.durationSeconds >= 60)) {
-        setHasCompletedSession(true)
-      }
-    }).catch(() => {})
-  }, [])
 
   // Sidebar collapse state with localStorage persistence
   const [collapsed, setCollapsed] = useState(false)
@@ -296,16 +257,13 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
   // Prefetch common data on first mount
   useEffect(() => { api.prefetch() }, [])
 
-  const isActive = (href: string) => {
-    const basePath = href.split('?')[0]
-    return pathname === basePath || pathname.startsWith(basePath + '/')
-  }
-
-  const breadcrumb = BREADCRUMB_MAP[pathname] ?? (pathname.startsWith('/progress/') ? 'Session Details' : '')
+  const breadcrumb = BREADCRUMB_MAP[pathname] ?? ''
   const isVoiceRoute = pathname.startsWith('/conversation/voice')
+  const isOnboardingRoute = pathname.startsWith('/onboarding')
+  const isFullscreen = isVoiceRoute || isOnboardingRoute
 
-  // Voice mode is full-screen — render children with no shell
-  if (isVoiceRoute) {
+  // Voice/onboarding mode is full-screen — render children with no shell
+  if (isFullscreen) {
     return <div style={{ fontFamily: "'Geist Sans', var(--font-sans)" }}>{children}</div>
   }
 
@@ -356,13 +314,6 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
         {!collapsed && <UsageBanner />}
 
         {/* Nav sections */}
-        <CoachMark
-          hintId="hint_sidebar"
-          content="Find your session history and settings here."
-          side="right"
-          show={hasCompletedSession && onboarding.isDismissed('welcome_card') && !onboarding.isDismissed('hint_sidebar')}
-          onDismiss={() => onboarding.dismiss('hint_sidebar')}
-        >
         <nav className={cn('flex-1 overflow-y-auto pb-2.5', collapsed ? 'px-1' : 'px-2.5')}>
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label}>
@@ -374,17 +325,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
               {collapsed && i > 0 && <div className="mx-2 my-2 border-t border-border" />}
               {collapsed && i === 0 && <div className="pt-3" />}
               {section.items.map((item) => {
-                const active = item.id === 'practice'
-                  ? pathname === '/conversation'
-                  : item.id === 'lessons'
-                  ? pathname === '/lessons'
-                  : item.id === 'progress'
-                  ? pathname === '/progress' || pathname.startsWith('/progress/')
-                  : item.id === 'plan'
-                  ? pathname === '/upgrade'
-                  : item.id === 'settings'
-                  ? pathname === '/settings'
-                  : false
+                const active = pathname === item.href || pathname.startsWith(item.href + '/')
 
                 return (
                   <Link
@@ -401,21 +342,12 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
                   >
                     <span className="w-5 flex items-center justify-center shrink-0">{item.icon}</span>
                     {!collapsed && <span className="flex-1 whitespace-nowrap overflow-hidden">{item.label}</span>}
-                    {!collapsed && item.badge !== undefined && (
-                      <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-accent-warm text-white text-[10.5px] font-bold leading-none">
-                        {item.badge}
-                      </span>
-                    )}
-                    {collapsed && item.badge !== undefined && (
-                      <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-accent-warm" />
-                    )}
                   </Link>
                 )
               })}
             </div>
           ))}
         </nav>
-        </CoachMark>
 
         {/* User footer */}
         <UserFooter collapsed={collapsed} />
@@ -454,7 +386,7 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
         </header>
 
         {/* Content */}
-        <div className={cn('p-6 flex-1 overflow-auto', pathname === '/conversation' && 'calligraphy-grid')}>
+        <div className="p-6 flex-1 overflow-auto">
           <div className="relative z-[1] h-full">
             {children}
           </div>

@@ -1,40 +1,36 @@
 import { NextResponse } from 'next/server'
-import { generateText, generateObject } from 'ai'
+import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { z } from 'zod'
 import { withAuth } from '@/lib/api-helpers'
 import { prisma } from '@lingle/db'
-import type { Prisma } from '@prisma/client'
+import { getSessionState, deleteSessionState } from '@/lib/redis'
+import { updateCefrScores } from '@/lib/cefr-updater'
+import { updateErrorPatterns } from '@/lib/error-patterns'
+import { runLongitudinalAnalysis } from '@/lib/longitudinal-analysis'
+import { addMemories } from '@/lib/memory'
 
 export const maxDuration = 120
 
 export const POST = withAuth(async (request, { userId }) => {
-  void userId // used implicitly via dbSession.userId
+  void userId // used implicitly via dbLesson.userId
   const { sessionId } = await request.json()
 
-  const dbSession = await prisma.conversationSession.findUnique({ where: { id: sessionId } })
-  if (!dbSession) return NextResponse.json(null)
+  const dbLesson = await prisma.lesson.findUnique({ where: { id: sessionId } })
+  if (!dbLesson) return NextResponse.json(null)
 
-  const duration = Math.floor((Date.now() - dbSession.timestamp.getTime()) / 1000)
+  const duration = Math.floor((Date.now() - dbLesson.startedAt.getTime()) / 1000)
+  const durationMinutes = Math.floor(duration / 60)
 
-  const transcript = dbSession.transcript as Array<{ role: string; content: string }> | null
+  // ── Step 1: Read session state from Redis ──
+  const sessionState = await getSessionState(sessionId)
 
-  // Run title generation and post-session analysis in parallel
+  // ── Step 2: Generate title ──
   const titlePromise = (async () => {
-    if (!transcript || transcript.length < 2) return undefined
+    if (!dbLesson.lessonGoal) return undefined
     try {
-      const recentMessages = transcript.slice(-10)
-        .map((m) => `${m.role}: ${m.content}`)
-        .join('\n')
-
       const { text } = await generateText({
         model: anthropic('claude-haiku-4-5-20251001'),
-        prompt: `Given this language learning conversation, generate a very short title (3-7 words, English) that captures what was practiced. Be specific and descriptive. Do NOT use quotes. Examples: "Ordering food at a restaurant", "Grammar conjugation drill", "Formal speech practice", "News article breakdown".
-
-Conversation (last messages):
-${recentMessages}
-
-Title:`,
+        prompt: `Generate a very short title (3-7 words, English) for a language lesson about: "${dbLesson.lessonGoal}". Do NOT use quotes.\n\nTitle:`,
         maxOutputTokens: 30,
       })
       return text.trim().replace(/^["']|["']$/g, '')
@@ -44,81 +40,74 @@ Title:`,
     }
   })()
 
-  const analysisPromise = (async () => {
-    if (!transcript || transcript.length < 4) return null
-    try {
-      const fullTranscript = transcript
-        .map((m) => `${m.role}: ${m.content}`)
-        .join('\n')
+  // ── Step 3: Run post-session analysis (in parallel where possible) ──
+  const cefrPromise = sessionState
+    ? updateCefrScores(dbLesson.userId, sessionState)
+    : Promise.resolve({ grammarDelta: 0, fluencyDelta: 0 })
 
-      const postSessionSchema = z.object({
-        targetsHit: z.array(z.string()).describe('Vocabulary/grammar successfully produced by the learner'),
-        errorsLogged: z.array(z.object({
-          errorType: z.string(),
-          contextQuote: z.string(),
-          explanation: z.string(),
-        })),
-        avoidanceEvents: z.array(z.object({
-          pattern: z.string(),
-          contextQuote: z.string(),
-        })),
-        overallAssessment: z.string(),
-        difficultyAppropriate: z.boolean(),
-      })
+  const errorPatternsPromise = sessionState
+    ? updateErrorPatterns(dbLesson.userId, sessionState)
+    : Promise.resolve()
 
-      const { object: analysis } = await generateObject({
-        model: anthropic('claude-haiku-4-5-20251001'),
-        schema: postSessionSchema,
-        prompt: `Analyze this language learning conversation session. Identify what the learner produced correctly, errors they made, and patterns they may be avoiding.
+  const [generatedTitle, cefrResult] = await Promise.all([
+    titlePromise,
+    cefrPromise,
+    errorPatternsPromise,
+  ])
 
-Session transcript:
-${fullTranscript}
-
-Be selective — only flag genuine errors and clear avoidance patterns. Most learner utterances are fine.`,
-      })
-
-      console.log('[end] post-session analysis:', {
-        targetsHit: analysis.targetsHit.length,
-        errors: analysis.errorsLogged.length,
-        avoidance: analysis.avoidanceEvents.length,
-        assessment: analysis.overallAssessment,
-      })
-      return analysis
-    } catch (err) {
-      console.error('[end] Failed to run post-session analysis:', err)
-      return null
-    }
-  })()
-
-  const [generatedTitle, analysis] = await Promise.all([titlePromise, analysisPromise])
-
-  const errorsLogged: Prisma.InputJsonValue = (analysis?.errorsLogged ?? dbSession.errorsLogged ?? []) as unknown as Prisma.InputJsonValue
-  const avoidanceEvents: Prisma.InputJsonValue = (analysis?.avoidanceEvents ?? dbSession.avoidanceEvents ?? []) as unknown as Prisma.InputJsonValue
-
-  // Store the title in sessionPlan JSON
-  const planData = (dbSession.sessionPlan ?? {}) as Record<string, unknown>
-  if (generatedTitle) {
-    planData.generatedTitle = generatedTitle
+  // ── Step 4: Bulk-write error logs ──
+  if (sessionState && sessionState.errorsLogged.length > 0) {
+    await prisma.errorLog.createMany({
+      data: sessionState.errorsLogged.map((e) => ({
+        userId: dbLesson.userId,
+        lessonId: sessionId,
+        errorType: e.errorType,
+        phrase: e.phrase,
+        correction: e.correction,
+        rule: e.rule,
+      })),
+    }).catch((err) => console.error('[end] Failed to write error logs:', err))
   }
 
-  // Run DB writes in parallel
+  // ── Step 5: Generate corrections doc ──
+  let correctionsDoc: string | undefined
+  if (sessionState && sessionState.corrections.length > 0) {
+    correctionsDoc = sessionState.corrections
+      .map((c, i) => {
+        let entry = `${i + 1}. "${c.phrase}" → "${c.correction}" (${c.rule})`
+        if (c.explanation) entry += `\n   ${c.explanation}`
+        return entry
+      })
+      .join('\n\n')
+  }
+
+  // ── Step 6: Update lesson record ──
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   await Promise.all([
-    prisma.conversationSession.update({
+    prisma.lesson.update({
       where: { id: sessionId },
       data: {
-        durationSeconds: duration,
-        sessionPlan: planData as Prisma.InputJsonValue,
-        errorsLogged,
-        avoidanceEvents,
+        endedAt: new Date(),
+        durationMinutes,
+        summary: generatedTitle ?? undefined,
+        errorsCount: sessionState?.errorsLogged.length ?? 0,
+        topicsCovered: sessionState?.topicsCovered ?? [],
+        vocabIntroduced: sessionState?.vocabIntroduced ?? [],
+        phasesCompleted: sessionState?.phasesCompleted?.length
+          ? [...sessionState.phasesCompleted, sessionState.lessonPhase]
+          : sessionState
+            ? [sessionState.lessonPhase]
+            : [],
+        difficultyFinal: sessionState?.difficultyLevel,
+        correctionsDoc,
       },
     }),
     prisma.dailyUsage.upsert({
-      where: { userId_date: { userId: dbSession.userId, date: today } },
+      where: { userId_date: { userId: dbLesson.userId, date: today } },
       create: {
-        userId: dbSession.userId,
+        userId: dbLesson.userId,
         date: today,
         conversationSeconds: duration,
       },
@@ -126,40 +115,55 @@ Be selective — only flag genuine errors and clear avoidance patterns. Most lea
         conversationSeconds: { increment: duration },
       },
     }),
-    (async () => {
-      const profile = await prisma.learnerProfile.findUnique({ where: { userId: dbSession.userId } })
-      if (!profile) return
-
-      const yesterday = new Date(today)
-      yesterday.setDate(yesterday.getDate() - 1)
-
-      let newStreak = profile.currentStreak
-      if (profile.lastActiveDate) {
-        const lastActive = new Date(profile.lastActiveDate)
-        lastActive.setHours(0, 0, 0, 0)
-
-        if (lastActive.getTime() === today.getTime()) {
-          // Already active today — no change
-        } else if (lastActive.getTime() === yesterday.getTime()) {
-          newStreak = profile.currentStreak + 1
-        } else {
-          newStreak = 1
-        }
-      } else {
-        newStreak = 1
-      }
-
-      await prisma.learnerProfile.update({
-        where: { userId: dbSession.userId },
-        data: {
-          currentStreak: newStreak,
-          longestStreak: Math.max(profile.longestStreak, newStreak),
-          lastActiveDate: new Date(),
-          totalSessions: profile.totalSessions + 1,
-        },
-      })
-    })(),
+    prisma.user.update({
+      where: { id: dbLesson.userId },
+      data: {
+        totalMinutes: { increment: durationMinutes },
+      },
+    }),
   ])
 
-  return NextResponse.json(null)
+  // ── Step 6b: Persist between-session data for next planner ──
+  if (sessionState && (sessionState.deferredTopics?.length || sessionState.nextSessionPriority?.length)) {
+    const existingPlan = dbLesson.lessonPlan as Record<string, unknown> | null
+    prisma.lesson.update({
+      where: { id: sessionId },
+      data: {
+        lessonPlan: {
+          ...(existingPlan ?? {}),
+          deferredTopics: sessionState.deferredTopics ?? [],
+          nextSessionPriority: sessionState.nextSessionPriority ?? [],
+        },
+      },
+    }).catch((err) => console.error('[end] Failed to persist between-session data:', err))
+  }
+
+  // ── Step 7: Memory extraction + Longitudinal analysis ──
+  if (sessionState) {
+    // Fire and forget — don't block the response
+    addMemories(dbLesson.userId, sessionState)
+      .catch((err) => console.error('[end] Memory extraction failed:', err))
+  }
+
+  const learnerModel = await prisma.learnerModel.findUnique({
+    where: { userId: dbLesson.userId },
+    select: { sessionsCompleted: true },
+  })
+  if (learnerModel) {
+    runLongitudinalAnalysis(dbLesson.userId, learnerModel.sessionsCompleted)
+      .catch((err) => console.error('[end] Longitudinal analysis failed:', err))
+  }
+
+  // ── Step 8: Clean up Redis ──
+  if (sessionState) {
+    deleteSessionState(sessionId)
+      .catch((err) => console.error('[end] Redis cleanup failed:', err))
+  }
+
+  return NextResponse.json({
+    cefrDelta: cefrResult,
+    errorsCount: sessionState?.errorsLogged.length ?? 0,
+    correctionsCount: sessionState?.corrections.length ?? 0,
+    correctionsDoc: correctionsDoc || null,
+  })
 })
