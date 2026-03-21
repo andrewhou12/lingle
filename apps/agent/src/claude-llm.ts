@@ -120,19 +120,11 @@ class ClaudeLLMStream extends llm.LLMStream {
   }
 
   protected async run(): Promise<void> {
+    const runStartTs = Date.now()
     const { system, messages } = convertChatContext(this.chatCtx)
     const anthropicTools = convertTools(this.toolCtx)
 
     // --- Prompt caching strategy ---
-    // Haiku requires >= 2048 tokens in the cached prefix for caching to activate.
-    // System prompt alone (~150-400 tokens in test mode) is too small.
-    // With tools (~10 tools × ~100 tokens each ≈ 1000 tokens) + system prompt
-    // (~1500 tokens in full session mode), we cross the threshold.
-    // In test mode (no tools), caching won't activate — this is acceptable
-    // since test mode has a minimal prompt and low token count anyway.
-    //
-    // For conversation history: cache up to the second-to-last user message
-    // so only the newest user message is uncached per turn.
     const cachedMessages = this.applyCacheBreakpoints(messages)
 
     // Estimate token count for cache eligibility logging
@@ -175,8 +167,14 @@ class ClaudeLLMStream extends llm.LLMStream {
       params.tools = toolsWithCache
     }
 
+    const apiCallTs = Date.now()
     const stream = anthropic.messages.stream(params)
 
+    // ── Latency instrumentation ──
+    let firstTokenTs = 0
+    let tokenCount = 0
+    let textLength = 0
+    let toolCallCount = 0
     let currentToolName = ''
     let currentToolId = ''
     let currentToolInput = ''
@@ -191,7 +189,7 @@ class ClaudeLLMStream extends llm.LLMStream {
           const inputTokens = u.input_tokens ?? 0
           const cachedTokens = (u as unknown as Record<string, number>).cache_read_input_tokens ?? 0
           const cacheCreation = (u as unknown as Record<string, number>).cache_creation_input_tokens ?? 0
-          console.log(`[cache] input=${inputTokens} cached_read=${cachedTokens} cached_creation=${cacheCreation}`)
+          console.log(`[llm-latency] message_start: +${Date.now() - apiCallTs}ms, input=${inputTokens} cached_read=${cachedTokens} cached_creation=${cacheCreation}`)
           this.queue.put({
             id: chunkId,
             usage: {
@@ -207,9 +205,16 @@ class ClaudeLLMStream extends llm.LLMStream {
           currentToolName = event.content_block.name
           currentToolId = event.content_block.id
           currentToolInput = ''
+          toolCallCount++
         }
       } else if (event.type === 'content_block_delta') {
         if (event.delta.type === 'text_delta') {
+          if (!firstTokenTs) {
+            firstTokenTs = Date.now()
+            console.log(`[llm-latency] first text token: +${firstTokenTs - apiCallTs}ms from API call, +${firstTokenTs - runStartTs}ms from run start, text="${event.delta.text.slice(0, 30)}"`)
+          }
+          tokenCount++
+          textLength += event.delta.text.length
           // Stream text directly to TTS — zero buffering
           this.queue.put({
             id: chunkId,
@@ -258,6 +263,23 @@ class ClaudeLLMStream extends llm.LLMStream {
         }
       }
     }
+
+    // ── Print latency summary ──
+    const endTs = Date.now()
+    const ttft = firstTokenTs ? firstTokenTs - apiCallTs : 0
+    const totalDuration = endTs - runStartTs
+    console.log(`[llm-latency] ──── SUMMARY ────`)
+    console.log(`[llm-latency]   model: ${this._model}`)
+    console.log(`[llm-latency]   setup time:    ${apiCallTs - runStartTs}ms  (context conversion + cache breakpoints)`)
+    console.log(`[llm-latency]   TTFT:          ${ttft}ms  (API call → first text token)`)
+    console.log(`[llm-latency]   total:         ${totalDuration}ms`)
+    console.log(`[llm-latency]   tokens: ${tokenCount} (${textLength} chars), tools: ${toolCallCount}`)
+    if (tokenCount > 0 && firstTokenTs) {
+      const streamDuration = endTs - firstTokenTs
+      const tokPerSec = tokenCount / (streamDuration / 1000)
+      console.log(`[llm-latency]   stream rate:   ${tokPerSec.toFixed(0)} tok/s`)
+    }
+    console.log(`[llm-latency] ──── END ────`)
   }
 
   /**

@@ -116,7 +116,7 @@ class TurnLatencyTracker {
   private ttsFirstTs = 0         // TTS first audio byte
   private eouDelayMs = 0         // total EOU delay (VAD silence + turn detector + endpointing)
   private transcriptionDelayMs = 0 // time to get transcript after speech ended
-  private turnDetectorDelayMs = 0 // turn detector inference time (0 if not using turn detector)
+  private callbackDelayMs = 0    // onUserTurnCompleted callback time (Redis + state injection)
   private llmTtftMs = 0          // LLM TTFT from its own metrics
   private ttsTtfbMs = 0          // TTS TTFB from its own metrics
   private llmTotalMs = 0
@@ -132,14 +132,14 @@ class TurnLatencyTracker {
     }
   }
 
-  /** Called when EOU is committed (after turn detector decision + endpointing delay) */
-  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number, turnDetectorDelayMs?: number) {
+  /** Called when EOU is committed (after VAD + turn detector + endpointing + callback) */
+  markEOU(eouDelayMs: number, transcriptionDelayMs: number, lastSpeakingTimeMs: number, callbackDelayMs?: number) {
     this.turnId++
     this.eouTs = Date.now()
     this.lastSpeakingTs = lastSpeakingTimeMs || Date.now() - eouDelayMs  // fallback: approximate from eouDelay
     this.eouDelayMs = eouDelayMs
     this.transcriptionDelayMs = transcriptionDelayMs
-    this.turnDetectorDelayMs = turnDetectorDelayMs || 0
+    this.callbackDelayMs = callbackDelayMs || 0
     this.sttFinalTs = 0
     this.llmFirstTs = 0
     this.ttsFirstTs = 0
@@ -150,8 +150,8 @@ class TurnLatencyTracker {
     this.llmTokens = 0
     this.ttsTotalMs = 0
     log(`[latency] ──── TURN ${this.turnId} START ────`)
-    const tdInfo = this.turnDetectorDelayMs ? `, turnDetector=${this.turnDetectorDelayMs.toFixed(0)}ms` : ''
-    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms${tdInfo}, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
+    const cbInfo = this.callbackDelayMs ? `, callback=${this.callbackDelayMs.toFixed(0)}ms` : ''
+    log(`[latency] EOU committed (eouDelay=${eouDelayMs.toFixed(0)}ms, transcriptionDelay=${transcriptionDelayMs.toFixed(0)}ms${cbInfo}, lastSpeakingTime=${lastSpeakingTimeMs.toFixed(0)})`)
   }
 
   /** Called when STT emits final transcript */
@@ -190,25 +190,47 @@ class TurnLatencyTracker {
     const wallClockE2E = this.lastSpeakingTs && this.speakingTs ? this.speakingTs - this.lastSpeakingTs : 0
 
     log(`[latency] ──── TURN ${this.turnId} SUMMARY ────`)
-    log(`[latency]   EOU delay:          ${this.eouDelayMs.toFixed(0)}ms  (VAD silence + turn detector + endpointing)`)
-    if (this.turnDetectorDelayMs) {
-      const vadOnly = Math.max(0, this.eouDelayMs - this.turnDetectorDelayMs)
-      log(`[latency]     ├─ VAD+endpointing: ${vadOnly.toFixed(0)}ms`)
-      log(`[latency]     └─ Turn detector:   ${this.turnDetectorDelayMs.toFixed(0)}ms  (MultilingualModel inference)`)
+    log(`[latency]   ┌─ EOU BREAKDOWN ─────────────────────────`)
+    log(`[latency]   │  Total EOU delay:    ${this.eouDelayMs.toFixed(0)}ms  (VAD + turn detector + endpointing)`)
+    if (this.callbackDelayMs) {
+      log(`[latency]   │  onUserTurnCompleted: ${this.callbackDelayMs.toFixed(0)}ms  (Redis + state injection)`)
+      if (this.callbackDelayMs > 100) {
+        log(`[latency]   │     ⚠ Callback >100ms — may be invalidating preemptive gen`)
+      }
     }
-    log(`[latency]   Transcription delay: ${this.transcriptionDelayMs.toFixed(0)}ms`)
-    log(`[latency]   EOU → STT final:    ${sttProcessing}ms`)
-    log(`[latency]   LLM TTFT:           ${this.llmTtftMs.toFixed(0)}ms`)
-    log(`[latency]   LLM total:          ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
-    log(`[latency]   TTS TTFB:           ${this.ttsTtfbMs.toFixed(0)}ms`)
-    log(`[latency]   TTS total:          ${this.ttsTotalMs.toFixed(0)}ms`)
-    log(`[latency]   ─────────────────────────`)
+    log(`[latency]   │  Transcription delay: ${this.transcriptionDelayMs.toFixed(0)}ms  (STT lag behind speech)`)
+    if (this.transcriptionDelayMs > 500) {
+      log(`[latency]   │     ⚠ STT transcription delay >500ms — check STT provider`)
+    }
+    log(`[latency]   │`)
+    log(`[latency]   ├─ PIPELINE STAGES ────────────────────────`)
+    log(`[latency]   │  EOU → STT final:    ${sttProcessing}ms`)
+    log(`[latency]   │  LLM TTFT:           ${this.llmTtftMs.toFixed(0)}ms  ${this.llmTtftMs > 600 ? '⚠ slow (cache miss?)' : ''}`)
+    log(`[latency]   │  LLM total:          ${this.llmTotalMs.toFixed(0)}ms (${this.llmTokens} tokens)`)
+    log(`[latency]   │  TTS TTFB:           ${this.ttsTtfbMs.toFixed(0)}ms  ${this.ttsTtfbMs > 300 ? '⚠ slow' : ''}`)
+    log(`[latency]   │  TTS total:          ${this.ttsTotalMs.toFixed(0)}ms`)
+    log(`[latency]   │`)
+    log(`[latency]   ├─ TOTALS ─────────────────────────────────`)
     if (wallClockE2E) {
-      log(`[latency]   🎯 WALL-CLOCK E2E:  ${wallClockE2E}ms  (VAD silence → agent speaking)`)
+      log(`[latency]   │  WALL-CLOCK E2E:    ${wallClockE2E}ms  (user silent → agent speaking)`)
     }
-    log(`[latency]   Sum E2E (stages):   ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
-    log(`[latency]   * neither includes WebRTC transport or client-side audio playout`)
-    log(`[latency] ──── END TURN ${this.turnId} ────`)
+    log(`[latency]   │  Sum (stages):       ${estimatedE2E.toFixed(0)}ms  (EOU + LLM TTFT + TTS TTFB)`)
+    log(`[latency]   │  + WebRTC overhead:  ~100-200ms`)
+    // Target assessment
+    const target = 800
+    const assessed = wallClockE2E || estimatedE2E
+    if (assessed <= target) {
+      log(`[latency]   │  ✓ Under ${target}ms target`)
+    } else if (assessed <= target * 1.25) {
+      log(`[latency]   │  ~ Close to ${target}ms target (${assessed - target}ms over)`)
+    } else {
+      log(`[latency]   │  ✗ Over ${target}ms target by ${assessed - target}ms`)
+      // Suggest where to optimize
+      if (this.eouDelayMs > 800) log(`[latency]   │    → EOU delay is the bottleneck (reduce minEndpointingDelay?)`)
+      if (this.llmTtftMs > 500) log(`[latency]   │    → LLM TTFT is the bottleneck (prompt cache hit? model choice?)`)
+      if (this.ttsTtfbMs > 250) log(`[latency]   │    → TTS TTFB is the bottleneck (check provider/network)`)
+    }
+    log(`[latency]   └────────────────────────────────────────`)
   }
 }
 
@@ -231,7 +253,13 @@ function buildStt(metadata: AgentMetadata): deepgram.STT | SonioxSTT {
 
   const deepgramLang = getDeepgramLanguage(targetLang)
   log(`STT=deepgram lang=${deepgramLang}`)
-  return new deepgram.STT({ model: 'nova-3', language: deepgramLang })
+  return new deepgram.STT({
+    model: 'nova-3',
+    language: deepgramLang,
+    // interim_results: true is the default in the LiveKit plugin — needed for preemptive gen
+    // smart_format: false to avoid extra processing latency
+    // endpointing: handled by LiveKit's VAD + turn detector, not Deepgram
+  })
 }
 
 function buildTts(metadata: AgentMetadata): tts.TTS {
@@ -254,6 +282,10 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
   const cartesiaLang = getCartesiaLanguage(targetLang)
   const voiceId = metadata.voiceId || getCartesiaVoiceId(cartesiaLang)
   log(`TTS=cartesia-persistent voice=${voiceId} lang=${cartesiaLang}`)
+  // CJK mode: 'fast' (lower latency, per-token + 300ms server buffer) or 'natural' (smooth, client-side buffered)
+  // Toggle with AGENT_CJK_MODE=natural in .env to switch back
+  const cjkMode = (process.env.AGENT_CJK_MODE === 'natural' ? 'natural' : 'fast') as 'natural' | 'fast'
+  log(`TTS=cartesia-persistent voice=${voiceId} lang=${cartesiaLang} cjkMode=${cjkMode}`)
   return new CartesiaPersistentTTS({
     model: 'sonic-3',
     voice: voiceId,
@@ -261,6 +293,8 @@ function buildTts(metadata: AgentMetadata): tts.TTS {
     speed: cartesiaLang === 'ja' ? 0.8 : 1.15,
     sampleRate: 24000,
     wordTimestamps: false,
+    bufferDelayMs: 150,
+    cjkMode,
   })
 }
 
@@ -458,9 +492,18 @@ export default defineAgent({
       turnDetection: turnDetector,
       voiceOptions: {
         preemptiveGeneration: usePreemptiveGen,
-        // Node.js SDK uses MILLISECONDS (not seconds like Python)
-        minEndpointingDelay: 500,
+        // Node.js SDK uses MILLISECONDS (not seconds like Python).
+        // minEndpointingDelay: time to wait after VAD silence before committing turn.
+        //   500ms: safe default, good for natural pauses in speech.
+        //   400ms: slightly faster response, tiny risk of cutting off slow speakers.
+        //   With preemptive generation (Cartesia), LLM starts during this window,
+        //   so reducing it further has diminishing returns.
+        minEndpointingDelay: 400,
         maxEndpointingDelay: 3000,
+        // minInterruptionDuration: how long user must speak to interrupt agent.
+        //   500ms: prevents backchanneling ("うん", "uh-huh") from interrupting.
+        //   Lower values make the agent more responsive to real interruptions
+        //   but risk false interruptions from acknowledgment sounds.
         minInterruptionDuration: 500,
         minInterruptionWords: 0,
       },
@@ -472,8 +515,8 @@ export default defineAgent({
     session.on(voice.AgentSessionEventTypes.MetricsCollected, (ev) => {
       const m = ev.metrics
       if (m.type === 'eou_metrics') {
-        const tdDelay = (m as unknown as { turnDetectorDelayMs?: number }).turnDetectorDelayMs
-        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs, tdDelay)
+        const callbackDelay = (m as unknown as { onUserTurnCompletedDelayMs?: number }).onUserTurnCompletedDelayMs ?? 0
+        turnTracker.markEOU(m.endOfUtteranceDelayMs, m.transcriptionDelayMs, m.lastSpeakingTimeMs, callbackDelay)
       } else if (m.type === 'llm_metrics') {
         turnTracker.markLLM(m.ttftMs, m.durationMs, m.completionTokens)
       } else if (m.type === 'tts_metrics') {

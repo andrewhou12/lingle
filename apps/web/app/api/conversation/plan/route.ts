@@ -445,6 +445,10 @@ export const POST = withAuth(withUsageCheck(async (request, { userId }) => {
     correctionStyle: user.correctionStyle || 'recast',
     personalNotes: user.personalNotes || undefined,
     memories: memoriesText || undefined,
+    // Voice pipeline overrides (null = use defaults)
+    ttsProvider: user.ttsProvider || undefined,
+    sttProvider: user.sttProvider || undefined,
+    voiceId: user.voiceId || undefined,
   }
 
   return NextResponse.json({

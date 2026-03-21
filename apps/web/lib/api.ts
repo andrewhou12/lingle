@@ -7,6 +7,9 @@ interface ProfileResponse {
   sessionLengthMinutes: number
   correctionStyle: string
   lessonStylePreference: string
+  ttsProvider: string | null
+  sttProvider: string | null
+  voiceId: string | null
   totalLessons: number
   cefrGrammar: number | null
   cefrFluency: number | null

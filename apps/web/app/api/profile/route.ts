@@ -21,6 +21,9 @@ export const GET = withAuth(async (_request, { userId }) => {
     sessionLengthMinutes: user.sessionLengthMinutes,
     correctionStyle: user.correctionStyle,
     lessonStylePreference: user.lessonStylePreference,
+    ttsProvider: user.ttsProvider,
+    sttProvider: user.sttProvider,
+    voiceId: user.voiceId,
     totalLessons: user.totalLessons,
     cefrGrammar: user.learnerModel?.cefrGrammar ?? null,
     cefrFluency: user.learnerModel?.cefrFluency ?? null,
@@ -75,7 +78,7 @@ export const PATCH = withAuth(async (request, { userId }) => {
     'targetLanguage', 'nativeLanguage', 'correctionStyle',
     'lessonStylePreference', 'sessionLengthMinutes', 'sessionsPerWeek',
     'topicFocusPreference', 'strugglePatience', 'nativeLanguageSupport',
-    'personalNotes',
+    'personalNotes', 'ttsProvider', 'sttProvider', 'voiceId',
   ] as const
 
   const userUpdates: Record<string, unknown> = {}

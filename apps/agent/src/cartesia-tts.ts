@@ -34,6 +34,28 @@ export interface CartesiaTTSOptions {
   baseUrl?: string
   apiVersion?: string
   wordTimestamps?: boolean
+  /**
+   * Cartesia server-side buffer delay in ms for Latin languages.
+   * CJK languages use client-side buffering by default (see cjkMode).
+   *
+   * - 0: Client-side buffering only (original behavior)
+   * - 150: Per-token streaming with server-side accumulation (recommended for Latin)
+   */
+  bufferDelayMs?: number
+  /**
+   * CJK audio quality mode. Controls the latency/quality tradeoff for
+   * Japanese, Korean, and Chinese where LLM tokens are small (1-2 chars)
+   * and arrive slowly (300ms+ apart).
+   *
+   * - 'natural' (default): Client-side buffering at punctuation/6 chars.
+   *   Smooth audio, no splits. ~200-280ms client buffer overhead.
+   *
+   * - 'fast': Per-token streaming with max_buffer_delay_ms=300.
+   *   ~200ms faster TTFB. Cartesia accumulates 300ms of tokens before
+   *   synthesizing. Usually captures 1-2 tokens for decent prosody,
+   *   but occasionally splits on slow tokens ("so"..."u" instead of "sou").
+   */
+  cjkMode?: 'natural' | 'fast'
 }
 
 const DEFAULTS = {
@@ -177,7 +199,12 @@ class SynthesizeStream extends tts.SynthesizeStream {
     this.#opts = opts
   }
 
+  get #isCJK(): boolean {
+    return ['ja', 'ko', 'zh'].includes(this.#opts.language || 'en')
+  }
+
   #buildPacket() {
+    const isCJK = this.#isCJK
     const packet: Record<string, unknown> = {
       model_id: this.#opts.model,
       voice: { mode: 'id', id: this.#opts.voice },
@@ -188,7 +215,12 @@ class SynthesizeStream extends tts.SynthesizeStream {
       },
       language: this.#opts.language,
       add_timestamps: this.#opts.wordTimestamps,
-      max_buffer_delay_ms: 0,
+      // CJK natural: client-side buffering, server synthesizes immediately (0).
+      // CJK fast: per-token, server accumulates 300ms of tokens.
+      // Latin: per-token, server accumulates bufferDelayMs of tokens.
+      max_buffer_delay_ms: isCJK
+        ? (this.#opts.cjkMode === 'fast' ? 300 : 0)
+        : (this.#opts.bufferDelayMs ?? 0),
     }
 
     if (this.#opts.speed !== undefined) {
@@ -201,6 +233,18 @@ class SynthesizeStream extends tts.SynthesizeStream {
   protected async run(): Promise<void> {
     const apiKey = this.#opts.apiKey || process.env.CARTESIA_API_KEY || ''
     let ws: WebSocket
+
+    // ── Latency instrumentation ──
+    const streamStartTs = Date.now()
+    let firstTokenTs = 0        // first LLM token received by TTS
+    let firstSendTs = 0         // first text chunk sent to Cartesia WS
+    let firstAudioTs = 0        // first audio chunk received from Cartesia
+    let firstFrameQueuedTs = 0  // first audio frame put into output queue
+    let chunksSent = 0
+    let chunksReceived = 0
+    let totalAudioBytes = 0
+    let totalTextSent = ''
+    let doneTs = 0
 
     try {
       ws = await getOrCreateWebSocket({
@@ -222,6 +266,9 @@ class SynthesizeStream extends tts.SynthesizeStream {
 
     const sendLastFrame = (final: boolean) => {
       if (lastFrame && !this.queue.closed) {
+        if (!firstFrameQueuedTs) {
+          firstFrameQueuedTs = Date.now()
+        }
         this.queue.put({
           requestId: contextId,
           segmentId: contextId,
@@ -267,7 +314,13 @@ class SynthesizeStream extends tts.SynthesizeStream {
           }
 
           if (msg.type === 'chunk' && msg.data) {
+            if (!firstAudioTs) {
+              firstAudioTs = Date.now()
+              console.log(`[cartesia-latency] (${contextId}) first audio chunk: +${firstAudioTs - streamStartTs}ms from stream start, +${firstSendTs ? firstAudioTs - firstSendTs : '?'}ms from first send`)
+            }
+            chunksReceived++
             const audioBuffer = Buffer.from(msg.data, 'base64')
+            totalAudioBytes += audioBuffer.length
             const audioData = audioBuffer.buffer.slice(
               audioBuffer.byteOffset,
               audioBuffer.byteOffset + audioBuffer.byteLength,
@@ -277,6 +330,7 @@ class SynthesizeStream extends tts.SynthesizeStream {
               lastFrame = frame
             }
           } else if (msg.type === 'done') {
+            doneTs = Date.now()
             // Flush remaining audio
             for (const frame of bstream.flush()) {
               sendLastFrame(false)
@@ -292,14 +346,41 @@ class SynthesizeStream extends tts.SynthesizeStream {
       }
     }
 
-    // Process text input and send to Cartesia
+    // Process text input and send to Cartesia.
+    //
+    // Language-aware buffering:
+    //
+    // CJK (ja, ko, zh): Client-side buffering ONLY. Haiku outputs Japanese
+    //   at ~1-3 tok/s with 1-2 char tokens. Per-token streaming causes choppy
+    //   audio ("so"..."u" instead of "sou") because neither the 80ms timer nor
+    //   max_buffer_delay_ms=150 can accumulate multiple tokens — they arrive
+    //   300ms+ apart. Client-side buffering at punctuation/char-count boundaries
+    //   gives Cartesia enough context for natural prosody.
+    //
+    // Latin (en, es, fr, etc.): Hybrid mode. Buffered first chunk (2+ words)
+    //   for prosody context, then per-token with server-side buffering
+    //   (max_buffer_delay_ms). LLM outputs Latin at 10-40 tok/s with 1-2 word
+    //   tokens, so the server buffer captures multiple tokens before synthesizing.
+    //
+    const isCJK = this.#isCJK
+    const cjkFastMode = isCJK && this.#opts.cjkMode === 'fast'
+    // Per-token after first chunk: Latin always (if bufferDelayMs>0), or CJK in fast mode
+    const usePerTokenAfterFirst = cjkFastMode || (!isCJK && (this.#opts.bufferDelayMs ?? 0) > 0)
+
     const inputTask = async () => {
-      let buffer = ''
       let sentAnything = false
-      const MIN_WORDS = 1  // Send at first punctuation after any word
+      let firstChunkSent = false
+      let buffer = ''
 
       const sendChunk = (text: string, isContinue: boolean) => {
         if (ws.readyState !== WebSocket.OPEN) return
+        if (!firstSendTs) {
+          firstSendTs = Date.now()
+          const mode = cjkFastMode ? 'cjk-fast' : isCJK ? 'cjk-natural' : (usePerTokenAfterFirst ? 'latin-hybrid' : 'latin-buffered')
+          console.log(`[cartesia-latency] (${contextId}) first chunk sent: +${firstSendTs - streamStartTs}ms from stream start, mode=${mode}, text="${text.slice(0, 60).trim()}"`)
+        }
+        chunksSent++
+        totalTextSent += text
         const msg = {
           ...packet,
           context_id: contextId,
@@ -310,42 +391,99 @@ class SynthesizeStream extends tts.SynthesizeStream {
         sentAnything = true
       }
 
+      // Time-based first-send for Latin and CJK fast mode.
+      // CJK natural mode doesn't use the timer — waits for 6 chars/punctuation.
+      let firstSendTimer: ReturnType<typeof setTimeout> | null = null
+      const useTimer = !isCJK || cjkFastMode
+
+      const startFirstSendTimer = () => {
+        if (!useTimer || firstChunkSent || firstSendTimer) return
+        firstSendTimer = setTimeout(() => {
+          firstSendTimer = null
+          if (!firstChunkSent && buffer.trim()) {
+            sendChunk(buffer + ' ', true)
+            buffer = ''
+            firstChunkSent = true
+          }
+        }, 80)
+      }
+
       for await (const data of this.input) {
         if (this.abortSignal.aborted) break
 
+        if (!firstTokenTs) firstTokenTs = Date.now()
+
         if (data === SynthesizeStream.FLUSH_SENTINEL) {
-          // Flush buffered text
           if (buffer.trim()) {
             sendChunk(buffer + ' ', true)
             buffer = ''
+            firstChunkSent = true
           }
+          if (firstSendTimer) { clearTimeout(firstSendTimer); firstSendTimer = null }
           continue
         }
 
         buffer += data
 
-        // Send when we have enough text for Cartesia to start synthesizing.
-        // Japanese/CJK has no spaces, so word-count doesn't work — use char count.
-        const words = buffer.trim().split(/\s+/)
         const hasPunctuation = /[.!?。！？、,;:—\n]/.test(buffer)
         const charCount = buffer.trim().length
 
-        if (words.length >= MIN_WORDS && hasPunctuation) {
-          sendChunk(buffer + ' ', true)
+        if (!firstChunkSent) {
+          // ── FIRST CHUNK ──
+          if (useTimer) startFirstSendTimer()
+
+          if (isCJK && !cjkFastMode) {
+            // CJK natural: punctuation or 6+ chars (no timer)
+            if (hasPunctuation && charCount >= 2) {
+              sendChunk(buffer + ' ', true)
+              buffer = ''
+              firstChunkSent = true
+            } else if (charCount >= 6) {
+              sendChunk(buffer + ' ', true)
+              buffer = ''
+              firstChunkSent = true
+            }
+          } else {
+            // Latin first chunk: punctuation, 2 words, or 80ms timer
+            const words = buffer.trim().split(/\s+/)
+            if (hasPunctuation && charCount >= 1) {
+              if (firstSendTimer) { clearTimeout(firstSendTimer); firstSendTimer = null }
+              sendChunk(buffer + ' ', true)
+              buffer = ''
+              firstChunkSent = true
+            } else if (words.length >= 2 && /\s$/.test(buffer)) {
+              if (firstSendTimer) { clearTimeout(firstSendTimer); firstSendTimer = null }
+              sendChunk(buffer + ' ', true)
+              buffer = ''
+              firstChunkSent = true
+            }
+          }
+        } else if (usePerTokenAfterFirst) {
+          // ── SUBSEQUENT (Latin per-token) ──
+          // Send accumulated buffer + new token directly. Cartesia's
+          // server-side max_buffer_delay_ms handles prosody timing.
+          sendChunk(buffer, true)
           buffer = ''
-        } else if (charCount >= 6 && hasPunctuation) {
-          // CJK: send at punctuation after ~6 chars (~2-3 Japanese words)
-          sendChunk(buffer + ' ', true)
-          buffer = ''
-        } else if (charCount >= 12) {
-          // CJK: force send after ~12 chars even without punctuation
-          sendChunk(buffer + ' ', true)
-          buffer = ''
-        } else if (words.length >= 4) {
-          // Latin: force send after 4 words even without punctuation
-          sendChunk(buffer + ' ', true)
-          buffer = ''
+        } else {
+          // ── SUBSEQUENT (client-side buffered — CJK or bufferDelayMs=0) ──
+          if (hasPunctuation) {
+            sendChunk(buffer + ' ', true)
+            buffer = ''
+          } else if (charCount >= 12) {
+            sendChunk(buffer + ' ', true)
+            buffer = ''
+          } else if (!isCJK && buffer.trim().split(/\s+/).length >= 4) {
+            sendChunk(buffer + ' ', true)
+            buffer = ''
+          }
         }
+      }
+
+      if (firstSendTimer) { clearTimeout(firstSendTimer); firstSendTimer = null }
+
+      // Send remaining buffer
+      if (buffer.trim()) {
+        sendChunk(buffer + ' ', true)
       }
 
       // If aborted (preemptive generation cancelled), close the Cartesia context
@@ -364,29 +502,20 @@ class SynthesizeStream extends tts.SynthesizeStream {
         if (!this.queue.closed) {
           this.queue.put(SynthesizeStream.END_OF_STREAM)
         }
+        console.log(`[cartesia-latency] (${contextId}) ABORTED +${Date.now() - streamStartTs}ms`)
         return
-      }
-
-      // Send remaining buffer
-      if (buffer.trim()) {
-        sendChunk(buffer + ' ', true)
       }
 
       // Send end-of-input — but only if we actually sent text.
       // Cartesia rejects empty/whitespace-only transcripts.
       if (sentAnything) {
-        // Flush to force immediate synthesis of any buffered text
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            ...packet,
-            context_id: contextId,
-            transcript: '',
-            continue: true,
-            flush: true,
-          }))
-        }
-        // Close the context
+        // Close the context with continue: false. This tells Cartesia to
+        // synthesize any remaining buffered text and send a "done" message.
+        // The recvTask will handle the "done" message and signal completion.
+        // No sleep needed — Cartesia processes the close signal and returns
+        // all remaining audio before sending "done".
         sendChunk(' ', false)
+        console.log(`[cartesia-latency] (${contextId}) context closed (no flush delay)`)
       } else {
         // Nothing to synthesize (tool-only turn) — signal done immediately
         done = true
@@ -401,6 +530,25 @@ class SynthesizeStream extends tts.SynthesizeStream {
     } finally {
       messageHandlers.delete(contextId)
       // Don't close the WebSocket — it's shared across turns
+
+      // ── Print latency summary ──
+      const endTs = Date.now()
+      const ttfb = firstAudioTs && firstSendTs ? firstAudioTs - firstSendTs : 0
+      const tokenToSend = firstSendTs && firstTokenTs ? firstSendTs - firstTokenTs : 0
+      const totalDuration = endTs - streamStartTs
+      const audioMs = totalAudioBytes / (this.#opts.sampleRate * 2) * 1000  // 16-bit PCM
+      console.log(`[cartesia-latency] (${contextId}) ──── SUMMARY ────`)
+      console.log(`[cartesia-latency]   stream duration:    ${totalDuration}ms`)
+      console.log(`[cartesia-latency]   first token → send: ${tokenToSend}ms  (client buffering)`)
+      console.log(`[cartesia-latency]   send → first audio: ${ttfb}ms  (Cartesia TTFB)`)
+      console.log(`[cartesia-latency]   first audio → queue:${firstFrameQueuedTs && firstAudioTs ? firstFrameQueuedTs - firstAudioTs : 0}ms  (frame processing)`)
+      console.log(`[cartesia-latency]   chunks sent/recv:   ${chunksSent}/${chunksReceived}`)
+      console.log(`[cartesia-latency]   audio: ${(audioMs / 1000).toFixed(1)}s (${totalAudioBytes} bytes)`)
+      console.log(`[cartesia-latency]   text: "${totalTextSent.slice(0, 80).trim()}"`)
+      if (this.abortSignal.aborted) {
+        console.log(`[cartesia-latency]   ⚠ ABORTED (preemptive gen cancelled)`)
+      }
+      console.log(`[cartesia-latency] ──── END ────`)
     }
   }
 }

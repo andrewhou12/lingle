@@ -25,7 +25,13 @@ export function getSonioxLanguageHints(languageId: string): string[] {
   return map[languageId] || ['ja', 'en']
 }
 
-/** Resolve which STT provider to use: metadata > env > default (deepgram) */
+/** Resolve which STT provider to use: metadata > env > default (deepgram)
+ *
+ * Deepgram Nova-3 is the default because it has significantly faster final
+ * transcript delivery (~200ms lag after speech ends vs Soniox ~600-900ms),
+ * which directly reduces E2E latency. Soniox has faster interim results
+ * but slower finals. Override with AGENT_STT_PROVIDER=soniox to switch back.
+ */
 export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvider {
   if (metadata.sttProvider === 'soniox' || metadata.sttProvider === 'deepgram') {
     return metadata.sttProvider
@@ -34,7 +40,7 @@ export function resolveAgentSttProvider(metadata: AgentMetadata): AgentSttProvid
   if (envProvider === 'soniox' || envProvider === 'deepgram') {
     return envProvider
   }
-  return 'soniox'
+  return 'deepgram'
 }
 
 /** Default Cartesia voice IDs per language (from environment variables) */
@@ -49,20 +55,23 @@ export function getRimeVoiceId(languageCode: string): string {
   return process.env[envKey] || process.env.RIME_VOICE_ID || 'luna'
 }
 
-/** Map language IDs to Deepgram STT language codes */
+/** Map language IDs to Deepgram STT language codes.
+ * Nova-3 supports these natively. Use 'multi' for automatic detection
+ * in multilingual conversations (e.g., learner mixes L1 and L2).
+ */
 export function getDeepgramLanguage(languageId: string): string {
   const map: Record<string, string> = {
     English: 'en',
-    Japanese: 'ja',
-    Korean: 'ko',
-    'Mandarin Chinese': 'zh',
+    Japanese: 'multi',     // Use multi for JP — learners mix Japanese + English
+    Korean: 'multi',       // Same: learners mix Korean + English
+    'Mandarin Chinese': 'multi', // Same: learners mix Chinese + English
     Spanish: 'es',
     French: 'fr',
     German: 'de',
     Italian: 'it',
     Portuguese: 'pt',
   }
-  return map[languageId] || 'ja'
+  return map[languageId] || 'multi'
 }
 
 /** Map language IDs to Cartesia TTS language codes */

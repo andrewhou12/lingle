@@ -147,6 +147,74 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Voice & AI */}
+      <span className="text-[11px] font-medium text-text-muted block mb-3">
+        Voice & AI
+      </span>
+
+      <div className="rounded-xl border border-border bg-bg mb-6">
+        <div className="flex flex-col">
+          <SettingsSelect
+            icon={<span className="text-[12px]">&#127908;</span>}
+            label="TTS Provider"
+            saved={savedField === 'ttsProvider'}
+            options={[
+              { value: '', label: 'Auto', description: 'Rime for English, Cartesia for others' },
+              { value: 'cartesia', label: 'Cartesia', description: 'Sonic-3 — low latency, multilingual' },
+              { value: 'rime', label: 'Rime', description: 'Arcana — natural English voices' },
+            ]}
+            value={profile.ttsProvider ?? ''}
+            onChange={(v) => updateField('ttsProvider', v || null)}
+          />
+          <hr className="border-t border-border m-0" />
+
+          <SettingsSelect
+            icon={<span className="text-[12px]">&#127897;</span>}
+            label="STT Provider"
+            saved={savedField === 'sttProvider'}
+            options={[
+              { value: '', label: 'Auto', description: 'Deepgram Nova-3 (default)' },
+              { value: 'deepgram', label: 'Deepgram', description: 'Nova-3 — fast finals, lower E2E' },
+              { value: 'soniox', label: 'Soniox', description: 'Realtime preview — fast interims' },
+            ]}
+            value={profile.sttProvider ?? ''}
+            onChange={(v) => updateField('sttProvider', v || null)}
+          />
+          <hr className="border-t border-border m-0" />
+
+          {/* Voice ID */}
+          <div className="py-3 px-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-7 h-7 rounded-md bg-bg-secondary shrink-0 text-text-secondary flex items-center justify-center">
+                <span className="text-[12px]">&#128483;</span>
+              </div>
+              <span className="text-[13px] font-medium flex-1">Voice ID</span>
+              {savedField === 'voiceId' && (
+                <span className="text-[11px] text-green font-medium flex items-center gap-1">
+                  <CheckIcon className="w-3 h-3" /> Saved
+                </span>
+              )}
+            </div>
+            <div className="ml-10">
+              <input
+                type="text"
+                value={profile.voiceId ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value || null
+                  setProfile({ ...profile, voiceId: val })
+                }}
+                onBlur={() => updateField('voiceId', profile.voiceId || null)}
+                placeholder="Leave blank for default voice"
+                className="w-full px-3 py-1.5 rounded-lg text-[13px] border border-border bg-bg-pure text-text-primary placeholder:text-text-muted/50 outline-none focus:border-accent-brand/50"
+              />
+              <span className="text-[11px] text-text-muted mt-1 block">
+                Cartesia: voice UUID &middot; Rime: speaker name (e.g. yukiko, luna)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Stats (read-only) */}
       <span className="text-[11px] font-medium text-text-muted block mb-3">
         Progress

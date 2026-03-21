@@ -38,6 +38,11 @@ model User {
   totalLessons          Int      @default(0) @map("total_lessons")
   totalMinutes          Int      @default(0) @map("total_minutes")
 
+  // Voice pipeline preferences (optional overrides — null = use defaults)
+  ttsProvider           String?  @map("tts_provider")    // 'cartesia' | 'rime' | null
+  sttProvider           String?  @map("stt_provider")    // 'deepgram' | 'soniox' | null
+  voiceId               String?  @map("voice_id")        // provider-specific voice/speaker ID
+
   // Relations
   learnerModel  LearnerModel?
   lessons       Lesson[]

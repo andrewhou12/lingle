@@ -29,6 +29,8 @@ export class LingleAgent extends voice.Agent {
   private metadata: AgentMetadata
   private turnIndex = 0
   private contextSummary: string | null = null
+  /** Last injected session state signature — skip re-injection if unchanged to preserve preemptive gen */
+  private lastStateSignature = ''
 
   constructor(metadata: AgentMetadata) {
     // Build base tools + whiteboard tools
@@ -95,31 +97,78 @@ export class LingleAgent extends voice.Agent {
 
     this.turnIndex++
 
-    // Inject live session state (Slot 3) into system prompt
+    // Inject live session state (Slot 3) into system prompt.
+    // CRITICAL FOR PREEMPTIVE GEN: Only mutate the chat context if the
+    // session state actually changed semantically. If we always mutate,
+    // the framework detects a context change and cancels the preemptive
+    // response — forcing a full LLM re-generation (+300-600ms E2E).
+    // By skipping injection when state hasn't changed, preemptive gen
+    // responses survive and we save the full LLM TTFT.
     if (this.metadata.sessionId) {
-      this.injectSessionState(chatCtx).catch((err) => {
+      try {
+        await this.injectSessionStateIfChanged(chatCtx)
+      } catch (err) {
         console.error('[LingleAgent] Session state injection failed:', err)
-      })
+      }
     }
 
-    // Context management: summarize old turns when context grows too large
-    await this.maybeCompressContext(chatCtx)
+    // Context management: summarize old turns when context grows too large.
+    // Fire-and-forget to avoid blocking the LLM response — compression uses
+    // a Haiku API call (~500-1000ms) which would destroy latency if awaited.
+    // The chat context is modified in place, but by the time compression
+    // finishes the LLM is already streaming. This is safe because compression
+    // only affects older messages that the LLM has already processed.
+    this.maybeCompressContext(chatCtx).catch((err) => {
+      console.error('[LingleAgent] Context compression failed:', err)
+    })
 
   }
 
   /**
    * Read session state from Redis and inject it into the system message
-   * as Slot 3 content. This ensures every LLM call sees the latest
-   * error counts, lesson phase, and difficulty constraints.
+   * ONLY if semantically important fields changed since last injection.
+   *
+   * This is critical for preemptive generation: if we always mutate the
+   * chat context, the framework cancels the preemptive response every turn,
+   * adding 300-600ms to E2E latency. By only mutating when the state
+   * actually changes (lesson phase, difficulty, error count thresholds),
+   * preemptive responses survive most turns.
+   *
+   * Fields that trigger re-injection:
+   * - lessonPhase / currentPhaseIndex (phase changed)
+   * - difficultyLevel (difficulty adjusted)
+   * - errorsLogged.length crossing a threshold (new errors matter for correction mode)
+   * - timePressure changing category (on_track → slightly_over)
+   *
+   * Fields that do NOT trigger re-injection:
+   * - elapsedMinutes (changes every turn, non-critical)
+   * - phaseStartedAt (timestamp, non-critical)
+   * - vocabIntroduced / topicsCovered (nice-to-have, not response-critical)
    */
-  private async injectSessionState(chatCtx: llm.ChatContext): Promise<void> {
+  private async injectSessionStateIfChanged(chatCtx: llm.ChatContext): Promise<void> {
     const state = await getSessionState(this.metadata.sessionId)
     if (!state) return
 
+    // Build a signature from semantically important fields
+    const sig = [
+      state.lessonPhase,
+      state.currentPhaseIndex,
+      state.difficultyLevel,
+      Math.floor(state.errorsLogged.length / 3), // re-inject every 3 errors
+      state.timePressure,
+      state.corrections.length > 0 ? 'has-corrections' : 'no-corrections',
+    ].join('|')
+
+    if (sig === this.lastStateSignature) {
+      console.log(`[LingleAgent] session state unchanged (turn ${this.turnIndex}), skipping injection — preemptive gen preserved`)
+      return
+    }
+
+    this.lastStateSignature = sig
     const stateBlock = serializeForPrompt(state)
 
     // Persist for dev panel inspection + log to console
-    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}) ──\n${stateBlock}\n── END INJECTED PROMPT ──`)
+    console.log(`[LingleAgent] ── INJECTED PROMPT (turn ${this.turnIndex}, sig changed: ${sig}) ──\n${stateBlock}\n── END INJECTED PROMPT ──`)
     updateSessionState(this.metadata.sessionId, { _devLastInjectedPrompt: stateBlock })
       .catch((err) => console.error('[LingleAgent] Failed to persist dev prompt:', err))
 
